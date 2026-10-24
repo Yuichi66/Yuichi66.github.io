@@ -3,10 +3,10 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Half Term Reading Challenge</title>
+<title>Half Term Challenge</title>
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-title" content="Reading">
+<meta name="apple-mobile-web-app-title" content="Challenge">
 <meta name="apple-mobile-web-app-status-bar-style" content="black">
 <meta name="theme-color" content="#e3350d">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
@@ -21,10 +21,10 @@
     --navy: #1b2a4a;
     --ink: #1d1d1f;
     --paper: #fffdf5;
-    --grey: #d9d9d9;
     --gold: #f5b700;
     --green: #2fb36d;
     --purple: #7b3fe4;
+    --cyan: #6cf;
   }
   * { box-sizing: border-box; }
   body {
@@ -48,34 +48,22 @@
   header .sub { font-size: 18px; margin-top: 4px; opacity: .9; }
   .dates { display: inline-block; margin-top: 8px; padding: 4px 14px; border-radius: 20px; background: rgba(255,255,255,.15); }
   .sync { font-size: 13px; margin-top: 6px; opacity: .85; }
+  .sync.error { color: #ffb3a7; opacity: 1; font-weight: bold; }
 
-  /* pokemon sprites (PokeAPI) */
+  /* ---------- pokemon sprites (PokeAPI) ---------- */
   .sprite { image-rendering: pixelated; image-rendering: crisp-edges; display: block; }
   .header-mons { display: flex; justify-content: center; gap: 2px; margin-top: 6px; flex-wrap: wrap; }
   .header-mons .sprite { width: 64px; height: 64px; animation: hop 1.6s ease-in-out infinite; }
   .header-mons .sprite:nth-child(2n) { animation-delay: .4s; }
   .header-mons .sprite:nth-child(3n) { animation-delay: .8s; }
   @keyframes hop { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-8px); } }
-  .card-red { position: relative; overflow: hidden; }
-  .card-red .partner { position: absolute; right: -6px; top: -4px; width: 120px; height: 120px; filter: drop-shadow(0 3px 0 rgba(0,0,0,.35)); }
-  .card-red .name, .card-red .rank { position: relative; }
-  .card-red .evo { position: relative; padding-right: 0; }
-  .entry .mon-sprite { width: 72px; height: 72px; margin: -8px -6px -8px auto; }
-  .whos { display: flex; align-items: center; gap: 12px; background: linear-gradient(135deg, #2a75bb, #1b4f8a); color: #fff; border: 3px solid #000; border-radius: 14px; padding: 6px 14px; margin-bottom: 12px; }
-  .whos .sprite { width: 84px; height: 84px; filter: brightness(0); }
-  .whos b { color: var(--yellow); font-size: 20px; display: block; }
-  .overlay .pop { width: 220px; height: 220px; animation: pop .6s ease-out; }
-  @keyframes pop { from { transform: scale(.2) translateY(60px); opacity: 0; } to { transform: scale(1); opacity: 1; } }
-  .credit { color: #fff; opacity: .55; font-size: 11px; text-align: center; margin-bottom: 20px; }
-  .sync.error { color: #ffb3a7; opacity: 1; font-weight: bold; }
-  .btn[disabled] { opacity: .6; cursor: wait; }
 
   /* ---------- trainer tabs ---------- */
-  .tabs { display: flex; gap: 12px; justify-content: center; margin: 16px 0; flex-wrap: wrap; }
+  .tabs { display: flex; gap: 10px; justify-content: center; margin: 16px 0; flex-wrap: wrap; }
   .tab {
     display: flex; align-items: center; gap: 10px;
-    border: 4px solid #000; border-radius: 40px; padding: 8px 22px 8px 8px;
-    font-size: 22px; font-weight: bold; cursor: pointer;
+    border: 4px solid #000; border-radius: 40px; padding: 6px 20px 6px 6px;
+    font-size: 20px; font-weight: bold; cursor: pointer; font-family: inherit;
     background: #fff; color: var(--ink);
   }
   .tab.active { background: var(--yellow); box-shadow: 0 0 0 4px var(--red); }
@@ -93,7 +81,6 @@
   }
   .ball.great { background: linear-gradient(#2a75bb 0 46%, #000 46% 54%, #fff 54% 100%); }
   .ball.ultra { background: linear-gradient(var(--gold) 0 46%, #000 46% 54%, #fff 54% 100%); box-shadow: 0 0 10px var(--gold); }
-  .ball.master { background: linear-gradient(#7b3fe4 0 46%, #000 46% 54%, #fff 54% 100%); }
   .ball.empty { background: linear-gradient(#bbb 0 46%, #888 46% 54%, #eee 54% 100%); border-color: #888; opacity: .55; }
   .ball.empty::after { border-color: #888; }
 
@@ -102,15 +89,17 @@
     background: var(--paper); border: 4px solid #000; border-radius: 18px;
     padding: 16px; margin-bottom: 16px; box-shadow: 6px 6px 0 rgba(0,0,0,.35);
   }
-  .panel h2 { margin: 0 0 12px; font-size: 22px; display: flex; align-items: center; gap: 8px; }
+  .panel h2 { margin: 0 0 12px; font-size: 22px; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .panel.bey-panel { background: linear-gradient(160deg, #eaf4ff, #fffdf5 60%); }
+  .two { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 16px; }
+  @media (max-width: 720px) { .two { grid-template-columns: minmax(0, 1fr); } }
 
   /* trainer card */
-  .trainer { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 16px; }
-  @media (max-width: 720px) { .trainer { grid-template-columns: minmax(0, 1fr); } }
-  .card-red { background: linear-gradient(135deg, var(--red), var(--red-dark)); color: #fff; border-radius: 14px; padding: 14px; border: 3px solid #000; }
-  .card-red .name { font-size: 28px; font-weight: bold; }
-  .rank { display: inline-block; margin-top: 6px; background: var(--yellow); color: #000; padding: 3px 12px; border-radius: 12px; font-weight: bold; }
-  .evo { margin-top: 10px; font-size: 15px; }
+  .card-red { position: relative; overflow: hidden; background: linear-gradient(135deg, var(--red), var(--red-dark)); color: #fff; border-radius: 14px; padding: 14px; border: 3px solid #000; }
+  .card-red .partner { position: absolute; right: -6px; top: -4px; width: 120px; height: 120px; filter: drop-shadow(0 3px 0 rgba(0,0,0,.35)); }
+  .card-red .name { font-size: 28px; font-weight: bold; position: relative; }
+  .rank { display: inline-block; margin-top: 6px; background: var(--yellow); color: #000; padding: 3px 12px; border-radius: 12px; font-weight: bold; position: relative; }
+  .evo { margin-top: 10px; font-size: 15px; position: relative; }
   .evo span { display: inline-block; padding: 2px 8px; border-radius: 10px; background: rgba(255,255,255,.2); margin: 2px 0; }
   .evo span.on { background: var(--yellow); color: #000; font-weight: bold; }
 
@@ -118,6 +107,7 @@
   .hp { height: 22px; border: 3px solid #000; border-radius: 12px; background: #333; overflow: hidden; }
   .hp > div { height: 100%; width: 0; background: linear-gradient(90deg, var(--green), #7be495); transition: width .8s; }
   .hp.low > div { background: linear-gradient(90deg, #f0a500, #ffd36b); }
+  .hp.bey > div { background: linear-gradient(90deg, var(--blue), var(--cyan)); }
 
   .stats { display: flex; gap: 10px; margin-top: 12px; flex-wrap: wrap; }
   .stat { flex: 1; min-width: 90px; text-align: center; background: #fff; border: 3px solid #000; border-radius: 12px; padding: 6px; }
@@ -130,18 +120,22 @@
     background: radial-gradient(ellipse at center, #3b4f7a 0, #1b2a4a 60%, #0b1224 100%);
     border: 4px solid #000; overflow: hidden; display: flex; align-items: center; justify-content: center;
   }
-  .blade { width: 90px; height: 90px; animation: spin 0.6s linear infinite; filter: drop-shadow(0 0 8px #6cf); }
+  .blade { width: 90px; height: 90px; animation: spin 0.6s linear infinite; filter: drop-shadow(0 0 8px var(--cyan)); }
   .blade.slow { animation-duration: 2.4s; filter: none; opacity: .7; }
+  .blade.lv1 { animation-duration: .45s; }
+  .blade.lv2 { animation-duration: .3s; filter: drop-shadow(0 0 12px var(--yellow)); }
+  .blade.lv3 { animation-duration: .18s; filter: drop-shadow(0 0 16px var(--red)); }
   @keyframes spin { to { transform: rotate(360deg); } }
   .bp { color: #fff; position: absolute; bottom: 8px; width: 100%; text-align: center; font-weight: bold; }
   .bp b { color: var(--yellow); font-size: 22px; }
+  .bey-name { position: absolute; top: 8px; width: 100%; text-align: center; color: var(--cyan); font-weight: bold; letter-spacing: 1px; }
   .finishes { font-size: 13px; margin-top: 8px; line-height: 1.6; }
-  .finishes .chip { display: inline-block; padding: 1px 8px; border-radius: 10px; border: 2px solid #000; margin-right: 4px; font-weight: bold; }
+  .chip { display: inline-block; padding: 1px 8px; border-radius: 10px; border: 2px solid #000; margin-right: 4px; font-weight: bold; }
   .chip.spin { background: #9fd3ff; }
   .chip.burst { background: #ffb36b; }
   .chip.xtreme { background: var(--yellow); }
 
-  /* gym badge days */
+  /* daily rows */
   .days { display: grid; grid-template-columns: repeat(9, 1fr); gap: 8px; }
   @media (max-width: 720px) { .days { grid-template-columns: repeat(3, 1fr); } }
   .day {
@@ -153,15 +147,18 @@
   .day .dname { font-weight: bold; font-size: 14px; }
   .day .ddate { font-size: 12px; color: #555; }
   .day .ball { margin: 8px auto 4px; width: 46px; height: 46px; }
+  .day .mini { width: 46px; height: 46px; margin: 8px auto 4px; display: block; }
+  .day .mini.off { opacity: .25; filter: grayscale(1); }
+  .day .mini.on { animation: spin .5s linear infinite; }
   .day .tag { font-size: 11px; font-weight: bold; }
   .double { position: absolute; top: -10px; right: -8px; background: var(--purple); color: #fff; font-size: 11px; padding: 2px 6px; border-radius: 10px; border: 2px solid #000; }
 
-  /* form */
-  form .row { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 10px; }
+  /* forms */
+  form .row, .row { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 10px; }
   label { font-weight: bold; font-size: 14px; display: block; margin-bottom: 3px; }
   .field { flex: 1; min-width: 140px; }
   input, select {
-    width: 100%; font-size: 18px; padding: 8px 10px; border: 3px solid #000; border-radius: 10px; font-family: inherit;
+    width: 100%; font-size: 18px; padding: 8px 10px; border: 3px solid #000; border-radius: 10px; font-family: inherit; background: #fff;
   }
   .score-row { display: flex; align-items: center; gap: 6px; }
   .score-row input { width: 70px; text-align: center; }
@@ -169,14 +166,28 @@
   .btn {
     font-family: inherit; font-size: 22px; font-weight: bold; cursor: pointer;
     padding: 12px 24px; border: 4px solid #000; border-radius: 40px;
-    background: var(--red); color: #fff; box-shadow: 0 5px 0 #000;
+    background: var(--red); color: #fff; box-shadow: 0 5px 0 #000; text-decoration: none; display: inline-block;
   }
   .btn:active { transform: translateY(4px); box-shadow: 0 1px 0 #000; }
+  .btn[disabled] { opacity: .6; cursor: wait; }
   .btn.small { font-size: 14px; padding: 6px 14px; box-shadow: 0 3px 0 #000; }
   .btn.blue { background: var(--blue); }
-  .btn.grey { background: #777; }
+  .btn.go { background: linear-gradient(135deg, #7b3fe4, #2a75bb); font-size: 20px; }
   .hint { font-size: 13px; color: #444; margin-top: 6px; }
-  .links a { display: inline-block; margin: 4px 8px 0 0; color: var(--blue); font-weight: bold; }
+
+  /* quiz / game launch buttons */
+  .launch { display: flex; gap: 10px; flex-wrap: wrap; margin: 6px 0 14px; }
+  .launch a {
+    flex: 1; min-width: 150px; text-align: center; text-decoration: none; color: #000; font-weight: bold;
+    border: 3px solid #000; border-radius: 14px; padding: 10px 8px; background: var(--yellow); box-shadow: 0 4px 0 #000;
+  }
+  .launch a small { display: block; font-weight: normal; font-size: 12px; margin-top: 2px; }
+  .launch a.alt { background: #fff; }
+  .launch a:active { transform: translateY(3px); box-shadow: 0 1px 0 #000; }
+
+  .whos { display: flex; align-items: center; gap: 12px; background: linear-gradient(135deg, #2a75bb, #1b4f8a); color: #fff; border: 3px solid #000; border-radius: 14px; padding: 6px 14px; margin-bottom: 12px; }
+  .whos .sprite { width: 84px; height: 84px; filter: brightness(0); }
+  .whos b { color: var(--yellow); font-size: 20px; display: block; }
 
   /* book-dex */
   .dex { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 10px; }
@@ -186,6 +197,7 @@
   .entry .ball { width: 34px; height: 34px; }
   .entry .mon { font-weight: bold; }
   .entry .type { display: inline-block; font-size: 11px; color: #fff; padding: 1px 7px; border-radius: 8px; }
+  .entry .mon-sprite { width: 72px; height: 72px; margin: -8px -6px -8px auto; }
   .entry .title { margin-top: 6px; font-size: 15px; }
   .entry .meta { font-size: 12px; color: #555; margin-top: 4px; }
   .entry .del { position: absolute; top: 6px; right: 6px; border: none; background: none; cursor: pointer; font-size: 14px; color: #999; }
@@ -196,11 +208,13 @@
   .chest { font-size: 70px; line-height: 1; }
   .chest.locked { filter: grayscale(1); opacity: .6; }
   .prize .msg { font-size: 18px; font-weight: bold; margin: 8px 0; }
+  .prize .need { font-size: 14px; color: #444; }
 
   /* settings */
-  details.settings { color: #fff; margin: 8px 0 30px; }
+  details.settings { color: #fff; margin: 8px 0 12px; }
   details.settings summary { cursor: pointer; opacity: .8; }
   details.settings .panel { color: var(--ink); margin-top: 8px; }
+  .credit { color: #fff; opacity: .55; font-size: 11px; text-align: center; margin-bottom: 20px; }
 
   /* overlay animation */
   .overlay {
@@ -208,21 +222,31 @@
     align-items: center; justify-content: center; flex-direction: column; z-index: 10; color: #fff; text-align: center; padding: 16px;
   }
   .overlay.show { display: flex; }
-  .overlay .big { font-size: 46px; font-weight: bold; color: var(--yellow); text-shadow: 3px 3px 0 var(--red); }
-  .overlay .mid { font-size: 24px; margin-top: 10px; }
+  .overlay .big { font-size: 44px; font-weight: bold; color: var(--yellow); text-shadow: 3px 3px 0 var(--red); }
+  .overlay .mid { font-size: 22px; margin-top: 10px; }
   .overlay .ball.huge { width: 140px; height: 140px; border-width: 6px; animation: wobble .5s ease-in-out 3; }
   .overlay .ball.huge::after { border-width: 6px; }
-  .overlay .blade { width: 160px; height: 160px; animation-duration: .25s; }
-  @keyframes wobble { 0%,100% { transform: rotate(0); } 25% { transform: rotate(-22deg); } 75% { transform: rotate(22deg); } }
+  .overlay .blade { width: 160px; height: 160px; animation-duration: .2s; }
+  .overlay .pop { width: 220px; height: 220px; animation: pop .6s ease-out; }
   .overlay .btn { margin-top: 24px; }
   .flash { animation: flash .6s ease-out; }
+  @keyframes wobble { 0%,100% { transform: rotate(0); } 25% { transform: rotate(-22deg); } 75% { transform: rotate(22deg); } }
+  @keyframes pop { from { transform: scale(.2) translateY(60px); opacity: 0; } to { transform: scale(1); opacity: 1; } }
   @keyframes flash { from { transform: scale(.4); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+  .hidden { display: none !important; }
 </style>
 </head>
 <body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="bey" viewBox="0 0 100 100">
+    <polygon points="50,2 61,35 97,38 68,58 79,94 50,72 21,94 32,58 3,38 39,35" fill="#2a75bb" stroke="#000" stroke-width="3"/>
+    <circle cx="50" cy="50" r="22" fill="#e3350d" stroke="#000" stroke-width="3"/>
+    <circle cx="50" cy="50" r="9" fill="#ffcb05" stroke="#000" stroke-width="3"/>
+  </symbol>
+</svg>
 <div class="wrap">
   <header>
-    <h1>HALF TERM READING CHALLENGE</h1>
+    <h1>HALF TERM CHALLENGE</h1>
     <div class="sub">Gotta read 'em all! &nbsp;|&nbsp; 3... 2... 1... LET IT RIP!</div>
     <div class="dates" id="dates"></div>
     <div class="sync" id="sync"></div>
@@ -231,7 +255,7 @@
 
   <div class="tabs" id="tabs"></div>
 
-  <section class="trainer">
+  <section class="two">
     <div class="panel">
       <h2><span class="ball"></span> Trainer Card</h2>
       <div class="card-red">
@@ -241,7 +265,7 @@
         <div class="evo" id="evo"></div>
       </div>
       <div style="margin-top:14px">
-        <div class="hp-label"><span>Challenge HP</span><span id="hpText"></span></div>
+        <div class="hp-label"><span>📖 Reading HP</span><span id="hpText"></span></div>
         <div class="hp" id="hp"><div></div></div>
       </div>
       <div class="stats">
@@ -251,32 +275,32 @@
       </div>
     </div>
 
-    <div class="panel">
+    <div class="panel bey-panel">
       <h2>🌀 Bey Stadium</h2>
       <div class="stadium">
-        <svg class="blade slow" id="blade" viewBox="0 0 100 100" aria-hidden="true">
-          <polygon points="50,2 61,35 97,38 68,58 79,94 50,72 21,94 32,58 3,38 39,35" fill="#2a75bb" stroke="#000" stroke-width="3"/>
-          <circle cx="50" cy="50" r="22" fill="#e3350d" stroke="#000" stroke-width="3"/>
-          <circle cx="50" cy="50" r="9" fill="#ffcb05" stroke="#000" stroke-width="3"/>
-        </svg>
+        <div class="bey-name" id="beyName"></div>
+        <svg class="blade slow" id="blade" viewBox="0 0 100 100" aria-hidden="true"><use href="#bey" xlink:href="#bey"/></svg>
         <div class="bp">Battle Points: <b id="bp">0</b></div>
       </div>
       <div class="finishes">
-        <span class="chip spin">SPIN FINISH +1</span> 80% or more<br>
-        <span class="chip burst">BURST FINISH +2</span> 90% or more<br>
-        <span class="chip xtreme">XTREME FINISH +3</span> 100% perfect!
+        <span class="chip spin">SPIN FINISH +1</span> book quiz 80%+<br>
+        <span class="chip burst">BURST FINISH +2</span> book quiz 90%+<br>
+        <span class="chip xtreme">XTREME FINISH +3</span> book quiz 100%<br>
+        <span id="mathsChip"><span class="chip spin">BATTLE WIN +2</span> 10 min Times Tables</span>
       </div>
     </div>
   </section>
 
+  <!-- ================= READING ================= -->
   <section class="panel">
-    <h2>🏅 Gym Badges (1 book a day)</h2>
+    <h2>🏅 Gym Badges <small style="font-weight:normal;font-size:15px">(read 1 book a day)</small></h2>
     <div class="days" id="days"></div>
     <div class="hint">Red ball = passed. Blue ball = 90%+. Gold ball = 100%. "DOUBLE!" = 2 books in one day.</div>
   </section>
 
   <section class="panel">
     <h2>📖 I finished a book!</h2>
+    <div class="launch" id="readLinks"></div>
     <form id="form" autocomplete="off">
       <div class="whos">
         <img class="sprite" id="whosSprite" alt="">
@@ -289,7 +313,7 @@
         </div>
         <div class="field">
           <label for="fDate">Day</label>
-          <select id="fDate"></select>
+          <select id="fDate" class="day-select"></select>
         </div>
       </div>
       <div class="row">
@@ -312,11 +336,6 @@
       </div>
       <button class="btn" type="submit">🎯 THROW POKé BALL!</button>
       <div class="hint">You need 80% or more to catch it. (8 out of 10)</div>
-      <div class="links">
-        <a href="https://readnquiz.com/" target="_blank" rel="noopener">ReadnQuiz</a>
-        <a href="https://www.freebookquiz.com/" target="_blank" rel="noopener">Free Book Quiz</a>
-        <a href="https://www.arbookfind.co.uk/" target="_blank" rel="noopener">AR Book Finder (book level)</a>
-      </div>
     </form>
   </section>
 
@@ -325,23 +344,64 @@
     <div class="dex" id="dex"></div>
   </section>
 
+  <!-- ================= MATHS ================= -->
+  <section class="panel bey-panel" id="mathsSection">
+    <h2>⚔️ Bey Battle Training <small style="font-weight:normal;font-size:15px">(Times Tables, 10 min a day)</small></h2>
+    <div class="launch">
+      <a id="ttrsLink" href="#" target="_blank" rel="noopener">🎸 Times Tables Rock Stars<small>Log in with your school username</small></a>
+      <a class="alt" href="https://www.topmarks.co.uk/maths-games/hit-the-button" target="_blank" rel="noopener">🔘 Hit the Button<small>Free bonus game</small></a>
+    </div>
+    <div class="days" id="mathsDays"></div>
+    <div style="margin-top:14px">
+      <div class="hp-label"><span>⚔️ Battle wins</span><span id="mathsText"></span></div>
+      <div class="hp bey" id="mathsHp"><div></div></div>
+    </div>
+    <form id="mathsForm" autocomplete="off" style="margin-top:14px">
+      <div class="row">
+        <div class="field">
+          <label for="mMinutes">Minutes played today</label>
+          <input id="mMinutes" type="number" min="1" max="120" required placeholder="10">
+        </div>
+        <div class="field">
+          <label for="mDate">Day</label>
+          <select id="mDate" class="day-select"></select>
+        </div>
+        <div class="field">
+          <label for="mSite">Game</label>
+          <select id="mSite">
+            <option>Times Tables Rock Stars</option>
+            <option>Hit the Button</option>
+          </select>
+        </div>
+      </div>
+      <button class="btn go" type="submit">🚀 LET IT RIP! I trained!</button>
+      <div class="hint">10 minutes or more = BATTLE WIN!</div>
+    </form>
+  </section>
+
+  <!-- ================= PRIZE ================= -->
   <section class="panel prize">
     <h2 style="justify-content:center">🎁 Champion Prize</h2>
     <div class="chest locked" id="chest">🎁</div>
     <div class="msg" id="prizeMsg"></div>
-    <button class="btn blue" id="openPrize" type="button" style="display:none">OPEN THE PRIZE!</button>
+    <div class="need" id="prizeNeed"></div>
+    <button class="btn blue hidden" id="openPrize" type="button">OPEN THE PRIZE!</button>
   </section>
 
   <details class="settings">
     <summary>⚙ Settings (for grown-ups)</summary>
     <div class="panel">
-      <div class="row" style="display:flex;gap:10px;flex-wrap:wrap">
+      <div class="row">
         <div class="field">
-          <label for="sTarget">Target (books passed)</label>
+          <label for="sTarget">Books to pass (<span id="sKid"></span>)</label>
           <input id="sTarget" type="number" min="1" max="30">
         </div>
+        <div class="field" id="sMathsField">
+          <label for="sMaths">Battle wins needed</label>
+          <input id="sMaths" type="number" min="1" max="30">
+        </div>
         <div class="field" style="flex:2">
-          <label for="sPrize">Prize</label>
+          <label for="sPrize">Prize (<span id="sKid2"></span>)</label>
           <input id="sPrize" maxlength="80">
         </div>
       </div>
@@ -366,17 +426,22 @@
   // Google Apps Script web app URL (shared Google Sheet). Empty = this device only.
   var API_URL = "";
   var REFRESH_MS = 60000;
-  var STORAGE_KEY = "htrc-2026-autumn";
+  var STORAGE_KEY = "htrc-2026-autumn-v2";
   var START = new Date(2026, 9, 24);   // Sat 24 Oct 2026
   var DAY_COUNT = 9;                   // to Sun 1 Nov 2026
   var PRIZE_DAY_INDEX = 8;             // Sun 1 Nov
   var PASS_RATE = 0.8;
   var BURST_RATE = 0.9;
+  var MATHS_WIN_MINUTES = 10;
+  var MATHS_WIN_POINTS = 2;
+  var CATCH_WOBBLE_MS = 1500;
+  var TTRS_URL = "https://play.ttrockstars.com/auth/school/student/29597";
   var KIDS = [
-    { id: "taiga", name: "TAIGA" },
-    { id: "leo", name: "LEO" }
+    { id: "taiga", name: "TAIGA", maths: true, target: 7, mathsTarget: 7, ks: "KS2" },
+    { id: "leo", name: "LEO", maths: true, target: 7, mathsTarget: 7, ks: "KS2" },
+    { id: "yudai", name: "YUDAI", maths: false, target: 5, mathsTarget: 0, ks: "KS3" }
   ];
-  var DEFAULTS = { target: 7, prize: "Mystery Prize!" };
+  var DEFAULT_PRIZE = "Mystery Prize!";
 
   // [name, type, colour, national dex number]
   var MONS = [
@@ -393,11 +458,8 @@
   ];
   var SPRITE_BASE = "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/";
   var HEADER_MONS = [25, 4, 7, 1, 133];
-  var CATCH_WOBBLE_MS = 1500;
-  var RANKS = [
-    [0, "Rookie Trainer"], [2, "Gym Challenger"], [4, "Ace Trainer"],
-    [6, "Elite Four"]
-  ];
+  var RANKS = [[0, "Rookie Trainer"], [2, "Gym Challenger"], [4, "Ace Trainer"], [6, "Elite Four"]];
+  var BEY_LEVELS = ["Starter Bey", "Burst Bey", "Xtreme Bey", "CHAMPION BEY"];
   var EVOLUTION = ["Charmander", "Charmeleon", "Charizard"];
   var EVOLUTION_IDS = [4, 5, 6];
   var DAY_NAMES = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
@@ -405,19 +467,31 @@
   var state = load();
   var current = KIDS[0].id;
 
-  // ---------- storage (works even when blocked) ----------
+  // ---------- local cache (works even when storage is blocked) ----------
+  function emptyState() {
+    var s = { settings: { targets: {}, mathsTargets: {}, prizes: {} }, kids: {} };
+    KIDS.forEach(function (k) {
+      s.settings.targets[k.id] = k.target;
+      s.settings.mathsTargets[k.id] = k.mathsTarget;
+      s.settings.prizes[k.id] = DEFAULT_PRIZE;
+      s.kids[k.id] = { entries: [], maths: [] };
+    });
+    return s;
+  }
   function load() {
-    var base = { target: DEFAULTS.target, prize: DEFAULTS.prize, kids: {} };
+    var base = emptyState();
     try {
       var raw = window.localStorage.getItem(STORAGE_KEY);
-      if (raw) {
-        var parsed = JSON.parse(raw);
-        if (parsed && typeof parsed === "object") base = parsed;
+      var parsed = raw ? JSON.parse(raw) : null;
+      if (parsed && parsed.settings && parsed.kids) {
+        KIDS.forEach(function (k) {
+          if (parsed.kids[k.id]) base.kids[k.id] = parsed.kids[k.id];
+          ["targets", "mathsTargets", "prizes"].forEach(function (f) {
+            if (parsed.settings[f] && parsed.settings[f][k.id] !== undefined) base.settings[f][k.id] = parsed.settings[f][k.id];
+          });
+        });
       }
     } catch (e) { /* storage unavailable: start fresh */ }
-    for (var i = 0; i < KIDS.length; i++) {
-      if (!base.kids[KIDS[i].id]) base.kids[KIDS[i].id] = { entries: [] };
-    }
     return base;
   }
   function save() {
@@ -425,21 +499,328 @@
     catch (e) { /* ignore: page still works for this session */ }
   }
 
+  // ---------- helpers ----------
+  function el(id) { return document.getElementById(id); }
+  function make(tag, cls, text) {
+    var n = document.createElement(tag);
+    if (cls) n.className = cls;
+    if (text !== undefined) n.textContent = text;
+    return n;
+  }
+  function kid() { return KIDS.filter(function (k) { return k.id === current; })[0]; }
+  function data() { return state.kids[current]; }
+  function target() { return state.settings.targets[current]; }
+  function mathsTarget() { return state.settings.mathsTargets[current]; }
+  function prize() { return state.settings.prizes[current] || DEFAULT_PRIZE; }
+  function dayDate(i) { return new Date(START.getFullYear(), START.getMonth(), START.getDate() + i); }
+  function todayIndex() {
+    var now = new Date();
+    var t = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    return Math.round((t - START) / 86400000);
+  }
+  function fmt(d) { return DAY_NAMES[d.getDay()] + " " + d.getDate() + " " + (d.getMonth() === 9 ? "Oct" : "Nov"); }
+  function rate(e) { return e.score / e.total; }
+  function isPass(e) { return rate(e) >= PASS_RATE; }
+  function isWin(m) { return m.minutes >= MATHS_WIN_MINUTES; }
+  function ballClass(e) {
+    if (!isPass(e)) return "empty";
+    if (e.score === e.total) return "ultra";
+    if (rate(e) >= BURST_RATE) return "great";
+    return "";
+  }
+  function finishOf(e) {
+    if (e.score === e.total) return { name: "XTREME FINISH", pts: 3 };
+    if (rate(e) >= BURST_RATE) return { name: "BURST FINISH", pts: 2 };
+    if (isPass(e)) return { name: "SPIN FINISH", pts: 1 };
+    return null;
+  }
+  function spriteUrl(dexNo) { return SPRITE_BASE + dexNo + ".png"; }
+  // Pixel sprite <img>; hides itself if the picture cannot load (offline).
+  function sprite(dexNo, cls, alt) {
+    var img = document.createElement("img");
+    img.className = "sprite " + (cls || "");
+    img.alt = alt || "";
+    img.onerror = function () { img.style.visibility = "hidden"; };
+    img.src = spriteUrl(dexNo);
+    return img;
+  }
+  function setSprite(img, dexNo, alt) {
+    img.onerror = function () { img.style.visibility = "hidden"; };
+    img.style.visibility = "";
+    img.alt = alt || "";
+    if (img.getAttribute("src") !== spriteUrl(dexNo)) img.src = spriteUrl(dexNo);
+  }
+  var SVG_NS = "http://www.w3.org/2000/svg";
+  function beySvg(cls) {
+    var svg = document.createElementNS(SVG_NS, "svg");
+    svg.setAttribute("viewBox", "0 0 100 100");
+    svg.setAttribute("class", cls);
+    var use = document.createElementNS(SVG_NS, "use");
+    use.setAttribute("href", "#bey");
+    use.setAttributeNS("http://www.w3.org/1999/xlink", "xlink:href", "#bey");
+    svg.appendChild(use);
+    return svg;
+  }
+  function newId() { return Date.now() + "-" + Math.floor(Math.random() * 1e6); }
+
+  function summary() {
+    var d = data();
+    var caught = d.entries.filter(isPass);
+    var wins = d.maths.filter(isWin);
+    var bp = wins.length * MATHS_WIN_POINTS;
+    d.entries.forEach(function (e) { var f = finishOf(e); if (f) bp += f.pts; });
+    var streak = 0;
+    var last = Math.min(todayIndex(), DAY_COUNT - 1);
+    for (var i = last; i >= 0; i--) {
+      if (caught.some(function (e) { return e.day === i; })) streak++;
+      else if (i !== last) break;
+    }
+    return {
+      caught: caught.length,
+      perfect: caught.filter(function (e) { return e.score === e.total; }).length,
+      wins: wins.length,
+      bp: bp,
+      streak: streak
+    };
+  }
+  function goalsDone(s) {
+    return s.caught >= target() && (!kid().maths || s.wins >= mathsTarget());
+  }
+
+  // ---------- render ----------
+  function renderTabs() {
+    var tabs = el("tabs");
+    tabs.innerHTML = "";
+    KIDS.forEach(function (k) {
+      var b = make("button", "tab" + (k.id === current ? " active" : ""));
+      b.type = "button";
+      b.appendChild(make("span", "ball"));
+      b.appendChild(document.createTextNode(k.name));
+      b.onclick = function () { current = k.id; render(); };
+      tabs.appendChild(b);
+    });
+  }
+
+  function renderTrainer(s) {
+    el("trainerName").textContent = "Trainer " + kid().name;
+    var rank = RANKS[0][1];
+    RANKS.forEach(function (r) { if (s.caught >= r[0]) rank = r[1]; });
+    if (goalsDone(s)) rank = "🏆 CHAMPION";
+    el("rank").textContent = rank;
+
+    var stage = s.caught >= target() ? 2 : (s.caught >= Math.ceil(target() / 2) ? 1 : 0);
+    setSprite(el("partner"), EVOLUTION_IDS[stage], EVOLUTION[stage]);
+    setSprite(el("whosSprite"), MONS[s.caught % MONS.length][3], "Mystery Pokémon");
+    var evo = el("evo");
+    evo.innerHTML = "Your partner: ";
+    EVOLUTION.forEach(function (name, i) {
+      evo.appendChild(make("span", i === stage ? "on" : "", name));
+      if (i < EVOLUTION.length - 1) evo.appendChild(document.createTextNode(" → "));
+    });
+
+    var pct = Math.min(100, Math.round(s.caught / target() * 100));
+    el("hp").firstElementChild.style.width = pct + "%";
+    el("hp").className = "hp" + (pct < 50 ? " low" : "");
+    el("hpText").textContent = s.caught + " / " + target() + " books";
+    el("sCaught").textContent = s.caught;
+    el("sPerfect").textContent = s.perfect;
+    el("sStreak").textContent = s.streak;
+    el("bp").textContent = s.bp;
+  }
+
+  function renderBey(s) {
+    var level = 0;
+    if (kid().maths) {
+      var t = mathsTarget();
+      level = s.wins >= t ? 3 : (s.wins >= Math.ceil(t * 2 / 3) ? 2 : (s.wins >= Math.ceil(t / 3) ? 1 : 0));
+    } else {
+      level = Math.min(3, Math.floor(s.bp / 4));
+    }
+    el("beyName").textContent = BEY_LEVELS[level];
+    el("blade").setAttribute("class", "blade " + (s.bp > 0 ? "lv" + level : "slow"));
+    el("mathsChip").className = kid().maths ? "" : "hidden";
+  }
+
+  function dayCell(i, t, label) {
+    var cell = make("div", "day" + (i === t ? " today" : "") + (i > t ? " future" : ""));
+    cell.appendChild(make("div", "dname", i === PRIZE_DAY_INDEX ? "Final!" : label + " " + (i + 1)));
+    cell.appendChild(make("div", "ddate", fmt(dayDate(i))));
+    return cell;
+  }
+
+  function renderDays() {
+    var box = el("days");
+    box.innerHTML = "";
+    var t = todayIndex();
+    for (var i = 0; i < DAY_COUNT; i++) {
+      var dayList = data().entries.filter(function (e) { return e.day === i && isPass(e); });
+      var cell = dayCell(i, t, "Day");
+      var best = dayList.slice().sort(function (a, b) { return rate(b) - rate(a); })[0];
+      cell.appendChild(make("div", "ball " + (best ? ballClass(best) : "empty")));
+      cell.appendChild(make("div", "tag", best ? "BADGE GET!" : (i < t ? "missed" : "")));
+      if (dayList.length >= 2) cell.appendChild(make("div", "double", "DOUBLE! x" + dayList.length));
+      box.appendChild(cell);
+    }
+  }
+
+  function renderMaths(s) {
+    el("mathsSection").className = "panel bey-panel" + (kid().maths ? "" : " hidden");
+    if (!kid().maths) return;
+    var box = el("mathsDays");
+    box.innerHTML = "";
+    var t = todayIndex();
+    for (var i = 0; i < DAY_COUNT; i++) {
+      var list = data().maths.filter(function (m) { return m.day === i; });
+      var mins = list.reduce(function (sum, m) { return sum + m.minutes; }, 0);
+      var won = list.some(isWin);
+      var cell = dayCell(i, t, "Battle");
+      cell.appendChild(beySvg("mini " + (won ? "on" : "off")));
+      cell.appendChild(make("div", "tag", won ? "WIN! " + mins + "min" : (mins ? mins + " min" : (i < t ? "missed" : ""))));
+      box.appendChild(cell);
+    }
+    var pct = Math.min(100, Math.round(s.wins / mathsTarget() * 100));
+    el("mathsHp").firstElementChild.style.width = pct + "%";
+    el("mathsText").textContent = s.wins + " / " + mathsTarget() + " wins";
+  }
+
+  function renderLinks() {
+    var box = el("readLinks");
+    box.innerHTML = "";
+    var links = [
+      ["📝 ReadnQuiz", "Take the book quiz", "https://readnquiz.com/", ""],
+      ["📝 Free Book Quiz", kid().ks + " quizzes", "https://www.freebookquiz.com/", "alt"]
+    ];
+    if (kid().ks === "KS2") links.push(["🔎 AR Book Finder", "Check the book level", "https://www.arbookfind.co.uk/", "alt"]);
+    links.forEach(function (l) {
+      var a = make("a", l[3], l[0]);
+      a.href = l[2];
+      a.target = "_blank";
+      a.rel = "noopener";
+      a.appendChild(make("small", "", l[1]));
+      box.appendChild(a);
+    });
+  }
+
+  function renderDex() {
+    var box = el("dex");
+    box.innerHTML = "";
+    var list = data().entries;
+    if (!list.length) {
+      box.appendChild(make("div", "empty-dex", "No books yet. Read a book, take the quiz, and catch your first one!"));
+      return;
+    }
+    var caughtNo = 0;
+    list.forEach(function (e) {
+      var pass = isPass(e);
+      var card = make("div", "entry" + (pass ? "" : " fail"));
+      var top = make("div", "top");
+      top.appendChild(make("div", "ball " + ballClass(e)));
+      var info = make("div");
+      top.appendChild(info);
+      if (pass) {
+        var mon = MONS[caughtNo % MONS.length];
+        caughtNo++;
+        info.appendChild(make("div", "mon", "#" + caughtNo + " " + mon[0]));
+        var type = make("span", "type", mon[1]);
+        type.style.background = mon[2];
+        info.appendChild(type);
+        top.appendChild(sprite(mon[3], "mon-sprite", mon[0]));
+      } else {
+        info.appendChild(make("div", "mon", "It broke free!"));
+        info.appendChild(make("div", "meta", "Read it again and retry"));
+      }
+      card.appendChild(top);
+      card.appendChild(make("div", "title", "📖 " + e.title));
+      var f = finishOf(e);
+      card.appendChild(make("div", "meta", e.score + "/" + e.total + " · " + e.site + " · " + fmt(dayDate(e.day)) + (f ? " · " + f.name : "")));
+      card.appendChild(deleteButton(e, "entries", "\"" + e.title + "\""));
+      box.appendChild(card);
+    });
+  }
+
+  function deleteButton(item, listName, label) {
+    var del = make("button", "del", "✕");
+    del.type = "button";
+    del.title = "Delete";
+    del.onclick = function () {
+      if (!window.confirm("Delete " + label + "?")) return;
+      var who = current;
+      commit({ action: "delete", id: item.id }, function () {
+        state.kids[who][listName] = state.kids[who][listName].filter(function (x) { return x.id !== item.id; });
+      }, function () {});
+    };
+    return del;
+  }
+
+  function renderPrize(s) {
+    var done = goalsDone(s);
+    var canOpen = done && todayIndex() >= PRIZE_DAY_INDEX;
+    el("chest").className = "chest" + (done ? "" : " locked");
+    el("prizeMsg").textContent = done
+      ? (canOpen ? "CHAMPION! Your prize is ready!" : "All goals reached! Open it on Sun 1 Nov!")
+      : "Reach your goals to unlock the prize!";
+    var need = "📖 " + s.caught + " / " + target() + " books";
+    if (kid().maths) need += "   ⚔️ " + s.wins + " / " + mathsTarget() + " battle wins";
+    el("prizeNeed").textContent = need;
+    el("openPrize").className = "btn blue" + (canOpen ? "" : " hidden");
+  }
+
+  function renderSettings() {
+    el("sKid").textContent = kid().name;
+    el("sKid2").textContent = kid().name;
+    el("sTarget").value = target();
+    el("sMaths").value = mathsTarget();
+    el("sPrize").value = prize();
+    el("sMathsField").className = "field" + (kid().maths ? "" : " hidden");
+  }
+
+  function renderDateSelects() {
+    var t = String(Math.max(0, Math.min(todayIndex(), DAY_COUNT - 1)));
+    var sels = document.querySelectorAll(".day-select");
+    for (var s = 0; s < sels.length; s++) {
+      for (var i = 0; i < DAY_COUNT; i++) {
+        var o = make("option", "", fmt(dayDate(i)));
+        o.value = String(i);
+        sels[s].appendChild(o);
+      }
+      sels[s].value = t;
+    }
+  }
+
+  function render() {
+    var s = summary();
+    el("dates").textContent = fmt(dayDate(0)) + " → " + fmt(dayDate(DAY_COUNT - 1)) + " 2026";
+    renderTabs();
+    renderTrainer(s);
+    renderBey(s);
+    renderLinks();
+    renderDays();
+    renderDex();
+    renderMaths(s);
+    renderPrize(s);
+    renderSettings();
+  }
+
   // ---------- shared storage (Google Sheet via Apps Script) ----------
   function setSync(text, isError) {
-    var s = el("sync");
-    s.textContent = text;
-    s.className = "sync" + (isError ? " error" : "");
+    el("sync").textContent = text;
+    el("sync").className = "sync" + (isError ? " error" : "");
   }
-  function applyRemote(data) {
-    if (!data || !data.ok) throw new Error((data && data.error) || "Bad response");
-    state.target = data.settings.target;
-    state.prize = data.settings.prize;
+  function applyRemote(res) {
+    if (!res || !res.ok) throw new Error((res && res.error) || "Bad response");
+    var next = emptyState();
     KIDS.forEach(function (k) {
-      state.kids[k.id] = {
-        entries: data.entries.filter(function (e) { return e.kid === k.id; })
-      };
+      var st = res.settings[k.id] || {};
+      if (st.target) next.settings.targets[k.id] = st.target;
+      if (st.mathsTarget) next.settings.mathsTargets[k.id] = st.mathsTarget;
+      if (st.prize) next.settings.prizes[k.id] = st.prize;
     });
+    res.entries.forEach(function (e) {
+      if (!next.kids[e.kid]) return;
+      if (e.type === "maths") next.kids[e.kid].maths.push(e);
+      else next.kids[e.kid].entries.push(e);
+    });
+    state = next;
     save();
     render();
     setSync("☁ Shared · updated " + new Date().toTimeString().slice(0, 5), false);
@@ -476,215 +857,6 @@
     });
   }
 
-  // ---------- helpers ----------
-  function dayDate(i) { return new Date(START.getFullYear(), START.getMonth(), START.getDate() + i); }
-  function todayIndex() {
-    var now = new Date();
-    var t = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-    return Math.round((t - START) / 86400000);
-  }
-  function fmt(d) { return DAY_NAMES[d.getDay()] + " " + d.getDate() + " " + (d.getMonth() === 9 ? "Oct" : "Nov"); }
-  function rate(e) { return e.score / e.total; }
-  function isPass(e) { return rate(e) >= PASS_RATE; }
-  function ballClass(e) {
-    if (!isPass(e)) return "empty";
-    if (e.score === e.total) return "ultra";
-    if (rate(e) >= BURST_RATE) return "great";
-    return "";
-  }
-  function finishOf(e) {
-    if (e.score === e.total) return { name: "XTREME FINISH", pts: 3 };
-    if (rate(e) >= BURST_RATE) return { name: "BURST FINISH", pts: 2 };
-    if (isPass(e)) return { name: "SPIN FINISH", pts: 1 };
-    return null;
-  }
-  function el(id) { return document.getElementById(id); }
-  function spriteUrl(dexNo) { return SPRITE_BASE + dexNo + ".png"; }
-  // Pixel sprite <img>; hides itself if the picture cannot load (offline).
-  function sprite(dexNo, cls, alt) {
-    var img = document.createElement("img");
-    img.className = "sprite " + (cls || "");
-    img.alt = alt || "";
-    img.onerror = function () { img.style.visibility = "hidden"; };
-    img.src = spriteUrl(dexNo);
-    return img;
-  }
-  function setSprite(img, dexNo, alt) {
-    img.onerror = function () { img.style.visibility = "hidden"; };
-    img.style.visibility = "";
-    img.alt = alt || "";
-    if (img.getAttribute("src") !== spriteUrl(dexNo)) img.src = spriteUrl(dexNo);
-  }
-  function make(tag, cls, text) {
-    var n = document.createElement(tag);
-    if (cls) n.className = cls;
-    if (text !== undefined) n.textContent = text;
-    return n;
-  }
-  function entries() { return state.kids[current].entries; }
-  function passed() { return entries().filter(isPass); }
-
-  function summary() {
-    var list = entries();
-    var caught = passed();
-    var perfect = caught.filter(function (e) { return e.score === e.total; }).length;
-    var bp = 0;
-    for (var i = 0; i < list.length; i++) {
-      var f = finishOf(list[i]);
-      if (f) bp += f.pts;
-    }
-    var streak = 0;
-    var last = Math.min(todayIndex(), DAY_COUNT - 1);
-    for (var d = last; d >= 0; d--) {
-      if (caught.some(function (e) { return e.day === d; })) streak++;
-      else if (d !== last) break;
-    }
-    return { caught: caught.length, perfect: perfect, bp: bp, streak: streak };
-  }
-
-  // ---------- render ----------
-  function renderTabs() {
-    var tabs = el("tabs");
-    tabs.innerHTML = "";
-    KIDS.forEach(function (k) {
-      var b = make("button", "tab" + (k.id === current ? " active" : ""));
-      b.type = "button";
-      b.appendChild(make("span", "ball"));
-      b.appendChild(document.createTextNode("Trainer " + k.name));
-      b.onclick = function () { current = k.id; render(); };
-      tabs.appendChild(b);
-    });
-  }
-
-  function renderTrainer(s) {
-    var kid = KIDS.filter(function (k) { return k.id === current; })[0];
-    el("trainerName").textContent = "Trainer " + kid.name;
-    var rank = RANKS[0][1];
-    for (var i = 0; i < RANKS.length; i++) if (s.caught >= RANKS[i][0]) rank = RANKS[i][1];
-    if (s.caught >= state.target) rank = "🏆 CHAMPION";
-    el("rank").textContent = rank;
-
-    var stage = s.caught >= state.target ? 2 : (s.caught >= Math.ceil(state.target / 2) ? 1 : 0);
-    setSprite(el("partner"), EVOLUTION_IDS[stage], EVOLUTION[stage]);
-    setSprite(el("whosSprite"), MONS[s.caught % MONS.length][3], "Mystery Pokémon");
-    var evo = el("evo");
-    evo.innerHTML = "Your partner: ";
-    EVOLUTION.forEach(function (name, i) {
-      evo.appendChild(make("span", i === stage ? "on" : "", name));
-      if (i < EVOLUTION.length - 1) evo.appendChild(document.createTextNode(" → "));
-    });
-
-    var pct = Math.min(100, Math.round(s.caught / state.target * 100));
-    el("hp").firstElementChild.style.width = pct + "%";
-    el("hp").className = "hp" + (pct < 50 ? " low" : "");
-    el("hpText").textContent = s.caught + " / " + state.target + " books";
-    el("sCaught").textContent = s.caught;
-    el("sPerfect").textContent = s.perfect;
-    el("sStreak").textContent = s.streak;
-    el("bp").textContent = s.bp;
-    el("blade").setAttribute("class", "blade" + (s.caught > 0 ? "" : " slow"));
-  }
-
-  function renderDays() {
-    var box = el("days");
-    box.innerHTML = "";
-    var t = todayIndex();
-    for (var i = 0; i < DAY_COUNT; i++) {
-      var dayList = entries().filter(function (e) { return e.day === i && isPass(e); });
-      var cell = make("div", "day" + (i === t ? " today" : "") + (i > t ? " future" : ""));
-      cell.appendChild(make("div", "dname", i === PRIZE_DAY_INDEX ? "Final!" : "Day " + (i + 1)));
-      cell.appendChild(make("div", "ddate", fmt(dayDate(i))));
-      var best = dayList.slice().sort(function (a, b) { return rate(b) - rate(a); })[0];
-      cell.appendChild(make("div", "ball " + (best ? ballClass(best) : "empty")));
-      cell.appendChild(make("div", "tag", best ? "BADGE GET!" : (i < t ? "missed" : "")));
-      if (dayList.length >= 2) cell.appendChild(make("div", "double", "DOUBLE! x" + dayList.length));
-      box.appendChild(cell);
-    }
-  }
-
-  function renderDex() {
-    var box = el("dex");
-    box.innerHTML = "";
-    var list = entries();
-    if (!list.length) {
-      box.appendChild(make("div", "empty-dex", "No books yet. Read a book, take the quiz, and catch your first one!"));
-      return;
-    }
-    var caughtNo = 0;
-    list.forEach(function (e) {
-      var pass = isPass(e);
-      var card = make("div", "entry" + (pass ? "" : " fail"));
-      var top = make("div", "top");
-      top.appendChild(make("div", "ball " + ballClass(e)));
-      var info = make("div");
-      if (pass) {
-        var mon = MONS[caughtNo % MONS.length];
-        caughtNo++;
-        info.appendChild(make("div", "mon", "#" + caughtNo + " " + mon[0]));
-        var type = make("span", "type", mon[1]);
-        type.style.background = mon[2];
-        info.appendChild(type);
-        top.appendChild(info);
-        top.appendChild(sprite(mon[3], "mon-sprite", mon[0]));
-      } else {
-        info.appendChild(make("div", "mon", "It broke free!"));
-        info.appendChild(make("div", "meta", "Read it again and retry"));
-        top.appendChild(info);
-      }
-      card.appendChild(top);
-      card.appendChild(make("div", "title", "📖 " + e.title));
-      var f = finishOf(e);
-      card.appendChild(make("div", "meta", e.score + "/" + e.total + " · " + e.site + " · " + fmt(dayDate(e.day)) + (f ? " · " + f.name : "")));
-      var del = make("button", "del", "✕");
-      del.type = "button";
-      del.title = "Delete";
-      del.onclick = function () {
-        if (!window.confirm("Delete \"" + e.title + "\"?")) return;
-        commit({ action: "delete", id: e.id }, function () {
-          state.kids[current].entries = entries().filter(function (x) { return x.id !== e.id; });
-        }, function () {});
-      };
-      card.appendChild(del);
-      box.appendChild(card);
-    });
-  }
-
-  function renderPrize(s) {
-    var done = s.caught >= state.target;
-    var canOpen = done && todayIndex() >= PRIZE_DAY_INDEX;
-    el("chest").className = "chest" + (done ? "" : " locked");
-    var left = state.target - s.caught;
-    el("prizeMsg").textContent = done
-      ? (canOpen ? "CHAMPION! Your prize is ready!" : "Target reached! Open it on Sun 1 Nov!")
-      : left + " more book" + (left === 1 ? "" : "s") + " to unlock the prize!";
-    el("openPrize").style.display = canOpen ? "inline-block" : "none";
-  }
-
-  function renderDateSelect() {
-    var sel = el("fDate");
-    var keep = sel.value;
-    sel.innerHTML = "";
-    var t = Math.max(0, Math.min(todayIndex(), DAY_COUNT - 1));
-    for (var i = 0; i < DAY_COUNT; i++) {
-      var o = make("option", "", fmt(dayDate(i)));
-      o.value = String(i);
-      sel.appendChild(o);
-    }
-    sel.value = keep !== "" && keep !== undefined && keep !== null && sel.querySelector("option[value='" + keep + "']") ? keep : String(t);
-  }
-
-  function render() {
-    var s = summary();
-    el("dates").textContent = fmt(dayDate(0)) + " → " + fmt(dayDate(DAY_COUNT - 1)) + " 2026";
-    renderTabs();
-    renderTrainer(s);
-    renderDays();
-    renderDex();
-    renderPrize(s);
-    el("sTarget").value = state.target;
-    el("sPrize").value = state.prize;
-  }
-
   // ---------- overlay ----------
   function show(artNode, big, mid) {
     var art = el("ovArt");
@@ -697,7 +869,7 @@
   }
   el("ovClose").onclick = function () { el("overlay").className = "overlay"; };
 
-  // ---------- form ----------
+  // ---------- reading form ----------
   el("form").onsubmit = function (ev) {
     ev.preventDefault();
     var title = el("fTitle").value.replace(/\s+/g, " ").trim();
@@ -708,50 +880,69 @@
       window.alert("Please check the score. It must be between 0 and " + (isNaN(total) ? "the total" : total) + ".");
       return;
     }
-    var entry = {
-      id: Date.now() + "-" + Math.floor(Math.random() * 1e6),
-      kid: current,
-      day: parseInt(el("fDate").value, 10),
-      title: title,
-      site: el("fSite").value,
-      score: score,
-      total: total
-    };
+    var entry = { id: newId(), kid: current, type: "read", day: parseInt(el("fDate").value, 10), title: title, site: el("fSite").value, score: score, total: total };
     var before = summary().caught;
-    var kid = current;
+    var who = current;
     var button = el("form").querySelector("button[type=submit]");
     button.disabled = true;
     commit({ action: "add", entry: entry }, function () {
-      state.kids[kid].entries = state.kids[kid].entries.concat([entry]);
+      state.kids[who].entries = state.kids[who].entries.concat([entry]);
     }, function (ok) {
       button.disabled = false;
-      if (ok) celebrate(entry, before);
+      if (!ok) return;
+      el("fTitle").value = "";
+      el("fScore").value = "";
+      celebrateBook(entry, before);
     });
   };
 
-  function celebrate(entry, before) {
-    var score = entry.score;
-    var total = entry.total;
+  function celebrateBook(entry, before) {
     var f = finishOf(entry);
-    if (f) {
-      var ball = make("div", "ball huge " + ballClass(entry));
-      var mon = MONS[before % MONS.length];
-      var mid = f.name + "!  +" + f.pts + " Battle Points";
-      if (before < state.target && before + 1 >= state.target) mid += "  🏆 TARGET REACHED!";
-      show(ball, "Gotcha! " + mon[0] + " was caught!", mid);
-      // Let the ball wobble, then the Pokémon pops out.
-      setTimeout(function () {
-        var art = el("ovArt");
-        if (!art.contains(ball)) return;
-        art.innerHTML = "";
-        art.appendChild(sprite(mon[3], "pop", mon[0]));
-      }, CATCH_WOBBLE_MS);
-    } else {
-      show(make("div", "ball huge empty"), "Oh no! It broke free!", "You got " + score + "/" + total + ". Read it again and try once more!");
+    if (!f) {
+      show(make("div", "ball huge empty"), "Oh no! It broke free!", "You got " + entry.score + "/" + entry.total + ". Read it again and try once more!");
+      return;
     }
-    el("fTitle").value = "";
-    el("fScore").value = "";
+    var ball = make("div", "ball huge " + ballClass(entry));
+    var mon = MONS[before % MONS.length];
+    var mid = f.name + "!  +" + f.pts + " Battle Points";
+    if (before < target() && before + 1 >= target()) mid += "  🏆 BOOK GOAL REACHED!";
+    show(ball, "Gotcha! " + mon[0] + " was caught!", mid);
+    // Let the ball wobble, then the Pokémon pops out.
+    setTimeout(function () {
+      var art = el("ovArt");
+      if (!art.contains(ball)) return;
+      art.innerHTML = "";
+      art.appendChild(sprite(mon[3], "pop", mon[0]));
+    }, CATCH_WOBBLE_MS);
   }
+
+  // ---------- maths form ----------
+  el("mathsForm").onsubmit = function (ev) {
+    ev.preventDefault();
+    var minutes = parseInt(el("mMinutes").value, 10);
+    if (isNaN(minutes) || minutes < 1 || minutes > 120) { window.alert("Please type the minutes (1 to 120)."); return; }
+    var item = { id: newId(), kid: current, type: "maths", day: parseInt(el("mDate").value, 10), site: el("mSite").value, minutes: minutes };
+    var winsBefore = summary().wins;
+    var who = current;
+    var button = el("mathsForm").querySelector("button[type=submit]");
+    button.disabled = true;
+    commit({ action: "add", entry: item }, function () {
+      state.kids[who].maths = state.kids[who].maths.concat([item]);
+    }, function (ok) {
+      button.disabled = false;
+      if (!ok) return;
+      el("mMinutes").value = "";
+      if (isWin(item)) {
+        var mid = "+" + MATHS_WIN_POINTS + " Battle Points · " + minutes + " minutes";
+        if (winsBefore < mathsTarget() && winsBefore + 1 >= mathsTarget()) mid += "  🏆 BATTLE GOAL REACHED!";
+        show(beySvg("blade"), "LET IT RIP! BATTLE WIN!", mid);
+      } else {
+        show(beySvg("blade slow"), "Good training!", minutes + " minutes. Play " + (MATHS_WIN_MINUTES - minutes) + " more minutes for a BATTLE WIN!");
+      }
+    });
+  };
+
+  el("ttrsLink").href = TTRS_URL;
 
   el("openPrize").onclick = function () {
     var art = make("div");
@@ -759,20 +950,22 @@
     art.style.alignItems = "center";
     art.style.justifyContent = "center";
     art.style.flexWrap = "wrap";
-    var blade = el("blade").cloneNode(true);
-    blade.setAttribute("class", "blade");
     art.appendChild(sprite(EVOLUTION_IDS[2], "pop", EVOLUTION[2]));
-    art.appendChild(blade);
-    show(art, "LET IT RIP! 🏆", "Your prize: " + state.prize);
+    art.appendChild(beySvg("blade"));
+    show(art, "LET IT RIP! 🏆", "Your prize: " + prize());
   };
 
   el("saveSettings").onclick = function () {
     var t = parseInt(el("sTarget").value, 10);
-    if (isNaN(t) || t < 1 || t > 30) { window.alert("Target must be 1 to 30."); return; }
-    var prize = el("sPrize").value.trim() || DEFAULTS.prize;
-    commit({ action: "settings", settings: { target: t, prize: prize } }, function () {
-      state.target = t;
-      state.prize = prize;
+    var m = kid().maths ? parseInt(el("sMaths").value, 10) : mathsTarget();
+    if (isNaN(t) || t < 1 || t > 30) { window.alert("Books must be 1 to 30."); return; }
+    if (kid().maths && (isNaN(m) || m < 1 || m > 30)) { window.alert("Battle wins must be 1 to 30."); return; }
+    var p = el("sPrize").value.trim() || DEFAULT_PRIZE;
+    var who = current;
+    commit({ action: "settings", kid: who, settings: { target: t, mathsTarget: m, prize: p } }, function () {
+      state.settings.targets[who] = t;
+      state.settings.mathsTargets[who] = m;
+      state.settings.prizes[who] = p;
     }, function (ok) {
       if (!ok) return;
       el("saved").textContent = "Saved!";
@@ -781,7 +974,7 @@
   };
 
   HEADER_MONS.forEach(function (n) { el("headerMons").appendChild(sprite(n)); });
-  renderDateSelect();
+  renderDateSelects();
   render();
   if (API_URL) {
     setSync("Loading...", false);
