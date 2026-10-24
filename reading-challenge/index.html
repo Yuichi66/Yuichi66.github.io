@@ -388,7 +388,7 @@
   var TIERS = [
     { pct: 100, ball: "great", name: "Great Ball", reward: "£3" },
     { pct: 150, ball: "ultra", name: "Ultra Ball", reward: "£5" },
-    { pct: 200, ball: "master", name: "Master Ball", reward: "Beyblade!" }
+    { pct: 200, ball: "master", name: "Master Ball", reward: "£8" }
   ];
 
   // [name, type, colour, national dex number]
@@ -594,7 +594,7 @@
       msg = "Next: " + next.name + " (" + next.reward + ") — " + parts.join(" and ");
     }
     el("nextMsg").textContent = msg;
-    el("ruleMsg").textContent = (kid().maths ? "Both goals count. " : "") + "Prizes are given on Sun 1 Nov.";
+    el("ruleMsg").textContent = (kid().maths ? "Both goals count. " : "") + "You get ONE prize: the highest ball you reach. Prizes are given on Sun 1 Nov.";
   }
 
   function renderCollection() {
