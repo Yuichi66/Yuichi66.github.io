@@ -1,0 +1,733 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Half Term Reading Challenge</title>
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Reading">
+<meta name="apple-mobile-web-app-status-bar-style" content="black">
+<meta name="theme-color" content="#e3350d">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="icon" type="image/png" href="icon-512.png">
+<link rel="manifest" href="manifest.json">
+<style>
+  :root {
+    --red: #e3350d;
+    --red-dark: #a8230a;
+    --yellow: #ffcb05;
+    --blue: #2a75bb;
+    --navy: #1b2a4a;
+    --ink: #1d1d1f;
+    --paper: #fffdf5;
+    --grey: #d9d9d9;
+    --gold: #f5b700;
+    --green: #2fb36d;
+    --purple: #7b3fe4;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: "Trebuchet MS", "Arial Rounded MT Bold", Arial, sans-serif;
+    color: var(--ink);
+    background: var(--navy);
+    background-image: radial-gradient(circle at 20% 10%, #31508a 0, transparent 40%),
+                      radial-gradient(circle at 85% 80%, #5a2a8a 0, transparent 45%);
+    min-height: 100vh;
+  }
+  .wrap { max-width: 980px; margin: 0 auto; padding: 16px; }
+
+  /* ---------- header ---------- */
+  header { text-align: center; color: #fff; padding: 8px 0 4px; }
+  header h1 {
+    margin: 0; font-size: clamp(24px, 6.5vw, 40px); letter-spacing: 1px; overflow-wrap: break-word;
+    color: var(--yellow);
+    text-shadow: 3px 3px 0 var(--blue), 6px 6px 0 #0d1830;
+  }
+  header .sub { font-size: 18px; margin-top: 4px; opacity: .9; }
+  .dates { display: inline-block; margin-top: 8px; padding: 4px 14px; border-radius: 20px; background: rgba(255,255,255,.15); }
+  .sync { font-size: 13px; margin-top: 6px; opacity: .85; }
+  .sync.error { color: #ffb3a7; opacity: 1; font-weight: bold; }
+  .btn[disabled] { opacity: .6; cursor: wait; }
+
+  /* ---------- trainer tabs ---------- */
+  .tabs { display: flex; gap: 12px; justify-content: center; margin: 16px 0; flex-wrap: wrap; }
+  .tab {
+    display: flex; align-items: center; gap: 10px;
+    border: 4px solid #000; border-radius: 40px; padding: 8px 22px 8px 8px;
+    font-size: 22px; font-weight: bold; cursor: pointer;
+    background: #fff; color: var(--ink);
+  }
+  .tab.active { background: var(--yellow); box-shadow: 0 0 0 4px var(--red); }
+
+  /* ---------- poke ball (pure CSS) ---------- */
+  .ball {
+    position: relative; width: 44px; height: 44px; border-radius: 50%;
+    border: 3px solid #000; overflow: hidden; flex-shrink: 0;
+    background: linear-gradient(#e3350d 0 46%, #000 46% 54%, #fff 54% 100%);
+  }
+  .ball::after {
+    content: ""; position: absolute; left: 50%; top: 50%;
+    width: 34%; height: 34%; transform: translate(-50%, -50%);
+    background: #fff; border: 3px solid #000; border-radius: 50%;
+  }
+  .ball.great { background: linear-gradient(#2a75bb 0 46%, #000 46% 54%, #fff 54% 100%); }
+  .ball.ultra { background: linear-gradient(var(--gold) 0 46%, #000 46% 54%, #fff 54% 100%); box-shadow: 0 0 10px var(--gold); }
+  .ball.master { background: linear-gradient(#7b3fe4 0 46%, #000 46% 54%, #fff 54% 100%); }
+  .ball.empty { background: linear-gradient(#bbb 0 46%, #888 46% 54%, #eee 54% 100%); border-color: #888; opacity: .55; }
+  .ball.empty::after { border-color: #888; }
+
+  /* ---------- panels ---------- */
+  .panel {
+    background: var(--paper); border: 4px solid #000; border-radius: 18px;
+    padding: 16px; margin-bottom: 16px; box-shadow: 6px 6px 0 rgba(0,0,0,.35);
+  }
+  .panel h2 { margin: 0 0 12px; font-size: 22px; display: flex; align-items: center; gap: 8px; }
+
+  /* trainer card */
+  .trainer { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 16px; }
+  @media (max-width: 720px) { .trainer { grid-template-columns: minmax(0, 1fr); } }
+  .card-red { background: linear-gradient(135deg, var(--red), var(--red-dark)); color: #fff; border-radius: 14px; padding: 14px; border: 3px solid #000; }
+  .card-red .name { font-size: 28px; font-weight: bold; }
+  .rank { display: inline-block; margin-top: 6px; background: var(--yellow); color: #000; padding: 3px 12px; border-radius: 12px; font-weight: bold; }
+  .evo { margin-top: 10px; font-size: 15px; }
+  .evo span { display: inline-block; padding: 2px 8px; border-radius: 10px; background: rgba(255,255,255,.2); margin: 2px 0; }
+  .evo span.on { background: var(--yellow); color: #000; font-weight: bold; }
+
+  .hp-label { display: flex; justify-content: space-between; font-weight: bold; margin-bottom: 4px; }
+  .hp { height: 22px; border: 3px solid #000; border-radius: 12px; background: #333; overflow: hidden; }
+  .hp > div { height: 100%; width: 0; background: linear-gradient(90deg, var(--green), #7be495); transition: width .8s; }
+  .hp.low > div { background: linear-gradient(90deg, #f0a500, #ffd36b); }
+
+  .stats { display: flex; gap: 10px; margin-top: 12px; flex-wrap: wrap; }
+  .stat { flex: 1; min-width: 90px; text-align: center; background: #fff; border: 3px solid #000; border-radius: 12px; padding: 6px; }
+  .stat b { display: block; font-size: 26px; }
+  .stat small { font-size: 12px; }
+
+  /* beyblade */
+  .stadium {
+    position: relative; height: 150px; border-radius: 50%/40%;
+    background: radial-gradient(ellipse at center, #3b4f7a 0, #1b2a4a 60%, #0b1224 100%);
+    border: 4px solid #000; overflow: hidden; display: flex; align-items: center; justify-content: center;
+  }
+  .blade { width: 90px; height: 90px; animation: spin 0.6s linear infinite; filter: drop-shadow(0 0 8px #6cf); }
+  .blade.slow { animation-duration: 2.4s; filter: none; opacity: .7; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .bp { color: #fff; position: absolute; bottom: 8px; width: 100%; text-align: center; font-weight: bold; }
+  .bp b { color: var(--yellow); font-size: 22px; }
+  .finishes { font-size: 13px; margin-top: 8px; line-height: 1.6; }
+  .finishes .chip { display: inline-block; padding: 1px 8px; border-radius: 10px; border: 2px solid #000; margin-right: 4px; font-weight: bold; }
+  .chip.spin { background: #9fd3ff; }
+  .chip.burst { background: #ffb36b; }
+  .chip.xtreme { background: var(--yellow); }
+
+  /* gym badge days */
+  .days { display: grid; grid-template-columns: repeat(9, 1fr); gap: 8px; }
+  @media (max-width: 720px) { .days { grid-template-columns: repeat(3, 1fr); } }
+  .day {
+    text-align: center; border: 3px solid #000; border-radius: 14px; padding: 8px 4px;
+    background: #fff; position: relative; min-height: 118px;
+  }
+  .day.today { box-shadow: 0 0 0 4px var(--yellow); }
+  .day.future { opacity: .55; }
+  .day .dname { font-weight: bold; font-size: 14px; }
+  .day .ddate { font-size: 12px; color: #555; }
+  .day .ball { margin: 8px auto 4px; width: 46px; height: 46px; }
+  .day .tag { font-size: 11px; font-weight: bold; }
+  .double { position: absolute; top: -10px; right: -8px; background: var(--purple); color: #fff; font-size: 11px; padding: 2px 6px; border-radius: 10px; border: 2px solid #000; }
+
+  /* form */
+  form .row { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 10px; }
+  label { font-weight: bold; font-size: 14px; display: block; margin-bottom: 3px; }
+  .field { flex: 1; min-width: 140px; }
+  input, select {
+    width: 100%; font-size: 18px; padding: 8px 10px; border: 3px solid #000; border-radius: 10px; font-family: inherit;
+  }
+  .score-row { display: flex; align-items: center; gap: 6px; }
+  .score-row input { width: 70px; text-align: center; }
+  .field.score { min-width: 210px; }
+  .btn {
+    font-family: inherit; font-size: 22px; font-weight: bold; cursor: pointer;
+    padding: 12px 24px; border: 4px solid #000; border-radius: 40px;
+    background: var(--red); color: #fff; box-shadow: 0 5px 0 #000;
+  }
+  .btn:active { transform: translateY(4px); box-shadow: 0 1px 0 #000; }
+  .btn.small { font-size: 14px; padding: 6px 14px; box-shadow: 0 3px 0 #000; }
+  .btn.blue { background: var(--blue); }
+  .btn.grey { background: #777; }
+  .hint { font-size: 13px; color: #444; margin-top: 6px; }
+  .links a { display: inline-block; margin: 4px 8px 0 0; color: var(--blue); font-weight: bold; }
+
+  /* book-dex */
+  .dex { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 10px; }
+  .entry { border: 3px solid #000; border-radius: 12px; padding: 10px; background: #fff; position: relative; }
+  .entry.fail { background: #f1f1f1; }
+  .entry .top { display: flex; gap: 8px; align-items: center; }
+  .entry .ball { width: 34px; height: 34px; }
+  .entry .mon { font-weight: bold; }
+  .entry .type { display: inline-block; font-size: 11px; color: #fff; padding: 1px 7px; border-radius: 8px; }
+  .entry .title { margin-top: 6px; font-size: 15px; }
+  .entry .meta { font-size: 12px; color: #555; margin-top: 4px; }
+  .entry .del { position: absolute; top: 6px; right: 6px; border: none; background: none; cursor: pointer; font-size: 14px; color: #999; }
+  .empty-dex { color: #666; }
+
+  /* prize */
+  .prize { text-align: center; }
+  .chest { font-size: 70px; line-height: 1; }
+  .chest.locked { filter: grayscale(1); opacity: .6; }
+  .prize .msg { font-size: 18px; font-weight: bold; margin: 8px 0; }
+
+  /* settings */
+  details.settings { color: #fff; margin: 8px 0 30px; }
+  details.settings summary { cursor: pointer; opacity: .8; }
+  details.settings .panel { color: var(--ink); margin-top: 8px; }
+
+  /* overlay animation */
+  .overlay {
+    position: fixed; inset: 0; background: rgba(0,0,0,.82); display: none;
+    align-items: center; justify-content: center; flex-direction: column; z-index: 10; color: #fff; text-align: center; padding: 16px;
+  }
+  .overlay.show { display: flex; }
+  .overlay .big { font-size: 46px; font-weight: bold; color: var(--yellow); text-shadow: 3px 3px 0 var(--red); }
+  .overlay .mid { font-size: 24px; margin-top: 10px; }
+  .overlay .ball.huge { width: 140px; height: 140px; border-width: 6px; animation: wobble .5s ease-in-out 3; }
+  .overlay .ball.huge::after { border-width: 6px; }
+  .overlay .blade { width: 160px; height: 160px; animation-duration: .25s; }
+  @keyframes wobble { 0%,100% { transform: rotate(0); } 25% { transform: rotate(-22deg); } 75% { transform: rotate(22deg); } }
+  .overlay .btn { margin-top: 24px; }
+  .flash { animation: flash .6s ease-out; }
+  @keyframes flash { from { transform: scale(.4); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>HALF TERM READING CHALLENGE</h1>
+    <div class="sub">Gotta read 'em all! &nbsp;|&nbsp; 3... 2... 1... LET IT RIP!</div>
+    <div class="dates" id="dates"></div>
+    <div class="sync" id="sync"></div>
+  </header>
+
+  <div class="tabs" id="tabs"></div>
+
+  <section class="trainer">
+    <div class="panel">
+      <h2><span class="ball"></span> Trainer Card</h2>
+      <div class="card-red">
+        <div class="name" id="trainerName"></div>
+        <div class="rank" id="rank"></div>
+        <div class="evo" id="evo"></div>
+      </div>
+      <div style="margin-top:14px">
+        <div class="hp-label"><span>Challenge HP</span><span id="hpText"></span></div>
+        <div class="hp" id="hp"><div></div></div>
+      </div>
+      <div class="stats">
+        <div class="stat"><b id="sCaught">0</b><small>Books caught</small></div>
+        <div class="stat"><b id="sPerfect">0</b><small>Perfect 100%</small></div>
+        <div class="stat"><b id="sStreak">0</b><small>Day streak</small></div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <h2>🌀 Bey Stadium</h2>
+      <div class="stadium">
+        <svg class="blade slow" id="blade" viewBox="0 0 100 100" aria-hidden="true">
+          <polygon points="50,2 61,35 97,38 68,58 79,94 50,72 21,94 32,58 3,38 39,35" fill="#2a75bb" stroke="#000" stroke-width="3"/>
+          <circle cx="50" cy="50" r="22" fill="#e3350d" stroke="#000" stroke-width="3"/>
+          <circle cx="50" cy="50" r="9" fill="#ffcb05" stroke="#000" stroke-width="3"/>
+        </svg>
+        <div class="bp">Battle Points: <b id="bp">0</b></div>
+      </div>
+      <div class="finishes">
+        <span class="chip spin">SPIN FINISH +1</span> 80% or more<br>
+        <span class="chip burst">BURST FINISH +2</span> 90% or more<br>
+        <span class="chip xtreme">XTREME FINISH +3</span> 100% perfect!
+      </div>
+    </div>
+  </section>
+
+  <section class="panel">
+    <h2>🏅 Gym Badges (1 book a day)</h2>
+    <div class="days" id="days"></div>
+    <div class="hint">Red ball = passed. Blue ball = 90%+. Gold ball = 100%. "DOUBLE!" = 2 books in one day.</div>
+  </section>
+
+  <section class="panel">
+    <h2>📖 I finished a book!</h2>
+    <form id="form" autocomplete="off">
+      <div class="row">
+        <div class="field" style="flex:2">
+          <label for="fTitle">Book title</label>
+          <input id="fTitle" required maxlength="120" placeholder="e.g. Diary of a Wimpy Kid">
+        </div>
+        <div class="field">
+          <label for="fDate">Day</label>
+          <select id="fDate"></select>
+        </div>
+      </div>
+      <div class="row">
+        <div class="field">
+          <label for="fSite">Quiz website</label>
+          <select id="fSite">
+            <option>ReadnQuiz</option>
+            <option>Free Book Quiz</option>
+            <option>School AR</option>
+          </select>
+        </div>
+        <div class="field score">
+          <label>Quiz score</label>
+          <div class="score-row">
+            <input id="fScore" type="number" min="0" max="50" required placeholder="8">
+            <span>out of</span>
+            <input id="fTotal" type="number" min="1" max="50" required value="10">
+          </div>
+        </div>
+      </div>
+      <button class="btn" type="submit">🎯 THROW POKé BALL!</button>
+      <div class="hint">You need 80% or more to catch it. (8 out of 10)</div>
+      <div class="links">
+        <a href="https://readnquiz.com/" target="_blank" rel="noopener">ReadnQuiz</a>
+        <a href="https://www.freebookquiz.com/" target="_blank" rel="noopener">Free Book Quiz</a>
+        <a href="https://www.arbookfind.co.uk/" target="_blank" rel="noopener">AR Book Finder (book level)</a>
+      </div>
+    </form>
+  </section>
+
+  <section class="panel">
+    <h2>📕 Book-dex</h2>
+    <div class="dex" id="dex"></div>
+  </section>
+
+  <section class="panel prize">
+    <h2 style="justify-content:center">🎁 Champion Prize</h2>
+    <div class="chest locked" id="chest">🎁</div>
+    <div class="msg" id="prizeMsg"></div>
+    <button class="btn blue" id="openPrize" type="button" style="display:none">OPEN THE PRIZE!</button>
+  </section>
+
+  <details class="settings">
+    <summary>⚙ Settings (for grown-ups)</summary>
+    <div class="panel">
+      <div class="row" style="display:flex;gap:10px;flex-wrap:wrap">
+        <div class="field">
+          <label for="sTarget">Target (books passed)</label>
+          <input id="sTarget" type="number" min="1" max="30">
+        </div>
+        <div class="field" style="flex:2">
+          <label for="sPrize">Prize</label>
+          <input id="sPrize" maxlength="80">
+        </div>
+      </div>
+      <button class="btn small blue" id="saveSettings" type="button">Save</button>
+      <span id="saved" style="margin-left:8px"></span>
+    </div>
+  </details>
+</div>
+
+<div class="overlay" id="overlay">
+  <div id="ovArt"></div>
+  <div class="big" id="ovBig"></div>
+  <div class="mid" id="ovMid"></div>
+  <button class="btn" id="ovClose" type="button">OK!</button>
+</div>
+
+<script>
+(function () {
+  "use strict";
+
+  // Google Apps Script web app URL (shared Google Sheet). Empty = this device only.
+  var API_URL = "";
+  var REFRESH_MS = 60000;
+  var STORAGE_KEY = "htrc-2026-autumn";
+  var START = new Date(2026, 9, 24);   // Sat 24 Oct 2026
+  var DAY_COUNT = 9;                   // to Sun 1 Nov 2026
+  var PRIZE_DAY_INDEX = 8;             // Sun 1 Nov
+  var PASS_RATE = 0.8;
+  var BURST_RATE = 0.9;
+  var KIDS = [
+    { id: "taiga", name: "TAIGA" },
+    { id: "leo", name: "LEO" }
+  ];
+  var DEFAULTS = { target: 7, prize: "Mystery Prize!" };
+
+  var MONS = [
+    ["Pikachu", "Electric", "#d9a400"], ["Charmander", "Fire", "#e3350d"],
+    ["Squirtle", "Water", "#2a75bb"], ["Bulbasaur", "Grass", "#2fb36d"],
+    ["Eevee", "Normal", "#9c8f6b"], ["Gengar", "Ghost", "#6b4ba8"],
+    ["Lucario", "Fighting", "#b0542c"], ["Snorlax", "Normal", "#9c8f6b"],
+    ["Jigglypuff", "Fairy", "#d685ad"], ["Gyarados", "Water", "#2a75bb"],
+    ["Dragonite", "Dragon", "#4b3fd1"], ["Mewtwo", "Psychic", "#d1477a"],
+    ["Greninja", "Water", "#2a75bb"], ["Sprigatito", "Grass", "#2fb36d"],
+    ["Fuecoco", "Fire", "#e3350d"], ["Quaxly", "Water", "#2a75bb"],
+    ["Lapras", "Ice", "#3fb6c9"], ["Machamp", "Fighting", "#b0542c"],
+    ["Rayquaza", "Dragon", "#4b3fd1"], ["Mew", "Psychic", "#d1477a"]
+  ];
+  var RANKS = [
+    [0, "Rookie Trainer"], [2, "Gym Challenger"], [4, "Ace Trainer"],
+    [6, "Elite Four"]
+  ];
+  var EVOLUTION = ["Charmander", "Charmeleon", "Charizard"];
+  var DAY_NAMES = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+
+  var state = load();
+  var current = KIDS[0].id;
+
+  // ---------- storage (works even when blocked) ----------
+  function load() {
+    var base = { target: DEFAULTS.target, prize: DEFAULTS.prize, kids: {} };
+    try {
+      var raw = window.localStorage.getItem(STORAGE_KEY);
+      if (raw) {
+        var parsed = JSON.parse(raw);
+        if (parsed && typeof parsed === "object") base = parsed;
+      }
+    } catch (e) { /* storage unavailable: start fresh */ }
+    for (var i = 0; i < KIDS.length; i++) {
+      if (!base.kids[KIDS[i].id]) base.kids[KIDS[i].id] = { entries: [] };
+    }
+    return base;
+  }
+  function save() {
+    try { window.localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); }
+    catch (e) { /* ignore: page still works for this session */ }
+  }
+
+  // ---------- shared storage (Google Sheet via Apps Script) ----------
+  function setSync(text, isError) {
+    var s = el("sync");
+    s.textContent = text;
+    s.className = "sync" + (isError ? " error" : "");
+  }
+  function applyRemote(data) {
+    if (!data || !data.ok) throw new Error((data && data.error) || "Bad response");
+    state.target = data.settings.target;
+    state.prize = data.settings.prize;
+    KIDS.forEach(function (k) {
+      state.kids[k.id] = {
+        entries: data.entries.filter(function (e) { return e.kid === k.id; })
+      };
+    });
+    save();
+    render();
+    setSync("☁ Shared · updated " + new Date().toTimeString().slice(0, 5), false);
+  }
+  function api(payload) {
+    var req = payload
+      ? fetch(API_URL, { method: "POST", body: JSON.stringify(payload) })
+      : fetch(API_URL, { cache: "no-store" });
+    return req.then(function (r) {
+      if (!r.ok) throw new Error("HTTP " + r.status);
+      return r.json();
+    }).then(applyRemote);
+  }
+  function refresh() {
+    if (!API_URL) return;
+    api(null).catch(function () {
+      setSync("⚠ Offline: showing the last saved records", true);
+    });
+  }
+  // Runs a change locally (no API) or on the shared sheet; calls done(ok).
+  function commit(payload, localChange, done) {
+    if (!API_URL) {
+      localChange();
+      save();
+      render();
+      done(true);
+      return;
+    }
+    setSync("Saving...", false);
+    api(payload).then(function () { done(true); }).catch(function () {
+      setSync("⚠ Not saved. Check the internet and try again.", true);
+      window.alert("Sorry, it could not be saved. Check the internet and try again.");
+      done(false);
+    });
+  }
+
+  // ---------- helpers ----------
+  function dayDate(i) { return new Date(START.getFullYear(), START.getMonth(), START.getDate() + i); }
+  function todayIndex() {
+    var now = new Date();
+    var t = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    return Math.round((t - START) / 86400000);
+  }
+  function fmt(d) { return DAY_NAMES[d.getDay()] + " " + d.getDate() + " " + (d.getMonth() === 9 ? "Oct" : "Nov"); }
+  function rate(e) { return e.score / e.total; }
+  function isPass(e) { return rate(e) >= PASS_RATE; }
+  function ballClass(e) {
+    if (!isPass(e)) return "empty";
+    if (e.score === e.total) return "ultra";
+    if (rate(e) >= BURST_RATE) return "great";
+    return "";
+  }
+  function finishOf(e) {
+    if (e.score === e.total) return { name: "XTREME FINISH", pts: 3 };
+    if (rate(e) >= BURST_RATE) return { name: "BURST FINISH", pts: 2 };
+    if (isPass(e)) return { name: "SPIN FINISH", pts: 1 };
+    return null;
+  }
+  function el(id) { return document.getElementById(id); }
+  function make(tag, cls, text) {
+    var n = document.createElement(tag);
+    if (cls) n.className = cls;
+    if (text !== undefined) n.textContent = text;
+    return n;
+  }
+  function entries() { return state.kids[current].entries; }
+  function passed() { return entries().filter(isPass); }
+
+  function summary() {
+    var list = entries();
+    var caught = passed();
+    var perfect = caught.filter(function (e) { return e.score === e.total; }).length;
+    var bp = 0;
+    for (var i = 0; i < list.length; i++) {
+      var f = finishOf(list[i]);
+      if (f) bp += f.pts;
+    }
+    var streak = 0;
+    var last = Math.min(todayIndex(), DAY_COUNT - 1);
+    for (var d = last; d >= 0; d--) {
+      if (caught.some(function (e) { return e.day === d; })) streak++;
+      else if (d !== last) break;
+    }
+    return { caught: caught.length, perfect: perfect, bp: bp, streak: streak };
+  }
+
+  // ---------- render ----------
+  function renderTabs() {
+    var tabs = el("tabs");
+    tabs.innerHTML = "";
+    KIDS.forEach(function (k) {
+      var b = make("button", "tab" + (k.id === current ? " active" : ""));
+      b.type = "button";
+      b.appendChild(make("span", "ball"));
+      b.appendChild(document.createTextNode("Trainer " + k.name));
+      b.onclick = function () { current = k.id; render(); };
+      tabs.appendChild(b);
+    });
+  }
+
+  function renderTrainer(s) {
+    var kid = KIDS.filter(function (k) { return k.id === current; })[0];
+    el("trainerName").textContent = "Trainer " + kid.name;
+    var rank = RANKS[0][1];
+    for (var i = 0; i < RANKS.length; i++) if (s.caught >= RANKS[i][0]) rank = RANKS[i][1];
+    if (s.caught >= state.target) rank = "🏆 CHAMPION";
+    el("rank").textContent = rank;
+
+    var stage = s.caught >= state.target ? 2 : (s.caught >= Math.ceil(state.target / 2) ? 1 : 0);
+    var evo = el("evo");
+    evo.innerHTML = "Your partner: ";
+    EVOLUTION.forEach(function (name, i) {
+      evo.appendChild(make("span", i === stage ? "on" : "", name));
+      if (i < EVOLUTION.length - 1) evo.appendChild(document.createTextNode(" → "));
+    });
+
+    var pct = Math.min(100, Math.round(s.caught / state.target * 100));
+    el("hp").firstElementChild.style.width = pct + "%";
+    el("hp").className = "hp" + (pct < 50 ? " low" : "");
+    el("hpText").textContent = s.caught + " / " + state.target + " books";
+    el("sCaught").textContent = s.caught;
+    el("sPerfect").textContent = s.perfect;
+    el("sStreak").textContent = s.streak;
+    el("bp").textContent = s.bp;
+    el("blade").setAttribute("class", "blade" + (s.caught > 0 ? "" : " slow"));
+  }
+
+  function renderDays() {
+    var box = el("days");
+    box.innerHTML = "";
+    var t = todayIndex();
+    for (var i = 0; i < DAY_COUNT; i++) {
+      var dayList = entries().filter(function (e) { return e.day === i && isPass(e); });
+      var cell = make("div", "day" + (i === t ? " today" : "") + (i > t ? " future" : ""));
+      cell.appendChild(make("div", "dname", i === PRIZE_DAY_INDEX ? "Final!" : "Day " + (i + 1)));
+      cell.appendChild(make("div", "ddate", fmt(dayDate(i))));
+      var best = dayList.slice().sort(function (a, b) { return rate(b) - rate(a); })[0];
+      cell.appendChild(make("div", "ball " + (best ? ballClass(best) : "empty")));
+      cell.appendChild(make("div", "tag", best ? "BADGE GET!" : (i < t ? "missed" : "")));
+      if (dayList.length >= 2) cell.appendChild(make("div", "double", "DOUBLE! x" + dayList.length));
+      box.appendChild(cell);
+    }
+  }
+
+  function renderDex() {
+    var box = el("dex");
+    box.innerHTML = "";
+    var list = entries();
+    if (!list.length) {
+      box.appendChild(make("div", "empty-dex", "No books yet. Read a book, take the quiz, and catch your first one!"));
+      return;
+    }
+    var caughtNo = 0;
+    list.forEach(function (e) {
+      var pass = isPass(e);
+      var card = make("div", "entry" + (pass ? "" : " fail"));
+      var top = make("div", "top");
+      top.appendChild(make("div", "ball " + ballClass(e)));
+      var info = make("div");
+      if (pass) {
+        var mon = MONS[caughtNo % MONS.length];
+        caughtNo++;
+        info.appendChild(make("div", "mon", "#" + caughtNo + " " + mon[0]));
+        var type = make("span", "type", mon[1]);
+        type.style.background = mon[2];
+        info.appendChild(type);
+      } else {
+        info.appendChild(make("div", "mon", "It broke free!"));
+        info.appendChild(make("div", "meta", "Read it again and retry"));
+      }
+      top.appendChild(info);
+      card.appendChild(top);
+      card.appendChild(make("div", "title", "📖 " + e.title));
+      var f = finishOf(e);
+      card.appendChild(make("div", "meta", e.score + "/" + e.total + " · " + e.site + " · " + fmt(dayDate(e.day)) + (f ? " · " + f.name : "")));
+      var del = make("button", "del", "✕");
+      del.type = "button";
+      del.title = "Delete";
+      del.onclick = function () {
+        if (!window.confirm("Delete \"" + e.title + "\"?")) return;
+        commit({ action: "delete", id: e.id }, function () {
+          state.kids[current].entries = entries().filter(function (x) { return x.id !== e.id; });
+        }, function () {});
+      };
+      card.appendChild(del);
+      box.appendChild(card);
+    });
+  }
+
+  function renderPrize(s) {
+    var done = s.caught >= state.target;
+    var canOpen = done && todayIndex() >= PRIZE_DAY_INDEX;
+    el("chest").className = "chest" + (done ? "" : " locked");
+    var left = state.target - s.caught;
+    el("prizeMsg").textContent = done
+      ? (canOpen ? "CHAMPION! Your prize is ready!" : "Target reached! Open it on Sun 1 Nov!")
+      : left + " more book" + (left === 1 ? "" : "s") + " to unlock the prize!";
+    el("openPrize").style.display = canOpen ? "inline-block" : "none";
+  }
+
+  function renderDateSelect() {
+    var sel = el("fDate");
+    var keep = sel.value;
+    sel.innerHTML = "";
+    var t = Math.max(0, Math.min(todayIndex(), DAY_COUNT - 1));
+    for (var i = 0; i < DAY_COUNT; i++) {
+      var o = make("option", "", fmt(dayDate(i)));
+      o.value = String(i);
+      sel.appendChild(o);
+    }
+    sel.value = keep !== "" && keep !== undefined && keep !== null && sel.querySelector("option[value='" + keep + "']") ? keep : String(t);
+  }
+
+  function render() {
+    var s = summary();
+    el("dates").textContent = fmt(dayDate(0)) + " → " + fmt(dayDate(DAY_COUNT - 1)) + " 2026";
+    renderTabs();
+    renderTrainer(s);
+    renderDays();
+    renderDex();
+    renderPrize(s);
+    el("sTarget").value = state.target;
+    el("sPrize").value = state.prize;
+  }
+
+  // ---------- overlay ----------
+  function show(artNode, big, mid) {
+    var art = el("ovArt");
+    art.innerHTML = "";
+    if (artNode) art.appendChild(artNode);
+    el("ovBig").textContent = big;
+    el("ovMid").textContent = mid;
+    el("ovBig").className = "big flash";
+    el("overlay").className = "overlay show";
+  }
+  el("ovClose").onclick = function () { el("overlay").className = "overlay"; };
+
+  // ---------- form ----------
+  el("form").onsubmit = function (ev) {
+    ev.preventDefault();
+    var title = el("fTitle").value.replace(/\s+/g, " ").trim();
+    var score = parseInt(el("fScore").value, 10);
+    var total = parseInt(el("fTotal").value, 10);
+    if (!title) { window.alert("Please type the book title."); return; }
+    if (isNaN(score) || isNaN(total) || total < 1 || score < 0 || score > total) {
+      window.alert("Please check the score. It must be between 0 and " + (isNaN(total) ? "the total" : total) + ".");
+      return;
+    }
+    var entry = {
+      id: Date.now() + "-" + Math.floor(Math.random() * 1e6),
+      kid: current,
+      day: parseInt(el("fDate").value, 10),
+      title: title,
+      site: el("fSite").value,
+      score: score,
+      total: total
+    };
+    var before = summary().caught;
+    var kid = current;
+    var button = el("form").querySelector("button[type=submit]");
+    button.disabled = true;
+    commit({ action: "add", entry: entry }, function () {
+      state.kids[kid].entries = state.kids[kid].entries.concat([entry]);
+    }, function (ok) {
+      button.disabled = false;
+      if (ok) celebrate(entry, before);
+    });
+  };
+
+  function celebrate(entry, before) {
+    var score = entry.score;
+    var total = entry.total;
+    var f = finishOf(entry);
+    if (f) {
+      var ball = make("div", "ball huge " + ballClass(entry));
+      var mon = MONS[before % MONS.length][0];
+      var mid = f.name + "!  +" + f.pts + " Battle Points";
+      if (before < state.target && before + 1 >= state.target) mid += "  🏆 TARGET REACHED!";
+      show(ball, "Gotcha! " + mon + " was caught!", mid);
+    } else {
+      show(make("div", "ball huge empty"), "Oh no! It broke free!", "You got " + score + "/" + total + ". Read it again and try once more!");
+    }
+    el("fTitle").value = "";
+    el("fScore").value = "";
+  }
+
+  el("openPrize").onclick = function () {
+    var blade = el("blade").cloneNode(true);
+    blade.setAttribute("class", "blade");
+    show(blade, "LET IT RIP! 🏆", "Your prize: " + state.prize);
+  };
+
+  el("saveSettings").onclick = function () {
+    var t = parseInt(el("sTarget").value, 10);
+    if (isNaN(t) || t < 1 || t > 30) { window.alert("Target must be 1 to 30."); return; }
+    var prize = el("sPrize").value.trim() || DEFAULTS.prize;
+    commit({ action: "settings", settings: { target: t, prize: prize } }, function () {
+      state.target = t;
+      state.prize = prize;
+    }, function (ok) {
+      if (!ok) return;
+      el("saved").textContent = "Saved!";
+      setTimeout(function () { el("saved").textContent = ""; }, 1500);
+    });
+  };
+
+  renderDateSelect();
+  render();
+  if (API_URL) {
+    setSync("Loading...", false);
+    refresh();
+    setInterval(refresh, REFRESH_MS);
+    document.addEventListener("visibilitychange", function () {
+      if (document.visibilityState === "visible") refresh();
+    });
+  } else {
+    setSync("This device only (shared sheet not connected yet)", false);
+  }
+})();
+</script>
+</body>
+</html>
