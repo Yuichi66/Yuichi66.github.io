@@ -392,6 +392,9 @@
   var CATCH_WOBBLE_MS = 1500;
   var NO_QUIZ = "No quiz";
   var TTRS_URL = "https://play.ttrockstars.com/auth/school/student/29597";
+  // ReadnQuiz needs a login first; the quiz search page works once logged in.
+  var RNQ_LOGIN_URL = "https://readnquiz.com/home.aspx?id=50285";
+  var RNQ_FIND_URL = "https://readnquiz.com/quiz/find.aspx?xid=50285";
   var KIDS = [
     { id: "taiga", name: "TAIGA", maths: true, target: 10, mathsTarget: 2500, ks: "KS2" },
     { id: "leo", name: "LEO", maths: true, target: 10, mathsTarget: 2500, ks: "KS2" },
@@ -788,8 +791,9 @@
     var links = el("quizLinks");
     links.innerHTML = "";
     var list = [
-      ["📝 ReadnQuiz", "Find your book and take the quiz", "https://readnquiz.com/", ""],
-      ["📝 Free Book Quiz", kid().ks + " quizzes, no login", "https://www.freebookquiz.com/", "alt"]
+      ["📝 ReadnQuiz: 1. Log in", "Use your ReadnQuiz username", RNQ_LOGIN_URL, ""],
+      ["📝 ReadnQuiz: 2. Find your book", "Type the title and take the quiz", RNQ_FIND_URL, ""],
+      ["📝 Free Book Quiz", kid().ks + " quizzes, no login", "https://www.freebookquiz.com/#search-heading", "alt"]
     ];
     list.forEach(function (l) {
       var a = make("a", "go-link " + l[3], l[0]);
