@@ -199,12 +199,18 @@
   .overlay .mid { font-size: 20px; margin-top: 10px; }
   .overlay .ball.huge { width: 140px; height: 140px; border-width: 6px; animation: wobble .5s ease-in-out 3; }
   .overlay .ball.huge::after { border-width: 6px; }
-  .overlay .pop { width: 200px; height: 200px; animation: pop .6s ease-out; }
+  .overlay .pop { display: block; margin: 0 auto; width: min(72vw, 320px); height: min(72vw, 320px); object-fit: contain; animation: pop .6s ease-out, hop 1.4s ease-in-out .6s infinite; filter: drop-shadow(0 6px 12px rgba(0,0,0,.5)); }
   .overlay .blade { width: 150px; height: 150px; animation: spin .2s linear infinite; filter: drop-shadow(0 0 10px var(--cyan)); }
   .overlay .btn { margin-top: 22px; }
   @keyframes wobble { 0%,100% { transform: rotate(0); } 25% { transform: rotate(-22deg); } 75% { transform: rotate(22deg); } }
   @keyframes pop { from { transform: scale(.2) translateY(60px); opacity: 0; } to { transform: scale(1); opacity: 1; } }
   @keyframes spin { to { transform: rotate(360deg); } }
+  @keyframes hop {
+    0%, 100% { transform: translateY(0) scale(1, 1) rotate(0); }
+    25% { transform: translateY(0) scale(1.06, .94) rotate(0); }
+    50% { transform: translateY(-30px) scale(.96, 1.05) rotate(-5deg); }
+    75% { transform: translateY(0) scale(1.04, .96) rotate(4deg); }
+  }
   .hidden { display: none !important; }
 </style>
 </head>
@@ -355,7 +361,7 @@
       <button class="btn ghost" type="button" data-close>Cancel</button>
       <button class="btn purple" type="submit">🚀 LET IT RIP!</button>
     </div>
-    <div class="rule">Every correct answer counts. The app adds them up for you.</div>
+    <div class="rule">Every correct answer counts. The app adds them up for you. Each game catches a Pokémon!</div>
   </form>
 </div>
 
@@ -407,9 +413,25 @@
     ["Greninja", "Water", "#2a75bb", 658], ["Sprigatito", "Grass", "#2fb36d", 906],
     ["Fuecoco", "Fire", "#e3350d", 909], ["Quaxly", "Water", "#2a75bb", 912],
     ["Lapras", "Ice", "#3fb6c9", 131], ["Machamp", "Fighting", "#b0542c", 68],
-    ["Rayquaza", "Dragon", "#4b3fd1", 384], ["Mew", "Psychic", "#d1477a", 151]
+    ["Rayquaza", "Dragon", "#4b3fd1", 384], ["Mew", "Psychic", "#d1477a", 151],
+    ["Charizard", "Fire", "#e3350d", 6], ["Piplup", "Water", "#2a75bb", 393],
+    ["Umbreon", "Dark", "#4a3b30", 197], ["Raichu", "Electric", "#d9a400", 26],
+    ["Garchomp", "Dragon", "#4b3fd1", 445], ["Sylveon", "Fairy", "#d685ad", 700],
+    ["Blastoise", "Water", "#2a75bb", 9], ["Mimikyu", "Ghost", "#6b4ba8", 778],
+    ["Arcanine", "Fire", "#e3350d", 59], ["Togepi", "Fairy", "#d685ad", 175],
+    ["Venusaur", "Grass", "#2fb36d", 3], ["Tyranitar", "Rock", "#a38c21", 248],
+    ["Psyduck", "Water", "#2a75bb", 54], ["Jolteon", "Electric", "#d9a400", 135],
+    ["Scyther", "Bug", "#8aa31a", 123], ["Gastly", "Ghost", "#6b4ba8", 92],
+    ["Cinderace", "Fire", "#e3350d", 815], ["Meowth", "Normal", "#9c8f6b", 52],
+    ["Lugia", "Psychic", "#d1477a", 249], ["Onix", "Rock", "#a38c21", 95],
+    ["Vaporeon", "Water", "#2a75bb", 134], ["Pichu", "Electric", "#d9a400", 172],
+    ["Dratini", "Dragon", "#4b3fd1", 147], ["Cubone", "Ground", "#c79a4b", 104],
+    ["Flareon", "Fire", "#e3350d", 136], ["Gardevoir", "Psychic", "#d1477a", 282],
+    ["Magikarp", "Water", "#2a75bb", 129], ["Abra", "Psychic", "#d1477a", 63],
+    ["Geodude", "Rock", "#a38c21", 74], ["Chansey", "Normal", "#9c8f6b", 113]
   ];
   var SPRITE_BASE = "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/";
+  var ART_BASE = SPRITE_BASE + "other/official-artwork/";
   var EVOLUTION = ["Charmander", "Charmeleon", "Charizard"];
   var EVOLUTION_IDS = [4, 5, 6];
   var RANKS = ["Rookie Trainer", "Gym Challenger", "Ace Trainer", "CHAMPION"];
@@ -488,6 +510,19 @@
     img.src = spriteUrl(dexNo);
     return img;
   }
+  // Large, smooth picture for the catch screen; falls back to the pixel sprite.
+  function artwork(dexNo, alt) {
+    var img = document.createElement("img");
+    img.className = "pop";
+    img.alt = alt || "";
+    img.onerror = function () {
+      img.onerror = function () { img.style.visibility = "hidden"; };
+      img.className = "pop sprite";
+      img.src = spriteUrl(dexNo);
+    };
+    img.src = ART_BASE + dexNo + ".png";
+    return img;
+  }
   function setSprite(img, dexNo, alt) {
     img.onerror = function () { img.style.visibility = "hidden"; };
     img.style.visibility = "";
@@ -521,6 +556,30 @@
     return { caught: caught, correct: correct, readPct: readPct, mathsPct: mathsPct, pct: pct, tier: tier };
   }
   function need(goal, pctNeeded) { return Math.ceil(goal * pctNeeded / 100); }
+
+  // Every passed book and every times tables game catches the next Pokémon,
+  // in the order they were logged (ids start with the time they were made).
+  function loggedAt(x) { return parseInt(String(x.id), 10) || 0; }
+  function catchOrder() {
+    var d = data();
+    var list = d.entries.filter(isPass).concat(d.maths.filter(function (m) { return m.correct > 0; }));
+    return list.sort(function (a, b) { return loggedAt(a) - loggedAt(b); });
+  }
+  // id -> catch number (0-based)
+  function catchNumbers() {
+    var nos = {};
+    catchOrder().forEach(function (x, i) { nos[x.id] = i; });
+    return nos;
+  }
+  function monAt(i) { return MONS[i % MONS.length]; }
+  function monLine(info, top, i) {
+    var mon = monAt(i);
+    info.appendChild(make("div", "mon", "#" + (i + 1) + " " + mon[0]));
+    var type = make("span", "type", mon[1]);
+    type.style.background = mon[2];
+    info.appendChild(type);
+    top.appendChild(sprite(mon[3], "mon-sprite", mon[0]));
+  }
 
   // ---------- render ----------
   function renderTabs() {
@@ -609,7 +668,7 @@
     dex.innerHTML = "";
     var list = data().entries;
     if (!list.length) dex.appendChild(make("div", "empty-dex", "No books yet. Read a book and catch your first Pokémon!"));
-    var caughtNo = 0;
+    var nos = catchNumbers();
     list.forEach(function (e) {
       var pass = isPass(e);
       var card = make("div", "entry" + (pass ? "" : " fail"));
@@ -618,13 +677,7 @@
       var info = make("div");
       top.appendChild(info);
       if (pass) {
-        var mon = MONS[caughtNo % MONS.length];
-        caughtNo++;
-        info.appendChild(make("div", "mon", "#" + caughtNo + " " + mon[0]));
-        var type = make("span", "type", mon[1]);
-        type.style.background = mon[2];
-        info.appendChild(type);
-        top.appendChild(sprite(mon[3], "mon-sprite", mon[0]));
+        monLine(info, top, nos[e.id]);
       } else {
         info.appendChild(make("div", "mon", "It broke free!"));
       }
@@ -653,7 +706,15 @@
     if (!data().maths.length) log.appendChild(make("div", "empty-dex", "No times tables yet."));
     data().maths.forEach(function (m) {
       var card = make("div", "entry");
-      card.appendChild(make("div", "mon", "🎸 " + m.correct + " correct"));
+      if (m.id in nos) {
+        var top = make("div", "top");
+        top.appendChild(make("div", "ball"));
+        var info = make("div");
+        top.appendChild(info);
+        monLine(info, top, nos[m.id]);
+        card.appendChild(top);
+      }
+      card.appendChild(make("div", "title", "🎸 " + m.correct + " correct"));
       card.appendChild(make("div", "meta", fmt(dayDate(m.day))));
       card.appendChild(deleteButton(m, "maths", m.correct + " correct answers"));
       log.appendChild(card);
@@ -689,7 +750,7 @@
       a.appendChild(make("small", "", l[1]));
       links.appendChild(a);
     });
-    setSprite(el("whosSprite"), MONS[summary().caught % MONS.length][3], "Mystery Pokémon");
+    setSprite(el("whosSprite"), monAt(catchOrder().length)[3], "Mystery Pokémon");
   }
 
   function renderSettings() {
@@ -818,15 +879,19 @@
       show(make("div", "ball huge empty"), "Oh no! It broke free!", "You got " + entry.score + "/" + entry.total + ". Read it again and try once more!");
       return;
     }
-    var ball = make("div", "ball huge " + ballClass(entry));
-    var mon = MONS[before.caught % MONS.length];
-    show(ball, "Gotcha! " + mon[0] + " was caught!", (noQuiz(entry) ? "Book done!" : entry.score + "/" + entry.total) + tierUpMessage(before, after));
-    // Let the ball wobble, then the Pokémon pops out.
+    catchPokemon(entry, ballClass(entry), "", (noQuiz(entry) ? "Book done!" : entry.score + "/" + entry.total) + tierUpMessage(before, after));
+  }
+
+  // Ball wobbles, then the next Pokémon pops out.
+  function catchPokemon(item, ballCls, bigPrefix, mid) {
+    var ball = make("div", "ball huge " + ballCls);
+    var mon = monAt(catchNumbers()[item.id] || 0);
+    show(ball, bigPrefix + "Gotcha! " + mon[0] + " was caught!", mid);
     setTimeout(function () {
       var art = el("ovArt");
       if (!art.contains(ball)) return;
       art.innerHTML = "";
-      art.appendChild(sprite(mon[3], "pop", mon[0]));
+      art.appendChild(artwork(mon[3], mon[0]));
     }, CATCH_WOBBLE_MS);
   }
 
@@ -848,7 +913,9 @@
       el("mCorrect").value = "";
       closeSheets();
       var after = summary();
-      show(beySvg("blade"), "LET IT RIP! +" + correct, "Total: " + after.correct + " correct answers" + tierUpMessage(before, after));
+      var mid = "Total: " + after.correct + " correct answers" + tierUpMessage(before, after);
+      if (correct > 0) catchPokemon(item, "", "+" + correct + "! ", mid);
+      else show(beySvg("blade"), "LET IT RIP! +0", mid);
     });
   };
 
