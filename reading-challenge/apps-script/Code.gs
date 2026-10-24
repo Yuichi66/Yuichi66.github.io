@@ -6,20 +6,20 @@
  */
 
 var KIDS = {
-  taiga: { maths: true, target: 7, mathsTarget: 7 },
-  leo: { maths: true, target: 7, mathsTarget: 7 },
-  yudai: { maths: false, target: 5, mathsTarget: 0 }
+  taiga: { maths: true, target: 5, mathsTarget: 500 },
+  leo: { maths: true, target: 5, mathsTarget: 500 },
+  yudai: { maths: false, target: 4, mathsTarget: 0 }
 };
 var DAY_COUNT = 9;
 var MAX_TITLE = 120;
-var MAX_PRIZE = 80;
 var MAX_SCORE = 50;
-var MAX_MINUTES = 120;
+var MAX_CORRECT = 2000;
 var MAX_TARGET = 30;
-var DEFAULT_PRIZE = "Mystery Prize!";
+var MIN_MATHS_TARGET = 10;
+var MAX_MATHS_TARGET = 20000;
 var READ_SITES = ["ReadnQuiz", "Free Book Quiz", "School AR"];
-var MATHS_SITES = ["Times Tables Rock Stars", "Hit the Button"];
-var ENTRY_HEADERS = ["id", "kid", "type", "day", "title", "site", "score", "total", "minutes", "createdAt"];
+var MATHS_SITE = "Times Tables Rock Stars";
+var ENTRY_HEADERS = ["id", "kid", "type", "day", "title", "site", "score", "total", "correct", "createdAt"];
 
 function doGet() {
   return json_(snapshot_());
@@ -46,7 +46,7 @@ function snapshot_() {
   var rows = entriesSheet_().getDataRange().getValues().slice(1);
   var entries = rows.filter(function (r) { return r[0] !== ""; }).map(function (r) {
     var base = { id: String(r[0]), kid: String(r[1]), type: String(r[2]), day: Number(r[3]), site: String(r[5]) };
-    if (base.type === "maths") base.minutes = Number(r[8]);
+    if (base.type === "maths") base.correct = Number(r[8]);
     else {
       base.title = String(r[4]);
       base.score = Number(r[6]);
@@ -66,11 +66,10 @@ function addEntry_(x) {
   var id = String(x.id || Utilities.getUuid()).slice(0, 40);
 
   if (x.type === "maths") {
-    var minutes = Number(x.minutes);
+    var correct = Number(x.correct);
     if (!KIDS[kid].maths) throw new Error("No maths for this kid");
-    if (!isInt_(minutes) || minutes < 1 || minutes > MAX_MINUTES) throw new Error("Bad minutes");
-    var mSite = MATHS_SITES.indexOf(x.site) >= 0 ? x.site : MATHS_SITES[0];
-    entriesSheet_().appendRow([id, kid, "maths", day, "", mSite, "", "", minutes, new Date()]);
+    if (!isInt_(correct) || correct < 0 || correct > MAX_CORRECT) throw new Error("Bad correct answers");
+    entriesSheet_().appendRow([id, kid, "maths", day, "", MATHS_SITE, "", "", correct, new Date()]);
     return;
   }
 
@@ -97,26 +96,22 @@ function saveSettings_(kid, s) {
   if (!s) throw new Error("Missing settings");
   var target = Number(s.target);
   var mathsTarget = KIDS[kid].maths ? Number(s.mathsTarget) : 0;
-  var prize = String(s.prize || "").trim().slice(0, MAX_PRIZE) || DEFAULT_PRIZE;
   if (!isInt_(target) || target < 1 || target > MAX_TARGET) throw new Error("Bad target");
-  if (KIDS[kid].maths && (!isInt_(mathsTarget) || mathsTarget < 1 || mathsTarget > MAX_TARGET)) throw new Error("Bad maths target");
+  if (KIDS[kid].maths && (!isInt_(mathsTarget) || mathsTarget < MIN_MATHS_TARGET || mathsTarget > MAX_MATHS_TARGET)) throw new Error("Bad maths target");
   setSetting_(kid + ".target", target);
   setSetting_(kid + ".mathsTarget", mathsTarget);
-  setSetting_(kid + ".prize", asText_(prize));
 }
 
 function readSettings_() {
   var out = {};
   Object.keys(KIDS).forEach(function (k) {
-    out[k] = { target: KIDS[k].target, mathsTarget: KIDS[k].mathsTarget, prize: DEFAULT_PRIZE };
+    out[k] = { target: KIDS[k].target, mathsTarget: KIDS[k].mathsTarget };
   });
   settingsSheet_().getDataRange().getValues().slice(1).forEach(function (r) {
     var parts = String(r[0]).split(".");
     if (!out[parts[0]] || r[1] === "") return;
-    if (parts[1] === "target" || parts[1] === "mathsTarget") {
-      if (isInt_(Number(r[1]))) out[parts[0]][parts[1]] = Number(r[1]);
-    } else if (parts[1] === "prize") {
-      out[parts[0]].prize = String(r[1]);
+    if ((parts[1] === "target" || parts[1] === "mathsTarget") && isInt_(Number(r[1]))) {
+      out[parts[0]][parts[1]] = Number(r[1]);
     }
   });
   return out;
@@ -135,7 +130,11 @@ function setSetting_(key, value) {
 }
 
 function entriesSheet_() {
-  return sheet_("Entries", ENTRY_HEADERS);
+  var sheet = sheet_("Entries", ENTRY_HEADERS);
+  // Keep the header row in step with ENTRY_HEADERS after column changes.
+  var header = sheet.getRange(1, 1, 1, ENTRY_HEADERS.length);
+  if (header.getValues()[0].join() !== ENTRY_HEADERS.join()) header.setValues([ENTRY_HEADERS]);
+  return sheet;
 }
 
 function settingsSheet_() {
