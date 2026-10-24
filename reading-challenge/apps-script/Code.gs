@@ -17,7 +17,7 @@ var MAX_CORRECT = 2000;
 var MAX_TARGET = 60;
 var MIN_MATHS_TARGET = 10;
 var MAX_MATHS_TARGET = 20000;
-var READ_SITES = ["ReadnQuiz", "Free Book Quiz", "School AR"];
+var READ_SITES = ["ReadnQuiz", "Free Book Quiz", "School AR", "No quiz"];
 var MATHS_SITE = "Times Tables Rock Stars";
 var ENTRY_HEADERS = ["id", "kid", "type", "day", "title", "site", "score", "total", "correct", "createdAt"];
 

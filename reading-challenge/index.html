@@ -304,31 +304,35 @@
     <h3>📖 I read a book!</h3>
     <div class="whos"><img class="sprite" id="whosSprite" alt=""><div><b>Who's that Pokémon?</b>Pass the quiz to catch it!</div></div>
     <div class="step"><div class="num">1</div><div class="body">
-      <b>Take the quiz</b>
-      <div id="quizLinks"></div>
-    </div></div>
-    <div class="step"><div class="num">2</div><div class="body">
       <b>Type the book title</b>
       <input id="fTitle" required maxlength="120" placeholder="e.g. The Twits">
-    </div></div>
-    <div class="step"><div class="num">3</div><div class="body">
-      <b>Type your score</b>
-      <div class="score-row">
-        <input id="fScore" type="number" min="0" max="50" required placeholder="8">
-        <span>out of</span>
-        <input id="fTotal" type="number" min="1" max="50" required value="10">
-      </div>
       <div class="row" style="margin-top:8px">
-        <div class="field"><label for="fSite">Quiz website</label>
-          <select id="fSite"><option>ReadnQuiz</option><option>Free Book Quiz</option><option>School AR</option></select></div>
-        <div class="field"><label for="fDate">Day</label><select id="fDate" class="day-select"></select></div>
+        <div class="field"><label for="fDate">Day you finished</label><select id="fDate" class="day-select"></select></div>
+      </div>
+    </div></div>
+    <div class="step"><div class="num">2</div><div class="body">
+      <b>Did you take a quiz?</b>
+      <select id="fSite">
+        <option value="No quiz">No quiz (just reading)</option>
+        <option>Free Book Quiz</option>
+        <option>ReadnQuiz</option>
+        <option>School AR</option>
+      </select>
+      <div id="quizPart" class="hidden" style="margin-top:10px">
+        <div id="quizLinks"></div>
+        <label>Your score</label>
+        <div class="score-row">
+          <input id="fScore" type="number" min="0" max="50" placeholder="8">
+          <span>out of</span>
+          <input id="fTotal" type="number" min="1" max="50" value="10">
+        </div>
       </div>
     </div></div>
     <div class="sheet-actions">
       <button class="btn ghost" type="button" data-close>Cancel</button>
       <button class="btn" type="submit">🎯 THROW POKé BALL!</button>
     </div>
-    <div class="rule">80% or more catches it (8 out of 10).</div>
+    <div class="rule" id="readRule"></div>
   </form>
 </div>
 
@@ -378,6 +382,7 @@
   var PASS_RATE = 0.8;
   var BURST_RATE = 0.9;
   var CATCH_WOBBLE_MS = 1500;
+  var NO_QUIZ = "No quiz";
   var TTRS_URL = "https://play.ttrockstars.com/auth/school/student/29597";
   var KIDS = [
     { id: "taiga", name: "TAIGA", maths: true, target: 10, mathsTarget: 2500, ks: "KS2" },
@@ -464,9 +469,11 @@
   function clampDay(i) { return Math.max(0, Math.min(i, DAY_COUNT - 1)); }
   function fmt(d) { return DAY_NAMES[d.getDay()] + " " + d.getDate() + " " + (d.getMonth() === 9 ? "Oct" : "Nov"); }
   function rate(e) { return e.score / e.total; }
-  function isPass(e) { return rate(e) >= PASS_RATE; }
+  function noQuiz(e) { return e.site === NO_QUIZ; }
+  function isPass(e) { return noQuiz(e) || rate(e) >= PASS_RATE; }
   function ballClass(e) {
     if (!isPass(e)) return "empty";
+    if (noQuiz(e)) return "";
     if (e.score === e.total) return "gold";
     if (rate(e) >= BURST_RATE) return "great";
     return "";
@@ -623,7 +630,7 @@
       }
       card.appendChild(top);
       card.appendChild(make("div", "title", "📖 " + e.title));
-      card.appendChild(make("div", "meta", e.score + "/" + e.total + " · " + e.site + " · " + fmt(dayDate(e.day))));
+      card.appendChild(make("div", "meta", (noQuiz(e) ? "Read (no quiz)" : e.score + "/" + e.total + " · " + e.site) + " · " + fmt(dayDate(e.day))));
       card.appendChild(deleteButton(e, "entries", "\"" + e.title + "\""));
       dex.appendChild(card);
     });
@@ -780,14 +787,16 @@
   el("readForm").onsubmit = function (ev) {
     ev.preventDefault();
     var title = el("fTitle").value.replace(/\s+/g, " ").trim();
-    var score = parseInt(el("fScore").value, 10);
-    var total = parseInt(el("fTotal").value, 10);
+    var site = el("fSite").value;
+    // A book without a quiz is stored as 1/1 so it always counts.
+    var score = site === NO_QUIZ ? 1 : parseInt(el("fScore").value, 10);
+    var total = site === NO_QUIZ ? 1 : parseInt(el("fTotal").value, 10);
     if (!title) { window.alert("Please type the book title."); return; }
     if (isNaN(score) || isNaN(total) || total < 1 || score < 0 || score > total) {
       window.alert("Please check the score. It must be between 0 and " + (isNaN(total) ? "the total" : total) + ".");
       return;
     }
-    var entry = { id: newId(), kid: current, type: "read", day: parseInt(el("fDate").value, 10), title: title, site: el("fSite").value, score: score, total: total };
+    var entry = { id: newId(), kid: current, type: "read", day: parseInt(el("fDate").value, 10), title: title, site: site, score: score, total: total };
     var before = summary();
     var who = current;
     var button = el("readForm").querySelector("button[type=submit]");
@@ -811,7 +820,7 @@
     }
     var ball = make("div", "ball huge " + ballClass(entry));
     var mon = MONS[before.caught % MONS.length];
-    show(ball, "Gotcha! " + mon[0] + " was caught!", entry.score + "/" + entry.total + tierUpMessage(before, after));
+    show(ball, "Gotcha! " + mon[0] + " was caught!", (noQuiz(entry) ? "Book done!" : entry.score + "/" + entry.total) + tierUpMessage(before, after));
     // Let the ball wobble, then the Pokémon pops out.
     setTimeout(function () {
       var art = el("ovArt");
@@ -844,6 +853,15 @@
   };
 
   el("ttrsLink").href = TTRS_URL;
+
+  function updateQuizPart() {
+    var quiz = el("fSite").value !== NO_QUIZ;
+    el("quizPart").className = quiz ? "" : "hidden";
+    el("fScore").required = quiz;
+    el("readRule").textContent = quiz ? "80% or more catches it (8 out of 10)." : "Finished the whole book? Throw the ball!";
+  }
+  el("fSite").onchange = updateQuizPart;
+  updateQuizPart();
 
   el("saveSettings").onclick = function () {
     var t = parseInt(el("sTarget").value, 10);
