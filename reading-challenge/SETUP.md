@@ -15,10 +15,9 @@ The sheet gets two tabs automatically: `Entries` (one row per book) and `Setting
 
 ## 2. GitHub Pages
 
-1. https://github.com/new → Repository name `reading-challenge` → `Public` → `Create repository`.
-2. Push this folder to `main`.
-3. Repository `Settings` → `Pages` → `Source`: `Deploy from a branch` → Branch `main` / `/ (root)` → `Save`.
-4. The app opens at `https://yuichi66.github.io/reading-challenge/`.
+The app lives in the `reading-challenge/` folder of the user-site repository `Yuichi66.github.io`.
+GitHub publishes user-site repositories automatically from `main`, so the app opens at
+`https://yuichi66.github.io/reading-challenge/`.
 
 ## 3. iPhone
 
