@@ -48,6 +48,25 @@
   header .sub { font-size: 18px; margin-top: 4px; opacity: .9; }
   .dates { display: inline-block; margin-top: 8px; padding: 4px 14px; border-radius: 20px; background: rgba(255,255,255,.15); }
   .sync { font-size: 13px; margin-top: 6px; opacity: .85; }
+
+  /* pokemon sprites (PokeAPI) */
+  .sprite { image-rendering: pixelated; image-rendering: crisp-edges; display: block; }
+  .header-mons { display: flex; justify-content: center; gap: 2px; margin-top: 6px; flex-wrap: wrap; }
+  .header-mons .sprite { width: 64px; height: 64px; animation: hop 1.6s ease-in-out infinite; }
+  .header-mons .sprite:nth-child(2n) { animation-delay: .4s; }
+  .header-mons .sprite:nth-child(3n) { animation-delay: .8s; }
+  @keyframes hop { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-8px); } }
+  .card-red { position: relative; overflow: hidden; }
+  .card-red .partner { position: absolute; right: -6px; top: -4px; width: 120px; height: 120px; filter: drop-shadow(0 3px 0 rgba(0,0,0,.35)); }
+  .card-red .name, .card-red .rank { position: relative; }
+  .card-red .evo { position: relative; padding-right: 0; }
+  .entry .mon-sprite { width: 72px; height: 72px; margin: -8px -6px -8px auto; }
+  .whos { display: flex; align-items: center; gap: 12px; background: linear-gradient(135deg, #2a75bb, #1b4f8a); color: #fff; border: 3px solid #000; border-radius: 14px; padding: 6px 14px; margin-bottom: 12px; }
+  .whos .sprite { width: 84px; height: 84px; filter: brightness(0); }
+  .whos b { color: var(--yellow); font-size: 20px; display: block; }
+  .overlay .pop { width: 220px; height: 220px; animation: pop .6s ease-out; }
+  @keyframes pop { from { transform: scale(.2) translateY(60px); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+  .credit { color: #fff; opacity: .55; font-size: 11px; text-align: center; margin-bottom: 20px; }
   .sync.error { color: #ffb3a7; opacity: 1; font-weight: bold; }
   .btn[disabled] { opacity: .6; cursor: wait; }
 
@@ -185,7 +204,7 @@
 
   /* overlay animation */
   .overlay {
-    position: fixed; inset: 0; background: rgba(0,0,0,.82); display: none;
+    position: fixed; inset: 0; background: radial-gradient(circle, #31508a 0, #0b1224 70%); display: none;
     align-items: center; justify-content: center; flex-direction: column; z-index: 10; color: #fff; text-align: center; padding: 16px;
   }
   .overlay.show { display: flex; }
@@ -207,6 +226,7 @@
     <div class="sub">Gotta read 'em all! &nbsp;|&nbsp; 3... 2... 1... LET IT RIP!</div>
     <div class="dates" id="dates"></div>
     <div class="sync" id="sync"></div>
+    <div class="header-mons" id="headerMons"></div>
   </header>
 
   <div class="tabs" id="tabs"></div>
@@ -215,6 +235,7 @@
     <div class="panel">
       <h2><span class="ball"></span> Trainer Card</h2>
       <div class="card-red">
+        <img class="sprite partner" id="partner" alt="">
         <div class="name" id="trainerName"></div>
         <div class="rank" id="rank"></div>
         <div class="evo" id="evo"></div>
@@ -257,6 +278,10 @@
   <section class="panel">
     <h2>📖 I finished a book!</h2>
     <form id="form" autocomplete="off">
+      <div class="whos">
+        <img class="sprite" id="whosSprite" alt="">
+        <div><b>Who's that Pokémon?</b>Pass your next quiz to find out!</div>
+      </div>
       <div class="row">
         <div class="field" style="flex:2">
           <label for="fTitle">Book title</label>
@@ -324,6 +349,7 @@
       <span id="saved" style="margin-left:8px"></span>
     </div>
   </details>
+  <div class="credit">Pokémon images from PokeAPI. Pokémon © Nintendo / Creatures / GAME FREAK / The Pokémon Company. Family fan project, not official.</div>
 </div>
 
 <div class="overlay" id="overlay">
@@ -352,23 +378,28 @@
   ];
   var DEFAULTS = { target: 7, prize: "Mystery Prize!" };
 
+  // [name, type, colour, national dex number]
   var MONS = [
-    ["Pikachu", "Electric", "#d9a400"], ["Charmander", "Fire", "#e3350d"],
-    ["Squirtle", "Water", "#2a75bb"], ["Bulbasaur", "Grass", "#2fb36d"],
-    ["Eevee", "Normal", "#9c8f6b"], ["Gengar", "Ghost", "#6b4ba8"],
-    ["Lucario", "Fighting", "#b0542c"], ["Snorlax", "Normal", "#9c8f6b"],
-    ["Jigglypuff", "Fairy", "#d685ad"], ["Gyarados", "Water", "#2a75bb"],
-    ["Dragonite", "Dragon", "#4b3fd1"], ["Mewtwo", "Psychic", "#d1477a"],
-    ["Greninja", "Water", "#2a75bb"], ["Sprigatito", "Grass", "#2fb36d"],
-    ["Fuecoco", "Fire", "#e3350d"], ["Quaxly", "Water", "#2a75bb"],
-    ["Lapras", "Ice", "#3fb6c9"], ["Machamp", "Fighting", "#b0542c"],
-    ["Rayquaza", "Dragon", "#4b3fd1"], ["Mew", "Psychic", "#d1477a"]
+    ["Pikachu", "Electric", "#d9a400", 25], ["Charmander", "Fire", "#e3350d", 4],
+    ["Squirtle", "Water", "#2a75bb", 7], ["Bulbasaur", "Grass", "#2fb36d", 1],
+    ["Eevee", "Normal", "#9c8f6b", 133], ["Gengar", "Ghost", "#6b4ba8", 94],
+    ["Lucario", "Fighting", "#b0542c", 448], ["Snorlax", "Normal", "#9c8f6b", 143],
+    ["Jigglypuff", "Fairy", "#d685ad", 39], ["Gyarados", "Water", "#2a75bb", 130],
+    ["Dragonite", "Dragon", "#4b3fd1", 149], ["Mewtwo", "Psychic", "#d1477a", 150],
+    ["Greninja", "Water", "#2a75bb", 658], ["Sprigatito", "Grass", "#2fb36d", 906],
+    ["Fuecoco", "Fire", "#e3350d", 909], ["Quaxly", "Water", "#2a75bb", 912],
+    ["Lapras", "Ice", "#3fb6c9", 131], ["Machamp", "Fighting", "#b0542c", 68],
+    ["Rayquaza", "Dragon", "#4b3fd1", 384], ["Mew", "Psychic", "#d1477a", 151]
   ];
+  var SPRITE_BASE = "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/";
+  var HEADER_MONS = [25, 4, 7, 1, 133];
+  var CATCH_WOBBLE_MS = 1500;
   var RANKS = [
     [0, "Rookie Trainer"], [2, "Gym Challenger"], [4, "Ace Trainer"],
     [6, "Elite Four"]
   ];
   var EVOLUTION = ["Charmander", "Charmeleon", "Charizard"];
+  var EVOLUTION_IDS = [4, 5, 6];
   var DAY_NAMES = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
   var state = load();
@@ -468,6 +499,22 @@
     return null;
   }
   function el(id) { return document.getElementById(id); }
+  function spriteUrl(dexNo) { return SPRITE_BASE + dexNo + ".png"; }
+  // Pixel sprite <img>; hides itself if the picture cannot load (offline).
+  function sprite(dexNo, cls, alt) {
+    var img = document.createElement("img");
+    img.className = "sprite " + (cls || "");
+    img.alt = alt || "";
+    img.onerror = function () { img.style.visibility = "hidden"; };
+    img.src = spriteUrl(dexNo);
+    return img;
+  }
+  function setSprite(img, dexNo, alt) {
+    img.onerror = function () { img.style.visibility = "hidden"; };
+    img.style.visibility = "";
+    img.alt = alt || "";
+    if (img.getAttribute("src") !== spriteUrl(dexNo)) img.src = spriteUrl(dexNo);
+  }
   function make(tag, cls, text) {
     var n = document.createElement(tag);
     if (cls) n.className = cls;
@@ -518,6 +565,8 @@
     el("rank").textContent = rank;
 
     var stage = s.caught >= state.target ? 2 : (s.caught >= Math.ceil(state.target / 2) ? 1 : 0);
+    setSprite(el("partner"), EVOLUTION_IDS[stage], EVOLUTION[stage]);
+    setSprite(el("whosSprite"), MONS[s.caught % MONS.length][3], "Mystery Pokémon");
     var evo = el("evo");
     evo.innerHTML = "Your partner: ";
     EVOLUTION.forEach(function (name, i) {
@@ -575,11 +624,13 @@
         var type = make("span", "type", mon[1]);
         type.style.background = mon[2];
         info.appendChild(type);
+        top.appendChild(info);
+        top.appendChild(sprite(mon[3], "mon-sprite", mon[0]));
       } else {
         info.appendChild(make("div", "mon", "It broke free!"));
         info.appendChild(make("div", "meta", "Read it again and retry"));
+        top.appendChild(info);
       }
-      top.appendChild(info);
       card.appendChild(top);
       card.appendChild(make("div", "title", "📖 " + e.title));
       var f = finishOf(e);
@@ -684,10 +735,17 @@
     var f = finishOf(entry);
     if (f) {
       var ball = make("div", "ball huge " + ballClass(entry));
-      var mon = MONS[before % MONS.length][0];
+      var mon = MONS[before % MONS.length];
       var mid = f.name + "!  +" + f.pts + " Battle Points";
       if (before < state.target && before + 1 >= state.target) mid += "  🏆 TARGET REACHED!";
-      show(ball, "Gotcha! " + mon + " was caught!", mid);
+      show(ball, "Gotcha! " + mon[0] + " was caught!", mid);
+      // Let the ball wobble, then the Pokémon pops out.
+      setTimeout(function () {
+        var art = el("ovArt");
+        if (!art.contains(ball)) return;
+        art.innerHTML = "";
+        art.appendChild(sprite(mon[3], "pop", mon[0]));
+      }, CATCH_WOBBLE_MS);
     } else {
       show(make("div", "ball huge empty"), "Oh no! It broke free!", "You got " + score + "/" + total + ". Read it again and try once more!");
     }
@@ -696,9 +754,16 @@
   }
 
   el("openPrize").onclick = function () {
+    var art = make("div");
+    art.style.display = "flex";
+    art.style.alignItems = "center";
+    art.style.justifyContent = "center";
+    art.style.flexWrap = "wrap";
     var blade = el("blade").cloneNode(true);
     blade.setAttribute("class", "blade");
-    show(blade, "LET IT RIP! 🏆", "Your prize: " + state.prize);
+    art.appendChild(sprite(EVOLUTION_IDS[2], "pop", EVOLUTION[2]));
+    art.appendChild(blade);
+    show(art, "LET IT RIP! 🏆", "Your prize: " + state.prize);
   };
 
   el("saveSettings").onclick = function () {
@@ -715,6 +780,7 @@
     });
   };
 
+  HEADER_MONS.forEach(function (n) { el("headerMons").appendChild(sprite(n)); });
   renderDateSelect();
   render();
   if (API_URL) {
