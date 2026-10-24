@@ -322,9 +322,7 @@
       <b>Did you take a quiz?</b>
       <select id="fSite">
         <option value="No quiz">No quiz (just reading)</option>
-        <option>Free Book Quiz</option>
         <option>ReadnQuiz</option>
-        <option>School AR</option>
       </select>
       <div id="quizPart" class="hidden" style="margin-top:10px">
         <div id="quizLinks"></div>
@@ -792,8 +790,7 @@
     links.innerHTML = "";
     var list = [
       ["📝 ReadnQuiz: 1. Log in", "Use your ReadnQuiz username", RNQ_LOGIN_URL, ""],
-      ["📝 ReadnQuiz: 2. Find your book", "Type the title and take the quiz", RNQ_FIND_URL, ""],
-      ["📝 Free Book Quiz", kid().ks + " quizzes, no login", "https://www.freebookquiz.com/#search-heading", "alt"]
+      ["📝 ReadnQuiz: 2. Find your book", "Type the title and take the quiz", RNQ_FIND_URL, ""]
     ];
     list.forEach(function (l) {
       var a = make("a", "go-link " + l[3], l[0]);
