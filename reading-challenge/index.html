@@ -147,6 +147,8 @@
   .entry .type { display: inline-block; font-size: 11px; color: #fff; padding: 1px 7px; border-radius: 8px; }
   .entry .mon-sprite { width: 64px; height: 64px; margin: -8px -6px -8px auto; }
   .entry .title { margin-top: 4px; font-size: 14px; }
+  .partner-btn { display: block; margin-top: 4px; font-family: inherit; font-size: 12px; font-weight: bold; cursor: pointer; border: 2px solid #000; border-radius: 10px; padding: 2px 8px; background: #fff; }
+  .partner-btn.on { background: var(--yellow); cursor: default; }
   .entry .meta { font-size: 12px; color: #555; margin-top: 2px; }
   .entry .del { position: absolute; top: 4px; right: 4px; border: none; background: none; cursor: pointer; font-size: 14px; color: #999; }
   .empty-dex { color: #666; }
@@ -444,10 +446,11 @@
 
   // ---------- local cache (works even when storage is blocked) ----------
   function emptyState() {
-    var s = { settings: { targets: {}, mathsTargets: {} }, kids: {} };
+    var s = { settings: { targets: {}, mathsTargets: {}, partners: {} }, kids: {} };
     KIDS.forEach(function (k) {
       s.settings.targets[k.id] = k.target;
       s.settings.mathsTargets[k.id] = k.mathsTarget;
+      s.settings.partners[k.id] = 0;
       s.kids[k.id] = { entries: [], maths: [] };
     });
     return s;
@@ -462,6 +465,7 @@
           if (parsed.kids[k.id]) base.kids[k.id] = parsed.kids[k.id];
           if (parsed.settings.targets[k.id]) base.settings.targets[k.id] = parsed.settings.targets[k.id];
           if (parsed.settings.mathsTargets[k.id]) base.settings.mathsTargets[k.id] = parsed.settings.mathsTargets[k.id];
+          if (parsed.settings.partners && parsed.settings.partners[k.id]) base.settings.partners[k.id] = parsed.settings.partners[k.id];
         });
       }
     } catch (e) { /* storage unavailable: start fresh */ }
@@ -597,6 +601,30 @@
     type.style.background = mon[2];
     info.appendChild(type);
     top.appendChild(sprite(mon[3], "mon-sprite", mon[0]));
+    info.appendChild(partnerButton(mon));
+  }
+
+  // Chosen partner, only while that Pokémon is still in the collection.
+  function partnerMon() {
+    var dexNo = state.settings.partners[current];
+    if (!dexNo) return null;
+    var byId = catches().byId;
+    for (var id in byId) if (byId[id].mon[3] === dexNo) return byId[id].mon;
+    return null;
+  }
+  function partnerButton(mon) {
+    var isPartner = state.settings.partners[current] === mon[3];
+    var b = make("button", "partner-btn" + (isPartner ? " on" : ""), isPartner ? "⭐ My partner" : "☆ Partner");
+    b.type = "button";
+    b.onclick = function () {
+      if (isPartner) return;
+      var who = current;
+      b.disabled = true;
+      commit({ action: "partner", kid: who, partner: mon[3] }, function () {
+        state.settings.partners[who] = mon[3];
+      }, function () { b.disabled = false; });
+    };
+    return b;
   }
 
   // ---------- render ----------
@@ -639,8 +667,11 @@
 
   function renderProgress(s) {
     var stage = Math.min(2, s.tier === 0 ? (s.pct >= 50 ? 1 : 0) : 2);
-    setSprite(el("partner"), EVOLUTION_IDS[stage], EVOLUTION[stage]);
-    el("trainerName").textContent = "Trainer " + kid().name + " & " + EVOLUTION[stage];
+    var chosen = partnerMon();
+    var partnerDex = chosen ? chosen[3] : EVOLUTION_IDS[stage];
+    var partnerName = chosen ? chosen[0] : EVOLUTION[stage];
+    setSprite(el("partner"), partnerDex, partnerName);
+    el("trainerName").textContent = "Trainer " + kid().name + " & " + partnerName;
     el("rank").textContent = RANKS[Math.min(3, s.tier === 0 ? (s.pct >= 50 ? 1 : 0) : s.tier + 0)];
 
     el("readText").textContent = s.caught + " / " + target() + " books (" + s.readPct + "%)";
@@ -801,6 +832,7 @@
       var st = res.settings[k.id] || {};
       if (st.target) next.settings.targets[k.id] = st.target;
       if (st.mathsTarget) next.settings.mathsTargets[k.id] = st.mathsTarget;
+      if (st.partner) next.settings.partners[k.id] = st.partner;
     });
     res.entries.forEach(function (e) {
       if (!next.kids[e.kid]) return;

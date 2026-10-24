@@ -17,6 +17,7 @@ var MAX_CORRECT = 2000;
 var MAX_TARGET = 60;
 var MIN_MATHS_TARGET = 10;
 var MAX_MATHS_TARGET = 20000;
+var MAX_DEX = 1025;
 var READ_SITES = ["ReadnQuiz", "Free Book Quiz", "School AR", "No quiz"];
 var MATHS_SITE = "Times Tables Rock Stars";
 var ENTRY_HEADERS = ["id", "kid", "type", "day", "title", "site", "score", "total", "correct", "createdAt"];
@@ -33,6 +34,7 @@ function doPost(e) {
     if (body.action === "add") addEntry_(body.entry);
     else if (body.action === "delete") deleteEntry_(String(body.id || ""));
     else if (body.action === "settings") saveSettings_(String(body.kid || ""), body.settings);
+    else if (body.action === "partner") savePartner_(String(body.kid || ""), Number(body.partner));
     else throw new Error("Unknown action");
     return json_(snapshot_());
   } catch (err) {
@@ -102,15 +104,22 @@ function saveSettings_(kid, s) {
   setSetting_(kid + ".mathsTarget", mathsTarget);
 }
 
+// Partner Pokémon shown next to the trainer name (national dex number; 0 = default).
+function savePartner_(kid, dexNo) {
+  if (!KIDS.hasOwnProperty(kid)) throw new Error("Unknown kid");
+  if (!isInt_(dexNo) || dexNo < 0 || dexNo > MAX_DEX) throw new Error("Bad partner");
+  setSetting_(kid + ".partner", dexNo);
+}
+
 function readSettings_() {
   var out = {};
   Object.keys(KIDS).forEach(function (k) {
-    out[k] = { target: KIDS[k].target, mathsTarget: KIDS[k].mathsTarget };
+    out[k] = { target: KIDS[k].target, mathsTarget: KIDS[k].mathsTarget, partner: 0 };
   });
   settingsSheet_().getDataRange().getValues().slice(1).forEach(function (r) {
     var parts = String(r[0]).split(".");
     if (!out[parts[0]] || r[1] === "") return;
-    if ((parts[1] === "target" || parts[1] === "mathsTarget") && isInt_(Number(r[1]))) {
+    if ((parts[1] === "target" || parts[1] === "mathsTarget" || parts[1] === "partner") && isInt_(Number(r[1]))) {
       out[parts[0]][parts[1]] = Number(r[1]);
     }
   });
