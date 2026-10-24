@@ -1,5 +1,6 @@
 /**
- * Half Term Challenge - shared storage.
+ * @OnlyCurrentDoc
+ * Half Term Challenge - shared storage. Only this spreadsheet can be touched.
  * Paste into Extensions > Apps Script of the Google Sheet, then
  * Deploy > New deployment > Web app (Execute as: Me, Who has access: Anyone).
  */
