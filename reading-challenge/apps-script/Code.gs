@@ -6,15 +6,15 @@
  */
 
 var KIDS = {
-  taiga: { maths: true, target: 5, mathsTarget: 500 },
-  leo: { maths: true, target: 5, mathsTarget: 500 },
-  yudai: { maths: false, target: 4, mathsTarget: 0 }
+  taiga: { maths: true, target: 10, mathsTarget: 2500 },
+  leo: { maths: true, target: 10, mathsTarget: 2500 },
+  yudai: { maths: false, target: 18, mathsTarget: 0 }
 };
 var DAY_COUNT = 9;
 var MAX_TITLE = 120;
 var MAX_SCORE = 50;
 var MAX_CORRECT = 2000;
-var MAX_TARGET = 30;
+var MAX_TARGET = 60;
 var MIN_MATHS_TARGET = 10;
 var MAX_MATHS_TARGET = 20000;
 var READ_SITES = ["ReadnQuiz", "Free Book Quiz", "School AR"];

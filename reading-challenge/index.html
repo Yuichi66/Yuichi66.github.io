@@ -284,7 +284,7 @@
       <div class="row">
         <div class="field">
           <label for="sTarget">Books goal (<span class="sKid"></span>)</label>
-          <input id="sTarget" type="number" min="1" max="30">
+          <input id="sTarget" type="number" min="1" max="60">
         </div>
         <div class="field" id="sMathsField">
           <label for="sMaths">Correct answers goal</label>
@@ -380,14 +380,14 @@
   var CATCH_WOBBLE_MS = 1500;
   var TTRS_URL = "https://play.ttrockstars.com/auth/school/student/29597";
   var KIDS = [
-    { id: "taiga", name: "TAIGA", maths: true, target: 5, mathsTarget: 500, ks: "KS2" },
-    { id: "leo", name: "LEO", maths: true, target: 5, mathsTarget: 500, ks: "KS2" },
-    { id: "yudai", name: "YUDAI", maths: false, target: 4, mathsTarget: 0, ks: "KS3" }
+    { id: "taiga", name: "TAIGA", maths: true, target: 10, mathsTarget: 2500, ks: "KS2" },
+    { id: "leo", name: "LEO", maths: true, target: 10, mathsTarget: 2500, ks: "KS2" },
+    { id: "yudai", name: "YUDAI", maths: false, target: 18, mathsTarget: 0, ks: "KS3" }
   ];
   // Prize tiers: share of the goal needed, ball, reward.
   var TIERS = [
     { pct: 100, ball: "great", name: "Great Ball", reward: "£3" },
-    { pct: 130, ball: "ultra", name: "Ultra Ball", reward: "£5" },
+    { pct: 150, ball: "ultra", name: "Ultra Ball", reward: "£5" },
     { pct: 200, ball: "master", name: "Master Ball", reward: "Beyblade!" }
   ];
 
@@ -848,7 +848,7 @@
   el("saveSettings").onclick = function () {
     var t = parseInt(el("sTarget").value, 10);
     var m = kid().maths ? parseInt(el("sMaths").value, 10) : mathsTarget();
-    if (isNaN(t) || t < 1 || t > 30) { window.alert("Books goal must be 1 to 30."); return; }
+    if (isNaN(t) || t < 1 || t > 60) { window.alert("Books goal must be 1 to 60."); return; }
     if (kid().maths && (isNaN(m) || m < 10 || m > 20000)) { window.alert("Correct answers goal must be 10 to 20000."); return; }
     var who = current;
     commit({ action: "settings", kid: who, settings: { target: t, mathsTarget: m } }, function () {
