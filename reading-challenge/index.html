@@ -439,6 +439,8 @@
 
   var state = load();
   var current = KIDS[0].id;
+  // Seed of the next book, made early so "Who's that Pokémon?" shows the one it will catch.
+  var pendingSeed = newSeed();
 
   // ---------- local cache (works even when storage is blocked) ----------
   function emptyState() {
@@ -540,7 +542,8 @@
     svg.appendChild(use);
     return svg;
   }
-  function newId() { return Date.now() + "-" + Math.floor(Math.random() * 1e6); }
+  function newSeed() { return String(Math.floor(Math.random() * 1e6)); }
+  function newId(seed) { return Date.now() + "-" + (seed || newSeed()); }
 
   // ---------- progress maths ----------
   function summary() {
@@ -565,16 +568,31 @@
     var list = d.entries.filter(isPass).concat(d.maths.filter(function (m) { return m.correct > 0; }));
     return list.sort(function (a, b) { return loggedAt(a) - loggedAt(b); });
   }
-  // id -> catch number (0-based)
-  function catchNumbers() {
-    var nos = {};
-    catchOrder().forEach(function (x, i) { nos[x.id] = i; });
-    return nos;
+  function hashOf(s) {
+    var h = 2166136261;
+    for (var i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619) >>> 0; }
+    return h;
   }
-  function monAt(i) { return MONS[i % MONS.length]; }
-  function monLine(info, top, i) {
-    var mon = monAt(i);
-    info.appendChild(make("div", "mon", "#" + (i + 1) + " " + mon[0]));
+  function allMonIndexes() { return MONS.map(function (m, k) { return k; }); }
+  // Random part of an id ("time-random"); it decides the Pokémon, the time decides the order.
+  function seedOf(id) { var parts = String(id).split("-"); return parts[1] || parts[0]; }
+  // A random Pokémon not caught yet, chosen from the record's id so every phone shows the same one.
+  function pickFrom(pool, id) { return pool[hashOf(seedOf(id)) % pool.length]; }
+  // byId: id -> { no: catch number (0-based), mon }; pool: Pokémon still to catch
+  function catches() {
+    var pool = allMonIndexes(), byId = {};
+    catchOrder().forEach(function (x, i) {
+      var k = pickFrom(pool, x.id);
+      pool = pool.filter(function (j) { return j !== k; });
+      if (!pool.length) pool = allMonIndexes();
+      byId[x.id] = { no: i, mon: MONS[k] };
+    });
+    return { byId: byId, pool: pool };
+  }
+  function nextMon(id) { return MONS[pickFrom(catches().pool, id)]; }
+  function monLine(info, top, c) {
+    var mon = c.mon;
+    info.appendChild(make("div", "mon", "#" + (c.no + 1) + " " + mon[0]));
     var type = make("span", "type", mon[1]);
     type.style.background = mon[2];
     info.appendChild(type);
@@ -668,7 +686,7 @@
     dex.innerHTML = "";
     var list = data().entries;
     if (!list.length) dex.appendChild(make("div", "empty-dex", "No books yet. Read a book and catch your first Pokémon!"));
-    var nos = catchNumbers();
+    var nos = catches().byId;
     list.forEach(function (e) {
       var pass = isPass(e);
       var card = make("div", "entry" + (pass ? "" : " fail"));
@@ -750,7 +768,7 @@
       a.appendChild(make("small", "", l[1]));
       links.appendChild(a);
     });
-    setSprite(el("whosSprite"), monAt(catchOrder().length)[3], "Mystery Pokémon");
+    setSprite(el("whosSprite"), nextMon("0-" + pendingSeed)[3], "Mystery Pokémon");
   }
 
   function renderSettings() {
@@ -857,7 +875,7 @@
       window.alert("Please check the score. It must be between 0 and " + (isNaN(total) ? "the total" : total) + ".");
       return;
     }
-    var entry = { id: newId(), kid: current, type: "read", day: parseInt(el("fDate").value, 10), title: title, site: site, score: score, total: total };
+    var entry = { id: newId(pendingSeed), kid: current, type: "read", day: parseInt(el("fDate").value, 10), title: title, site: site, score: score, total: total };
     var before = summary();
     var who = current;
     var button = el("readForm").querySelector("button[type=submit]");
@@ -867,6 +885,8 @@
     }, function (ok) {
       button.disabled = false;
       if (!ok) return;
+      pendingSeed = newSeed();
+      renderSheets();
       el("fTitle").value = "";
       el("fScore").value = "";
       closeSheets();
@@ -885,7 +905,8 @@
   // Ball wobbles, then the next Pokémon pops out.
   function catchPokemon(item, ballCls, bigPrefix, mid) {
     var ball = make("div", "ball huge " + ballCls);
-    var mon = monAt(catchNumbers()[item.id] || 0);
+    var c = catches().byId[item.id];
+    var mon = c ? c.mon : MONS[0];
     show(ball, bigPrefix + "Gotcha! " + mon[0] + " was caught!", mid);
     setTimeout(function () {
       var art = el("ovArt");
