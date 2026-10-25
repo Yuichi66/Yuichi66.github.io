@@ -446,7 +446,7 @@
   var REFRESH_MS = 60000;
   // Change on every release: a page left open with older code reloads itself,
   // so every phone works out the same Pokémon.
-  var APP_VERSION = "2026-10-25-1";
+  var APP_VERSION = "2026-10-25-2";
   var STORAGE_KEY = "htrc-2026-autumn-v3";
   var START = new Date(2026, 9, 24);   // Sat 24 Oct 2026
   var DAY_COUNT = 9;                   // to Sun 1 Nov 2026
@@ -537,6 +537,11 @@
     ["Tinkatink", "Fairy", "#d685ad", 957], ["Pawmi", "Electric", "#d9a400", 921]
   ];
   var ORIGINAL_MON_COUNT = 50;
+  // From FAMILY_RULE_FROM a new catch is always a first-stage Pokémon from a family the child
+  // does not have yet (YUDAI's 19:09 Pichu, caught while having Pikachu, is the first one re-picked).
+  var FAMILY_RULE_FROM = 1792955381311;
+  // Eevee's other evolutions (not in its EVOLVES line).
+  var EEVEE_FAMILY = [133, 134, 135, 136, 196, 197, 700];
   var NEW_MONS_FROM = 1792954754993;
   // What each Pokémon above evolves into, stage by stage, then its Mega / Gigantamax / special forms.
   // Keyed by the dex number in MONS; [name, dex number]. Not listed = already fully evolved.
@@ -834,6 +839,33 @@
     for (var i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619) >>> 0; }
     return h;
   }
+  // Family of a dex number: the smallest dex of the evolution family it belongs to.
+  var FAMILY = (function () {
+    var parent = {};
+    function find(d) { while (parent[d] !== undefined && parent[d] !== d) d = parent[d]; return d; }
+    function join(a, b) {
+      var x = find(a), y = find(b);
+      if (parent[x] === undefined) parent[x] = x;
+      if (parent[y] === undefined) parent[y] = y;
+      if (x !== y) { if (x < y) parent[y] = x; else parent[x] = y; }
+    }
+    Object.keys(EVOLVES).forEach(function (k) { EVOLVES[k].forEach(function (f) { join(+k, f[1]); }); });
+    EEVEE_FAMILY.forEach(function (d) { join(EEVEE_FAMILY[0], d); });
+    return function (d) { return parent[d] === undefined ? d : find(d); };
+  })();
+  // MONS indexes that are a first stage (nothing in MONS evolves into them).
+  var FIRST_STAGE = (function () {
+    var evolved = {};
+    Object.keys(EVOLVES).forEach(function (k) { EVOLVES[k].forEach(function (f) { evolved[f[1]] = true; }); });
+    EEVEE_FAMILY.slice(1).forEach(function (d) { evolved[d] = true; });
+    return MONS.map(function (m, k) { return k; }).filter(function (k) { return !evolved[MONS[k][3]]; });
+  })();
+  // First-stage Pokémon whose family the child does not have yet (all first stages once every family is owned).
+  function freshPool(owned, withNew) {
+    var all = FIRST_STAGE.filter(function (k) { return withNew || k < ORIGINAL_MON_COUNT; });
+    var fresh = all.filter(function (k) { return !owned[FAMILY(MONS[k][3])]; });
+    return fresh.length ? fresh : all;
+  }
   // Pokémon that can be caught: the first 50, plus the new ones once `withNew`.
   function allMonIndexes(withNew) {
     return MONS.map(function (m, k) { return k; }).filter(function (k) { return withNew || k < ORIGINAL_MON_COUNT; });
@@ -851,14 +883,18 @@
       withNew = true;
       pool = pool.concat(allMonIndexes(true).slice(ORIGINAL_MON_COUNT));
     }
+    var owned = {};   // families already in the collection
     catchOrder().forEach(function (x, i) {
       if (loggedAt(x) >= NEW_MONS_FROM) addNew();
-      var k = pickFrom(pool, x.id);
+      var k = loggedAt(x) >= FAMILY_RULE_FROM ? pickFrom(freshPool(owned, withNew), x.id) : pickFrom(pool, x.id);
+      owned[FAMILY(MONS[k][3])] = true;
       pool = pool.filter(function (j) { return j !== k; });
       if (!pool.length) pool = allMonIndexes(withNew);
       byId[x.id] = { no: i, mon: MONS[k], steps: 0 };
     });
     if (Date.now() >= NEW_MONS_FROM) addNew();
+    // Next catch ("Who's that Pokémon?") follows the family rule too.
+    if (Date.now() >= FAMILY_RULE_FROM) pool = freshPool(owned, withNew);
     // Evolutions, oldest first: each one moves its Pokémon one stage up (only while it is still in the collection).
     // bySource: record id -> "Charmander → Charmeleon", shown on the record that paid for it.
     var bySource = {};
