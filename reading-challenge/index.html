@@ -380,7 +380,7 @@
       <button class="btn ghost" type="button" data-close>Cancel</button>
       <button class="btn purple" type="submit">🚀 LET IT RIP!</button>
     </div>
-    <div class="rule">Every correct answer counts. The app adds them up for you. Get 50 or more in one go to catch a Pokémon! 100 or more also lets you evolve one!</div>
+    <div class="rule">Every correct answer counts. The app adds them up for you. Get 50 or more in one go to catch a Pokémon AND win an evolution!</div>
   </form>
 </div>
 
@@ -437,12 +437,12 @@
     { id: "leo", name: "LEO", maths: true, target: 10, mathsTarget: 2500, ks: "KS2", practices: [] },
     { id: "yudai", name: "YUDAI", maths: false, target: 18, mathsTarget: 0, ks: "KS3", practices: ["latin", "mymaths"] }
   ];
-  // Extra practice: a session with at least `min` correct answers catches a Pokémon,
-  // and one with at least `evolve` also gives an evolution. It does not count towards the prize.
+  // Extra practice: a session with at least `min` correct answers catches a Pokémon
+  // (and gives an evolution). It does not count towards the prize.
   // Sessions logged before PRACTICE_RULE_FROM keep `oldMin`, so nothing already caught changes.
   var PRACTICES = {
-    latin: { name: "Latin", icon: "🏛️", min: 150, oldMin: 50, evolve: 200 },
-    mymaths: { name: "MyMaths", icon: "🧮", min: 100, evolve: 150 }
+    latin: { name: "Latin", icon: "🏛️", min: 150, oldMin: 50 },
+    mymaths: { name: "MyMaths", icon: "🧮", min: 100 }
   };
   var PRACTICE_RULE_FROM = 1792947578805;
   // Prize tiers: share of the goal needed, ball, reward.
@@ -523,8 +523,6 @@
     74: [["Graveler", 75], ["Golem", 76]],
     113: [["Blissey", 242]]
   };
-  // Times tables: this many correct in one game also gives an evolution. Every book passed gives one too.
-  var MATHS_EVOLVE_MIN = 100;
   var SPRITE_BASE ="https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/";
   var ART_BASE = SPRITE_BASE + "other/official-artwork/";
   var EVOLUTION = ["Charmander", "Charmeleon", "Charizard"];
@@ -689,10 +687,10 @@
     return cfg.oldMin && loggedAt(p) < PRACTICE_RULE_FROM ? cfg.oldMin : cfg.min;
   }
   function practiceCatches(p) { return !!PRACTICES[p.type] && p.correct >= practiceMin(p); }
-  // Records that give the right to evolve one Pokémon.
+  // Every record that catches a Pokémon also gives the right to evolve one.
   function givesEvolve(x) {
-    if (x.type === "maths") return x.correct >= MATHS_EVOLVE_MIN;
-    if (PRACTICES[x.type]) return x.correct >= PRACTICES[x.type].evolve;
+    if (x.type === "maths") return mathsCatches(x);
+    if (PRACTICES[x.type]) return practiceCatches(x);
     return isPass(x);
   }
   function catchOrder() {
@@ -1204,7 +1202,7 @@
       var cfg = PRACTICES[type];
       practiceType = type;
       el("pTitle").textContent = cfg.icon + " " + cfg.name;
-      el("pRule").textContent = "Get " + cfg.min + " or more in one go to catch a Pokémon! " + cfg.evolve + " or more also lets you evolve one!";
+      el("pRule").textContent = "Get " + cfg.min + " or more in one go to catch a Pokémon AND win an evolution!";
       openSheet("practiceSheet");
     };
   });
