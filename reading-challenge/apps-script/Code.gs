@@ -51,6 +51,7 @@ function snapshot_() {
   var entries = rows.filter(function (r) { return r[0] !== ""; }).map(function (r) {
     var base = { id: String(r[0]), kid: String(r[1]), type: String(r[2]), day: Number(r[3]), site: String(r[5]) };
     if (base.type === "maths" || PRACTICE_SITES.hasOwnProperty(base.type)) base.correct = Number(r[8]);
+    else if (base.type === "evolve") return base;
     else {
       base.title = String(r[4]);
       base.score = Number(r[6]);
@@ -85,6 +86,14 @@ function addEntry_(x) {
     return;
   }
 
+  // Evolution of one caught Pokémon; "site" holds the id of the record that caught it.
+  if (x.type === "evolve") {
+    var target = String(x.target || "").slice(0, 40);
+    if (!target || !hasEntry_(target, kid)) throw new Error("Unknown Pokémon to evolve");
+    entriesSheet_().appendRow([id, kid, "evolve", day, "", target, "", "", "", new Date()]);
+    return;
+  }
+
   var title = String(x.title || "").replace(/\s+/g, " ").trim();
   var score = Number(x.score);
   var total = Number(x.total);
@@ -93,6 +102,12 @@ function addEntry_(x) {
   if (!isInt_(total) || total < 1 || total > MAX_SCORE) throw new Error("Bad total");
   if (!isInt_(score) || score < 0 || score > total) throw new Error("Bad score");
   entriesSheet_().appendRow([id, kid, "read", day, asText_(title), site, score, total, "", new Date()]);
+}
+
+function hasEntry_(id, kid) {
+  return entriesSheet_().getDataRange().getValues().slice(1).some(function (r) {
+    return String(r[0]) === id && String(r[1]) === kid;
+  });
 }
 
 function deleteEntry_(id) {

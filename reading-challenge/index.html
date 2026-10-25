@@ -152,6 +152,12 @@
   .entry .title { margin-top: 4px; font-size: 14px; }
   .partner-btn { display: block; margin-top: 4px; font-family: inherit; font-size: 12px; font-weight: bold; cursor: pointer; border: 2px solid #000; border-radius: 10px; padding: 2px 8px; background: #fff; }
   .partner-btn.on { background: var(--yellow); cursor: default; }
+  .evo-mark { display: block; margin-top: 4px; font-size: 11px; font-weight: bold; color: var(--purple); }
+  .evo-btn { display: block; margin-top: 4px; font-family: inherit; font-size: 13px; font-weight: bold; cursor: pointer; border: 2px solid #000; border-radius: 10px; padding: 3px 10px; color: #fff; background: linear-gradient(135deg, var(--purple), var(--blue)); animation: glow 1.2s ease-in-out infinite; }
+  .evo-btn[disabled] { opacity: .6; cursor: wait; animation: none; }
+  @keyframes glow { 50% { box-shadow: 0 0 10px 2px var(--yellow); } }
+  .overlay .pop.evolving { animation: evolve 2.4s ease-in forwards; }
+  @keyframes evolve { 0% { filter: brightness(1); transform: scale(1); } 30% { transform: scale(.9); } 50% { transform: scale(1.1); } 100% { filter: brightness(0) invert(1) drop-shadow(0 0 30px #fff); transform: scale(1.15); } }
   .entry .meta { font-size: 12px; color: #555; margin-top: 2px; }
   .entry .del { position: absolute; top: 4px; right: 4px; border: none; background: none; cursor: pointer; font-size: 14px; color: #999; }
   .empty-dex { color: #666; }
@@ -374,7 +380,7 @@
       <button class="btn ghost" type="button" data-close>Cancel</button>
       <button class="btn purple" type="submit">🚀 LET IT RIP!</button>
     </div>
-    <div class="rule">Every correct answer counts. The app adds them up for you. Get 50 or more in one go to catch a Pokémon!</div>
+    <div class="rule">Every correct answer counts. The app adds them up for you. Get 50 or more in one go to catch a Pokémon! 100 or more also lets you evolve one!</div>
   </form>
 </div>
 
@@ -420,6 +426,7 @@
   var PASS_RATE = 0.8;
   var BURST_RATE = 0.9;
   var CATCH_WOBBLE_MS = 1500;
+  var EVOLVE_MS = 2400;
   var NO_QUIZ = "No quiz";
   var TTRS_URL = "https://play.ttrockstars.com/auth/school/student/29597";
   // ReadnQuiz needs a login first; the quiz search page works once logged in.
@@ -430,12 +437,14 @@
     { id: "leo", name: "LEO", maths: true, target: 10, mathsTarget: 2500, ks: "KS2", practices: [] },
     { id: "yudai", name: "YUDAI", maths: false, target: 18, mathsTarget: 0, ks: "KS3", practices: ["latin", "mymaths"] }
   ];
-  // Extra practice: a session with at least `min` correct answers catches a Pokémon.
-  // It does not count towards the prize.
+  // Extra practice: a session with at least `min` correct answers catches a Pokémon,
+  // and one with at least `evolve` also gives an evolution. It does not count towards the prize.
+  // Sessions logged before PRACTICE_RULE_FROM keep `oldMin`, so nothing already caught changes.
   var PRACTICES = {
-    latin: { name: "Latin", icon: "🏛️", min: 50 },
-    mymaths: { name: "MyMaths", icon: "🧮", min: 100 }
+    latin: { name: "Latin", icon: "🏛️", min: 150, oldMin: 50, evolve: 200 },
+    mymaths: { name: "MyMaths", icon: "🧮", min: 100, evolve: 150 }
   };
+  var PRACTICE_RULE_FROM = 1792947578805;
   // Prize tiers: share of the goal needed, ball, reward.
   var TIERS = [
     { pct: 100, ball: "great", name: "Great Ball", reward: "£2" },
@@ -471,7 +480,47 @@
     ["Magikarp", "Water", "#2a75bb", 129], ["Abra", "Psychic", "#d1477a", 63],
     ["Geodude", "Rock", "#a38c21", 74], ["Chansey", "Normal", "#9c8f6b", 113]
   ];
-  var SPRITE_BASE = "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/";
+  // What each Pokémon above evolves into, stage by stage (Mega Evolution is the last stage).
+  // Keyed by the dex number in MONS; [name, dex number]. Not listed = already fully evolved.
+  var EVOLVES = {
+    25: [["Raichu", 26]],
+    4: [["Charmeleon", 5], ["Charizard", 6], ["Mega Charizard X", 10034]],
+    7: [["Wartortle", 8], ["Blastoise", 9], ["Mega Blastoise", 10036]],
+    1: [["Ivysaur", 2], ["Venusaur", 3], ["Mega Venusaur", 10033]],
+    133: [["Espeon", 196]],
+    94: [["Mega Gengar", 10038]],
+    448: [["Mega Lucario", 10059]],
+    39: [["Wigglytuff", 40]],
+    130: [["Mega Gyarados", 10041]],
+    150: [["Mega Mewtwo X", 10043]],
+    906: [["Floragato", 907], ["Meowscarada", 908]],
+    909: [["Crocalor", 910], ["Skeledirge", 911]],
+    912: [["Quaxwell", 913], ["Quaquaval", 914]],
+    384: [["Mega Rayquaza", 10079]],
+    6: [["Mega Charizard X", 10034]],
+    393: [["Prinplup", 394], ["Empoleon", 395]],
+    445: [["Mega Garchomp", 10058]],
+    9: [["Mega Blastoise", 10036]],
+    175: [["Togetic", 176], ["Togekiss", 468]],
+    3: [["Mega Venusaur", 10033]],
+    248: [["Mega Tyranitar", 10049]],
+    54: [["Golduck", 55]],
+    123: [["Scizor", 212], ["Mega Scizor", 10046]],
+    92: [["Haunter", 93], ["Gengar", 94], ["Mega Gengar", 10038]],
+    52: [["Persian", 53]],
+    95: [["Steelix", 208], ["Mega Steelix", 10072]],
+    172: [["Pikachu", 25], ["Raichu", 26]],
+    147: [["Dragonair", 148], ["Dragonite", 149]],
+    104: [["Marowak", 105]],
+    282: [["Mega Gardevoir", 10051]],
+    129: [["Gyarados", 130], ["Mega Gyarados", 10041]],
+    63: [["Kadabra", 64], ["Alakazam", 65], ["Mega Alakazam", 10037]],
+    74: [["Graveler", 75], ["Golem", 76]],
+    113: [["Blissey", 242]]
+  };
+  // Times tables: this many correct in one game also gives an evolution. Every book passed gives one too.
+  var MATHS_EVOLVE_MIN = 100;
+  var SPRITE_BASE ="https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/";
   var ART_BASE = SPRITE_BASE + "other/official-artwork/";
   var EVOLUTION = ["Charmander", "Charmeleon", "Charizard"];
   var EVOLUTION_IDS = [4, 5, 6];
@@ -490,7 +539,7 @@
       s.settings.targets[k.id] = k.target;
       s.settings.mathsTargets[k.id] = k.mathsTarget;
       s.settings.partners[k.id] = 0;
-      s.kids[k.id] = { entries: [], maths: [], practice: [] };
+      s.kids[k.id] = { entries: [], maths: [], practice: [], evolves: [] };
     });
     return s;
   }
@@ -503,6 +552,7 @@
         KIDS.forEach(function (k) {
           if (parsed.kids[k.id]) base.kids[k.id] = parsed.kids[k.id];
           if (!base.kids[k.id].practice) base.kids[k.id].practice = [];
+          if (!base.kids[k.id].evolves) base.kids[k.id].evolves = [];
           if (parsed.settings.targets[k.id]) base.settings.targets[k.id] = parsed.settings.targets[k.id];
           if (parsed.settings.mathsTargets[k.id]) base.settings.mathsTargets[k.id] = parsed.settings.mathsTargets[k.id];
           if (parsed.settings.partners && parsed.settings.partners[k.id]) base.settings.partners[k.id] = parsed.settings.partners[k.id];
@@ -623,7 +673,17 @@
     return MATHS_CATCH_MIN;
   }
   function mathsCatches(m) { return m.correct >= mathsMin(m); }
-  function practiceCatches(p) { var cfg = PRACTICES[p.type]; return !!cfg && p.correct >= cfg.min; }
+  function practiceMin(p) {
+    var cfg = PRACTICES[p.type];
+    return cfg.oldMin && loggedAt(p) < PRACTICE_RULE_FROM ? cfg.oldMin : cfg.min;
+  }
+  function practiceCatches(p) { return !!PRACTICES[p.type] && p.correct >= practiceMin(p); }
+  // Records that give the right to evolve one Pokémon.
+  function givesEvolve(x) {
+    if (x.type === "maths") return x.correct >= MATHS_EVOLVE_MIN;
+    if (PRACTICES[x.type]) return x.correct >= PRACTICES[x.type].evolve;
+    return isPass(x);
+  }
   function catchOrder() {
     var d = data();
     var list = d.entries.filter(isPass).concat(d.maths.filter(mathsCatches), d.practice.filter(practiceCatches));
@@ -646,19 +706,63 @@
       var k = pickFrom(pool, x.id);
       pool = pool.filter(function (j) { return j !== k; });
       if (!pool.length) pool = allMonIndexes();
-      byId[x.id] = { no: i, mon: MONS[k] };
+      byId[x.id] = { no: i, mon: MONS[k], steps: 0 };
     });
-    return { byId: byId, pool: pool };
+    // Evolutions: each one moves its Pokémon one stage up (only for Pokémon still in the collection).
+    var used = 0;
+    data().evolves.forEach(function (v) {
+      var c = byId[v.target];
+      if (!c) return;
+      used++;
+      c.steps++;
+    });
+    Object.keys(byId).forEach(function (id) {
+      var c = byId[id];
+      var chain = EVOLVES[c.mon[3]] || [];
+      c.steps = Math.min(c.steps, chain.length);
+      var form = c.steps ? chain[c.steps - 1] : [c.mon[0], c.mon[3]];
+      c.name = form[0];
+      c.dex = form[1];
+      c.next = chain[c.steps] || null;
+    });
+    return { byId: byId, pool: pool, used: used };
+  }
+  // Evolutions earned but not used yet.
+  function evolvesLeft(cs) {
+    var d = data();
+    var earned = d.entries.concat(d.maths, d.practice).filter(givesEvolve).length;
+    return Math.max(0, earned - (cs || catches()).used);
   }
   function nextMon(id) { return MONS[pickFrom(catches().pool, id)]; }
-  function monLine(info, top, c) {
+  function monLine(info, top, c, id, left) {
     var mon = c.mon;
-    info.appendChild(make("div", "mon", "#" + (c.no + 1) + " " + mon[0]));
+    info.appendChild(make("div", "mon", "#" + (c.no + 1) + " " + c.name));
     var type = make("span", "type", mon[1]);
     type.style.background = mon[2];
     info.appendChild(type);
-    top.appendChild(sprite(mon[3], "mon-sprite", mon[0]));
+    top.appendChild(sprite(c.dex, "mon-sprite", c.name));
     info.appendChild(partnerButton(mon));
+    if (c.next) info.appendChild(evolveButton(c, id, left));
+  }
+  // Pokémon that can still evolve are marked; the mark becomes a button while an evolution is ready.
+  function evolveButton(c, id, left) {
+    if (!left) return make("span", "evo-mark", "⬆ Can evolve");
+    var b = make("button", "evo-btn", "✨ Evolve!");
+    b.type = "button";
+    b.onclick = function () {
+      if (!window.confirm("Evolve " + c.name + " into " + c.next[0] + "?")) return;
+      var who = current;
+      var from = [c.name, c.dex], to = c.next;
+      var item = { id: newId(), kid: who, type: "evolve", day: clampDay(todayIndex()), target: id };
+      b.disabled = true;
+      commit({ action: "add", entry: item }, function () {
+        state.kids[who].evolves = state.kids[who].evolves.concat([item]);
+      }, function (ok) {
+        b.disabled = false;
+        if (ok) celebrateEvolve(from, to);
+      });
+    };
+    return b;
   }
 
   // Chosen partner, only while that Pokémon is still in the collection.
@@ -666,7 +770,7 @@
     var dexNo = state.settings.partners[current];
     if (!dexNo) return null;
     var byId = catches().byId;
-    for (var id in byId) if (byId[id].mon[3] === dexNo) return byId[id].mon;
+    for (var id in byId) if (byId[id].mon[3] === dexNo) return [byId[id].name, byId[id].dex];
     return null;
   }
   function partnerButton(mon) {
@@ -716,6 +820,8 @@
       var n = data().practice.filter(function (p) { return p.type === type && p.day === t; }).reduce(function (s, p) { return s + p.correct; }, 0);
       msg += "  ·  " + (n ? "✅ " + cfg.name + " " + n : cfg.icon + " no " + cfg.name + " yet");
     });
+    var left = evolvesLeft();
+    if (left) msg += "  ·  ✨ " + left + " evolution" + (left > 1 ? "s" : "") + " ready! Open My collection";
     el("todayDone").textContent = msg;
   }
 
@@ -735,7 +841,7 @@
   function renderProgress(s) {
     var stage = Math.min(2, s.tier === 0 ? (s.pct >= 50 ? 1 : 0) : 2);
     var chosen = partnerMon();
-    var partnerDex = chosen ? chosen[3] : EVOLUTION_IDS[stage];
+    var partnerDex = chosen ? chosen[1] : EVOLUTION_IDS[stage];
     var partnerName = chosen ? chosen[0] : EVOLUTION[stage];
     setSprite(el("partner"), partnerDex, partnerName);
     el("trainerName").textContent = "Trainer " + kid().name + " & " + partnerName;
@@ -784,7 +890,7 @@
     dex.innerHTML = "";
     var list = data().entries;
     if (!list.length) dex.appendChild(make("div", "empty-dex", "No books yet. Read a book and catch your first Pokémon!"));
-    var nos = catches().byId;
+    var cs = catches(), nos = cs.byId, left = evolvesLeft(cs);
     list.forEach(function (e) {
       var pass = isPass(e);
       var card = make("div", "entry" + (pass ? "" : " fail"));
@@ -793,7 +899,7 @@
       var info = make("div");
       top.appendChild(info);
       if (pass) {
-        monLine(info, top, nos[e.id]);
+        monLine(info, top, nos[e.id], e.id, left);
       } else {
         info.appendChild(make("div", "mon", "It broke free!"));
       }
@@ -827,7 +933,7 @@
         top.appendChild(make("div", "ball"));
         var info = make("div");
         top.appendChild(info);
-        monLine(info, top, nos[m.id]);
+        monLine(info, top, nos[m.id], m.id, left);
         card.appendChild(top);
       }
       card.appendChild(make("div", "title", "🎸 " + m.correct + " correct"));
@@ -848,7 +954,7 @@
         top.appendChild(make("div", "ball"));
         var info = make("div");
         top.appendChild(info);
-        monLine(info, top, nos[p.id]);
+        monLine(info, top, nos[p.id], p.id, left);
         card.appendChild(top);
       }
       card.appendChild(make("div", "title", cfg.icon + " " + cfg.name + ": " + p.correct + " correct"));
@@ -926,6 +1032,7 @@
       if (!next.kids[e.kid]) return;
       if (e.type === "maths") next.kids[e.kid].maths.push(e);
       else if (PRACTICES[e.type]) next.kids[e.kid].practice.push(e);
+      else if (e.type === "evolve") next.kids[e.kid].evolves.push({ id: e.id, kid: e.kid, type: e.type, day: e.day, target: e.site });
       else next.kids[e.kid].entries.push(e);
     });
     state = next;
@@ -1020,7 +1127,25 @@
       show(make("div", "ball huge empty"), "Oh no! It broke free!", "You got " + entry.score + "/" + entry.total + ". Read it again and try once more!");
       return;
     }
-    catchPokemon(entry, ballClass(entry), "", (noQuiz(entry) ? "Book done!" : entry.score + "/" + entry.total) + tierUpMessage(before, after));
+    catchPokemon(entry, ballClass(entry), "", (noQuiz(entry) ? "Book done!" : entry.score + "/" + entry.total) + tierUpMessage(before, after) + evolveMessage(entry));
+  }
+
+  function evolveMessage(item) {
+    return givesEvolve(item) ? "  ✨ You can evolve a Pokémon! Open My collection and tap ✨ Evolve!" : "";
+  }
+
+  // The old Pokémon glows white, then the evolved one pops out.
+  function celebrateEvolve(from, to) {
+    var old = artwork(from[1], from[0]);
+    old.className = "pop evolving";
+    show(old, "What? " + from[0] + " is evolving!", "");
+    setTimeout(function () {
+      var art = el("ovArt");
+      if (!art.contains(old)) return;
+      art.innerHTML = "";
+      art.appendChild(artwork(to[1], to[0]));
+      el("ovBig").textContent = "Congratulations! " + from[0] + " evolved into " + to[0] + "!";
+    }, EVOLVE_MS);
   }
 
   // Ball wobbles, then the next Pokémon pops out.
@@ -1056,7 +1181,7 @@
       closeSheets();
       var after = summary();
       var mid = "Total: " + after.correct + " correct answers" + tierUpMessage(before, after);
-      if (mathsCatches(item)) catchPokemon(item, "", "+" + correct + "! ", mid);
+      if (mathsCatches(item)) catchPokemon(item, "", "+" + correct + "! ", mid + evolveMessage(item));
       else show(beySvg("blade"), "LET IT RIP! +" + correct, mid + "  ·  Get " + mathsMin(item) + " or more in one go to catch a Pokémon!");
     });
   };
@@ -1068,7 +1193,7 @@
       var cfg = PRACTICES[type];
       practiceType = type;
       el("pTitle").textContent = cfg.icon + " " + cfg.name;
-      el("pRule").textContent = "Get " + cfg.min + " or more in one go to catch a Pokémon!";
+      el("pRule").textContent = "Get " + cfg.min + " or more in one go to catch a Pokémon! " + cfg.evolve + " or more also lets you evolve one!";
       openSheet("practiceSheet");
     };
   });
@@ -1090,8 +1215,8 @@
       el("pCorrect").value = "";
       closeSheets();
       var mid = cfg.name + ": " + correct + " correct";
-      if (practiceCatches(item)) catchPokemon(item, "", "+" + correct + "! ", mid);
-      else show(make("div", "ball huge empty"), cfg.icon + " +" + correct, mid + "  ·  Get " + cfg.min + " or more in one go to catch a Pokémon!");
+      if (practiceCatches(item)) catchPokemon(item, "", "+" + correct + "! ", mid + evolveMessage(item));
+      else show(make("div", "ball huge empty"), cfg.icon + " +" + correct, mid + "  ·  Get " + practiceMin(item) + " or more in one go to catch a Pokémon!");
     });
   };
 
@@ -1101,7 +1226,7 @@
     var quiz = el("fSite").value !== NO_QUIZ;
     el("quizPart").className = quiz ? "" : "hidden";
     el("fScore").required = quiz;
-    el("readRule").textContent = quiz ? "80% or more catches it (8 out of 10)." : "Finished the whole book? Throw the ball!";
+    el("readRule").textContent = quiz ? "80% or more catches it (8 out of 10). Every book caught also lets you evolve a Pokémon!" : "Finished the whole book? Throw the ball! Every book also lets you evolve a Pokémon!";
   }
   el("fSite").onchange = updateQuizPart;
   updateQuizPart();
