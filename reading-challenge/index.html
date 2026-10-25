@@ -611,7 +611,18 @@
   // Games logged before MATHS_RULE_FROM keep the old rule (1 or more), so nothing already caught changes.
   var MATHS_CATCH_MIN = 50;
   var MATHS_RULE_FROM = 1792913612973;
-  function mathsCatches(m) { return m.correct >= (loggedAt(m) < MATHS_RULE_FROM ? 1 : MATHS_CATCH_MIN); }
+  // LEO's very first times tables game needs only this many.
+  var FIRST_MATHS_CATCH_MIN = { leo: 35 };
+  function isFirstMaths(m) {
+    var first = data().maths.reduce(function (a, b) { return loggedAt(b) < loggedAt(a) ? b : a; }, m);
+    return first.id === m.id;
+  }
+  function mathsMin(m) {
+    if (loggedAt(m) < MATHS_RULE_FROM) return 1;
+    if (FIRST_MATHS_CATCH_MIN[current] && isFirstMaths(m)) return FIRST_MATHS_CATCH_MIN[current];
+    return MATHS_CATCH_MIN;
+  }
+  function mathsCatches(m) { return m.correct >= mathsMin(m); }
   function practiceCatches(p) { var cfg = PRACTICES[p.type]; return !!cfg && p.correct >= cfg.min; }
   function catchOrder() {
     var d = data();
@@ -1046,7 +1057,7 @@
       var after = summary();
       var mid = "Total: " + after.correct + " correct answers" + tierUpMessage(before, after);
       if (mathsCatches(item)) catchPokemon(item, "", "+" + correct + "! ", mid);
-      else show(beySvg("blade"), "LET IT RIP! +" + correct, mid + "  ·  Get " + MATHS_CATCH_MIN + " or more in one go to catch a Pokémon!");
+      else show(beySvg("blade"), "LET IT RIP! +" + correct, mid + "  ·  Get " + mathsMin(item) + " or more in one go to catch a Pokémon!");
     });
   };
 
