@@ -153,6 +153,7 @@
   .partner-btn { display: block; margin-top: 4px; font-family: inherit; font-size: 12px; font-weight: bold; cursor: pointer; border: 2px solid #000; border-radius: 10px; padding: 2px 8px; background: #fff; }
   .partner-btn.on { background: var(--yellow); cursor: default; }
   .evo-mark { display: block; margin-top: 4px; font-size: 11px; font-weight: bold; color: var(--purple); }
+  .evo-note { font-size: 13px; color: var(--purple); font-weight: bold; }
   .reward-pick { display: grid; gap: 12px; margin-top: 14px; }
   .evo-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; margin-top: 12px; }
   .evo-choice { font-family: inherit; cursor: pointer; border: 3px solid #000; border-radius: 12px; background: #fff; padding: 6px; text-align: center; font-size: 13px; font-weight: bold; box-shadow: 0 3px 0 #000; }
@@ -742,7 +743,7 @@
       byId[x.id] = { no: i, mon: MONS[k], steps: 0 };
     });
     // Evolutions, oldest first: each one moves its Pokémon one stage up (only while it is still in the collection).
-    // bySource: record id -> "Charmander → Charmeleon", shown on the record that paid for it.
+    // bySource: record id -> { from, to: [name, dex] }, shown on the record whose reward paid for it.
     var bySource = {};
     data().evolves.slice().sort(function (a, b) { return loggedAt(a) - loggedAt(b); }).forEach(function (v) {
       var c = byId[v.target];
@@ -751,7 +752,7 @@
       if (c.steps >= chain.length) return;
       var from = c.steps ? chain[c.steps - 1][0] : c.mon[0];
       c.steps++;
-      if (v.source) bySource[v.source] = from + " → " + chain[c.steps - 1][0];
+      if (v.source) bySource[v.source] = { from: from, to: chain[c.steps - 1] };
     });
     Object.keys(byId).forEach(function (id) {
       var c = byId[id];
@@ -782,11 +783,17 @@
     // Marked so the children can plan which one to evolve next time.
     if (c.next) info.appendChild(make("span", "evo-mark", "⬆ Can evolve"));
   }
-  // Card top for a record that was used to evolve a Pokémon instead of catching one.
-  function evolvedLine(card, text) {
+  // A record whose reward was used to evolve a Pokémon (instead of catching a new one).
+  function evolvedInfo(info, top, x) {
+    info.appendChild(make("div", "mon", "✨ Evolve reward"));
+    info.appendChild(make("div", "evo-note", x.from + " evolved into " + x.to[0] + "!"));
+    top.appendChild(sprite(x.to[1], "mon-sprite", x.to[0]));
+  }
+  function evolvedLine(card, x) {
     var top = make("div", "top");
-    top.appendChild(make("div", "ball"));
-    top.appendChild(make("div", "mon", "✨ Evolved: " + text));
+    var info = make("div");
+    top.appendChild(info);
+    evolvedInfo(info, top, x);
     card.appendChild(top);
   }
 
@@ -923,8 +930,8 @@
       top.appendChild(info);
       if (pass && nos[e.id]) {
         monLine(info, top, nos[e.id]);
-      } else if (pass) {
-        info.appendChild(make("div", "mon", "✨ Evolved: " + (evolved[e.id] || "a Pokémon")));
+      } else if (pass && evolved[e.id]) {
+        evolvedInfo(info, top, evolved[e.id]);
       } else {
         info.appendChild(make("div", "mon", "It broke free!"));
       }
