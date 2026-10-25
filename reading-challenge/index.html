@@ -128,6 +128,7 @@
   .partner-row { display: flex; align-items: center; gap: 12px; background: linear-gradient(135deg, var(--red), var(--red-dark)); color: #fff; border: 3px solid #000; border-radius: 14px; padding: 6px 12px; margin-bottom: 14px; }
   .partner-row .sprite { width: 88px; height: 88px; }
   .partner-row b { font-size: 20px; display: block; }
+  .rank-next { margin-top: 6px; font-size: 14px; font-weight: bold; color: var(--purple); }
   .rank { display: inline-block; margin-top: 4px; background: var(--yellow); color: #000; padding: 2px 10px; border-radius: 12px; font-weight: bold; font-size: 14px; }
 
   /* ---------- 3. collection ---------- */
@@ -289,6 +290,7 @@
     </div>
     <div class="ladder" id="ladder"></div>
     <div class="next" id="nextMsg"></div>
+    <div class="rank-next" id="rankMsg"></div>
     <div class="rule" id="ruleMsg"></div>
   </section>
 
@@ -629,7 +631,15 @@
   var ART_BASE = SPRITE_BASE + "other/official-artwork/";
   var EVOLUTION = ["Charmander", "Charmeleon", "Charizard"];
   var EVOLUTION_IDS = [4, 5, 6];
-  var RANKS = ["Rookie Trainer", "Gym Challenger", "Ace Trainer", "CHAMPION"];
+  // A new trainer rank every RANK_STEP % of the goal (the same % that decides the prize).
+  var RANK_STEP = 10;
+  var RANKS = [
+    "Rookie Trainer", "Youngster", "Bug Catcher", "Camper", "Hiker",
+    "Gym Challenger", "Badge Collector", "Pokémon Ranger", "Cool Trainer", "Rising Star",
+    "Gym Leader", "Veteran Trainer", "Ace Trainer", "Dragon Tamer", "Expert Trainer",
+    "Elite Four Challenger", "Elite Four Member", "Legend Seeker", "Legend Hunter", "Champion Challenger",
+    "CHAMPION"
+  ];
   var DAY_NAMES = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
   var state = load();
@@ -761,9 +771,23 @@
     var pct = kid().maths ? Math.min(readPct, mathsPct) : readPct;
     var tier = 0;
     TIERS.forEach(function (t, i) { if (pct >= t.pct) tier = i + 1; });
-    return { caught: caught, correct: correct, readPct: readPct, mathsPct: mathsPct, pct: pct, tier: tier };
+    var rank = Math.min(RANKS.length - 1, Math.floor(pct / RANK_STEP));
+    return { caught: caught, correct: correct, readPct: readPct, mathsPct: mathsPct, pct: pct, tier: tier, rank: rank };
   }
   function need(goal, pctNeeded) { return Math.ceil(goal * pctNeeded / 100); }
+  // "Next rank: Youngster (10%) - 1 more book and 50 more correct answers"
+  function rankNextMessage(s) {
+    if (s.rank >= RANKS.length - 1) return "⭐ Top rank! You are the CHAMPION!";
+    var pct = (s.rank + 1) * RANK_STEP;
+    var parts = [];
+    var moreBooks = need(target(), pct) - s.caught;
+    if (moreBooks > 0) parts.push(moreBooks + " more book" + (moreBooks > 1 ? "s" : ""));
+    if (kid().maths) {
+      var moreCorrect = need(mathsTarget(), pct) - s.correct;
+      if (moreCorrect > 0) parts.push(moreCorrect + " more correct answers");
+    }
+    return "⭐ Next rank: " + RANKS[s.rank + 1] + " (" + pct + "%) — " + parts.join(" and ");
+  }
 
   // Every passed book and every big enough times tables game catches the next Pokémon,
   // in the order they were logged (ids start with the time they were made).
@@ -958,7 +982,8 @@
     var partnerName = chosen ? chosen[0] : EVOLUTION[stage];
     setSprite(el("partner"), partnerDex, partnerName);
     el("trainerName").textContent = "Trainer " + kid().name + " & " + partnerName;
-    el("rank").textContent = RANKS[Math.min(3, s.tier === 0 ? (s.pct >= 50 ? 1 : 0) : s.tier + 0)];
+    el("rank").textContent = "Lv." + (s.rank + 1) + " " + RANKS[s.rank];
+    el("rankMsg").textContent = rankNextMessage(s);
 
     el("readText").textContent = s.caught + " / " + target() + " books (" + s.readPct + "%)";
     fillBar("readBar", s.caught, target());
@@ -1203,7 +1228,9 @@
   }
   el("ovClose").onclick = function () { el("overlay").className = "overlay"; };
   function tierUpMessage(before, after) {
-    return after.tier > before.tier ? "  🏆 " + TIERS[after.tier - 1].name + " unlocked! (" + TIERS[after.tier - 1].reward + ")" : "";
+    var msg = after.tier > before.tier ? "  🏆 " + TIERS[after.tier - 1].name + " unlocked! (" + TIERS[after.tier - 1].reward + ")" : "";
+    if (after.rank > before.rank) msg += "  ⭐ RANK UP! You are now a " + RANKS[after.rank] + "!";
+    return msg;
   }
 
   // ---------- reading ----------
