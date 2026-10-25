@@ -480,38 +480,43 @@
     ["Magikarp", "Water", "#2a75bb", 129], ["Abra", "Psychic", "#d1477a", 63],
     ["Geodude", "Rock", "#a38c21", 74], ["Chansey", "Normal", "#9c8f6b", 113]
   ];
-  // What each Pokémon above evolves into, stage by stage (Mega Evolution is the last stage).
+  // What each Pokémon above evolves into, stage by stage, then its Mega / Gigantamax / special forms.
   // Keyed by the dex number in MONS; [name, dex number]. Not listed = already fully evolved.
   var EVOLVES = {
-    25: [["Raichu", 26]],
-    4: [["Charmeleon", 5], ["Charizard", 6], ["Mega Charizard X", 10034]],
-    7: [["Wartortle", 8], ["Blastoise", 9], ["Mega Blastoise", 10036]],
-    1: [["Ivysaur", 2], ["Venusaur", 3], ["Mega Venusaur", 10033]],
+    25: [["Raichu", 26], ["Alolan Raichu", 10100], ["Mega Raichu X", 10304], ["Mega Raichu Y", 10305]],
+    4: [["Charmeleon", 5], ["Charizard", 6], ["Mega Charizard X", 10034], ["Mega Charizard Y", 10035], ["Gigantamax Charizard", 10196]],
+    7: [["Wartortle", 8], ["Blastoise", 9], ["Mega Blastoise", 10036], ["Gigantamax Blastoise", 10197]],
+    1: [["Ivysaur", 2], ["Venusaur", 3], ["Mega Venusaur", 10033], ["Gigantamax Venusaur", 10195]],
     133: [["Espeon", 196]],
-    94: [["Mega Gengar", 10038]],
+    94: [["Mega Gengar", 10038], ["Gigantamax Gengar", 10202]],
     448: [["Mega Lucario", 10059]],
     39: [["Wigglytuff", 40]],
     130: [["Mega Gyarados", 10041]],
-    150: [["Mega Mewtwo X", 10043]],
+    150: [["Mega Mewtwo X", 10043], ["Mega Mewtwo Y", 10044]],
+    143: [["Gigantamax Snorlax", 10206]],
+    131: [["Gigantamax Lapras", 10204]],
+    68: [["Gigantamax Machamp", 10201]],
+    149: [["Mega Dragonite", 10281]],
+    658: [["Ash-Greninja", 10117]],
     906: [["Floragato", 907], ["Meowscarada", 908]],
     909: [["Crocalor", 910], ["Skeledirge", 911]],
     912: [["Quaxwell", 913], ["Quaquaval", 914]],
     384: [["Mega Rayquaza", 10079]],
-    6: [["Mega Charizard X", 10034]],
+    6: [["Mega Charizard X", 10034], ["Mega Charizard Y", 10035], ["Gigantamax Charizard", 10196]],
     393: [["Prinplup", 394], ["Empoleon", 395]],
     445: [["Mega Garchomp", 10058]],
-    9: [["Mega Blastoise", 10036]],
+    9: [["Mega Blastoise", 10036], ["Gigantamax Blastoise", 10197]],
     175: [["Togetic", 176], ["Togekiss", 468]],
-    3: [["Mega Venusaur", 10033]],
+    3: [["Mega Venusaur", 10033], ["Gigantamax Venusaur", 10195]],
     248: [["Mega Tyranitar", 10049]],
     54: [["Golduck", 55]],
     123: [["Scizor", 212], ["Mega Scizor", 10046]],
-    92: [["Haunter", 93], ["Gengar", 94], ["Mega Gengar", 10038]],
+    92: [["Haunter", 93], ["Gengar", 94], ["Mega Gengar", 10038], ["Gigantamax Gengar", 10202]],
     52: [["Persian", 53]],
     95: [["Steelix", 208], ["Mega Steelix", 10072]],
-    172: [["Pikachu", 25], ["Raichu", 26]],
-    147: [["Dragonair", 148], ["Dragonite", 149]],
-    104: [["Marowak", 105]],
+    172: [["Pikachu", 25], ["Raichu", 26], ["Alolan Raichu", 10100], ["Mega Raichu X", 10304], ["Mega Raichu Y", 10305]],
+    147: [["Dragonair", 148], ["Dragonite", 149], ["Mega Dragonite", 10281]],
+    104: [["Marowak", 105], ["Alolan Marowak", 10115]],
     282: [["Mega Gardevoir", 10051]],
     129: [["Gyarados", 130], ["Mega Gyarados", 10041]],
     63: [["Kadabra", 64], ["Alakazam", 65], ["Mega Alakazam", 10037]],
@@ -602,7 +607,10 @@
     var img = document.createElement("img");
     img.className = "sprite " + (cls || "");
     img.alt = alt || "";
-    img.onerror = function () { img.style.visibility = "hidden"; };
+    img.onerror = function () {
+      img.onerror = function () { img.style.visibility = "hidden"; };
+      img.src = ART_BASE + dexNo + ".png";
+    };
     img.src = spriteUrl(dexNo);
     return img;
   }
@@ -620,7 +628,10 @@
     return img;
   }
   function setSprite(img, dexNo, alt) {
-    img.onerror = function () { img.style.visibility = "hidden"; };
+    img.onerror = function () {
+      img.onerror = function () { img.style.visibility = "hidden"; };
+      img.src = ART_BASE + dexNo + ".png";
+    };
     img.style.visibility = "";
     img.alt = alt || "";
     if (img.getAttribute("src") !== spriteUrl(dexNo)) img.src = spriteUrl(dexNo);
