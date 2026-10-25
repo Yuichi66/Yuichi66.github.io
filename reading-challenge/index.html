@@ -444,6 +444,9 @@
   // Google Apps Script web app URL (shared Google Sheet). Empty = this device only.
   var API_URL = "https://script.google.com/macros/s/AKfycbyrdjCaqA7GQqRpDCtViVTtgWya-2IZGlm1uK-dZgvDbogkANOthCs2liKze9yvyUjU/exec";
   var REFRESH_MS = 60000;
+  // Change on every release: a page left open with older code reloads itself,
+  // so every phone works out the same Pokémon.
+  var APP_VERSION = "2026-10-25-1";
   var STORAGE_KEY = "htrc-2026-autumn-v3";
   var START = new Date(2026, 9, 24);   // Sat 24 Oct 2026
   var DAY_COUNT = 9;                   // to Sun 1 Nov 2026
@@ -505,7 +508,8 @@
     ["Magikarp", "Water", "#2a75bb", 129], ["Abra", "Psychic", "#d1477a", 63],
     ["Geodude", "Rock", "#a38c21", 74], ["Chansey", "Normal", "#9c8f6b", 113],
     // Added 25 Oct 2026 (all can evolve). Only records logged from NEW_MONS_FROM can catch them,
-    // so Pokémon already caught stay the same.
+    // so Pokémon already caught stay the same. (Moved to 18:59 because a phone with the old page
+    // caught Umbreon at 18:53.)
     ["Chikorita", "Grass", "#2fb36d", 152], ["Cyndaquil", "Fire", "#e3350d", 155],
     ["Totodile", "Water", "#2a75bb", 158], ["Treecko", "Grass", "#2fb36d", 252],
     ["Torchic", "Fire", "#e3350d", 255], ["Mudkip", "Water", "#2a75bb", 258],
@@ -533,7 +537,7 @@
     ["Tinkatink", "Fairy", "#d685ad", 957], ["Pawmi", "Electric", "#d9a400", 921]
   ];
   var ORIGINAL_MON_COUNT = 50;
-  var NEW_MONS_FROM = 1792953639420;
+  var NEW_MONS_FROM = 1792954754993;
   // What each Pokémon above evolves into, stage by stage, then its Mega / Gigantamax / special forms.
   // Keyed by the dex number in MONS; [name, dex number]. Not listed = already fully evolved.
   var EVOLVES = {
@@ -1192,7 +1196,16 @@
   }
   function refresh() {
     if (!API_URL) return;
+    reloadIfOutdated();
     api(null).catch(function () { setSync("⚠ Offline: showing the last saved records", true); });
+  }
+  // Reload when a newer version is online, but never while a form or reward screen is open.
+  function reloadIfOutdated() {
+    if (location.protocol === "file:") return;
+    fetch(location.pathname, { cache: "no-store" }).then(function (r) { return r.ok ? r.text() : ""; }).then(function (text) {
+      var busy = document.querySelector(".sheet.show, .overlay.show");
+      if (text && text.indexOf('var APP_VERSION = "' + APP_VERSION + '"') < 0 && !busy) location.reload();
+    }).catch(function () { /* offline: try again next time */ });
   }
   // Runs a change locally (no API) or on the shared sheet; calls done(ok).
   function commit(payload, localChange, done) {
