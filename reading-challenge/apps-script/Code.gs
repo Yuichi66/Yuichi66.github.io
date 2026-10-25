@@ -6,10 +6,12 @@
  */
 
 var KIDS = {
-  taiga: { maths: true, target: 10, mathsTarget: 2500 },
-  leo: { maths: true, target: 10, mathsTarget: 2500 },
-  yudai: { maths: false, target: 18, mathsTarget: 0 }
+  taiga: { maths: true, target: 10, mathsTarget: 2500, practices: [] },
+  leo: { maths: true, target: 10, mathsTarget: 2500, practices: [] },
+  yudai: { maths: false, target: 18, mathsTarget: 0, practices: ["latin", "mymaths"] }
 };
+// Extra practice types and the name stored in the "site" column.
+var PRACTICE_SITES = { latin: "Latin", mymaths: "MyMaths" };
 var DAY_COUNT = 9;
 var MAX_TITLE = 120;
 var MAX_SCORE = 50;
@@ -48,7 +50,7 @@ function snapshot_() {
   var rows = entriesSheet_().getDataRange().getValues().slice(1);
   var entries = rows.filter(function (r) { return r[0] !== ""; }).map(function (r) {
     var base = { id: String(r[0]), kid: String(r[1]), type: String(r[2]), day: Number(r[3]), site: String(r[5]) };
-    if (base.type === "maths") base.correct = Number(r[8]);
+    if (base.type === "maths" || PRACTICE_SITES.hasOwnProperty(base.type)) base.correct = Number(r[8]);
     else {
       base.title = String(r[4]);
       base.score = Number(r[6]);
@@ -72,6 +74,14 @@ function addEntry_(x) {
     if (!KIDS[kid].maths) throw new Error("No maths for this kid");
     if (!isInt_(correct) || correct < 0 || correct > MAX_CORRECT) throw new Error("Bad correct answers");
     entriesSheet_().appendRow([id, kid, "maths", day, "", MATHS_SITE, "", "", correct, new Date()]);
+    return;
+  }
+
+  if (PRACTICE_SITES.hasOwnProperty(x.type)) {
+    var n = Number(x.correct);
+    if (KIDS[kid].practices.indexOf(x.type) < 0) throw new Error("No " + PRACTICE_SITES[x.type] + " for this kid");
+    if (!isInt_(n) || n < 0 || n > MAX_CORRECT) throw new Error("Bad correct answers");
+    entriesSheet_().appendRow([id, kid, x.type, day, "", PRACTICE_SITES[x.type], "", "", n, new Date()]);
     return;
   }
 

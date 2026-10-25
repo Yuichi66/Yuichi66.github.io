@@ -100,6 +100,9 @@
   .mission small { display: block; font-size: 14px; margin-top: 4px; opacity: .9; }
   .mission.read { background: linear-gradient(135deg, var(--red), var(--red-dark)); }
   .mission.maths { background: linear-gradient(135deg, var(--purple), var(--blue)); }
+  .mission.latin { background: linear-gradient(135deg, #2fb36d, #1f7a4a); }
+  .mission.mymaths { background: linear-gradient(135deg, #f08c00, #c25e00); }
+  .missions.three .mission.read { grid-column: 1 / -1; }
   .today-done { margin-top: 10px; font-size: 14px; text-align: center; }
 
   /* ---------- 2. progress + prize ladder ---------- */
@@ -247,6 +250,12 @@
       <button class="mission maths" type="button" id="openMaths">
         <div class="icon">🎸</div><b>Times Tables</b><small>Play, then tap here</small>
       </button>
+      <button class="mission latin hidden" type="button" id="open-latin">
+        <div class="icon">🏛️</div><b>Latin</b><small>Practise, then tap here</small>
+      </button>
+      <button class="mission mymaths hidden" type="button" id="open-mymaths">
+        <div class="icon">🧮</div><b>MyMaths</b><small>Practise, then tap here</small>
+      </button>
     </div>
     <div class="today-done" id="todayDone"></div>
   </section>
@@ -282,6 +291,10 @@
       <div id="mathsLogWrap">
         <div class="sub-h">Times tables log</div>
         <div class="dex" id="mathsLog"></div>
+      </div>
+      <div id="practiceLogWrap">
+        <div class="sub-h">Latin &amp; MyMaths log</div>
+        <div class="dex" id="practiceLog"></div>
       </div>
     </details>
   </section>
@@ -365,6 +378,25 @@
   </form>
 </div>
 
+<!-- Latin / MyMaths steps -->
+<div class="sheet" id="practiceSheet">
+  <form class="sheet-card" id="practiceForm" autocomplete="off">
+    <h3 id="pTitle"></h3>
+    <div class="step"><div class="num">1</div><div class="body">
+      <b>How many did you get right?</b>
+      <div class="score-row"><input id="pCorrect" type="number" min="0" max="2000" required><span>correct answers</span></div>
+      <div class="row" style="margin-top:8px">
+        <div class="field"><label for="pDate">Day</label><select id="pDate" class="day-select"></select></div>
+      </div>
+    </div></div>
+    <div class="sheet-actions">
+      <button class="btn ghost" type="button" data-close>Cancel</button>
+      <button class="btn purple" type="submit">✅ Done!</button>
+    </div>
+    <div class="rule" id="pRule"></div>
+  </form>
+</div>
+
 <div class="overlay" id="overlay">
   <div class="overlay-inner">
     <div id="ovArt"></div>
@@ -394,10 +426,16 @@
   var RNQ_LOGIN_URL = "https://readnquiz.com/home.aspx?id=50285";
   var RNQ_FIND_URL = "https://readnquiz.com/quiz/find.aspx?xid=50285";
   var KIDS = [
-    { id: "taiga", name: "TAIGA", maths: true, target: 10, mathsTarget: 2500, ks: "KS2" },
-    { id: "leo", name: "LEO", maths: true, target: 10, mathsTarget: 2500, ks: "KS2" },
-    { id: "yudai", name: "YUDAI", maths: false, target: 18, mathsTarget: 0, ks: "KS3" }
+    { id: "taiga", name: "TAIGA", maths: true, target: 10, mathsTarget: 2500, ks: "KS2", practices: [] },
+    { id: "leo", name: "LEO", maths: true, target: 10, mathsTarget: 2500, ks: "KS2", practices: [] },
+    { id: "yudai", name: "YUDAI", maths: false, target: 18, mathsTarget: 0, ks: "KS3", practices: ["latin", "mymaths"] }
   ];
+  // Extra practice: a session with at least `min` correct answers catches a Pokémon.
+  // It does not count towards the prize.
+  var PRACTICES = {
+    latin: { name: "Latin", icon: "🏛️", min: 50 },
+    mymaths: { name: "MyMaths", icon: "🧮", min: 100 }
+  };
   // Prize tiers: share of the goal needed, ball, reward.
   var TIERS = [
     { pct: 100, ball: "great", name: "Great Ball", reward: "£2" },
@@ -452,7 +490,7 @@
       s.settings.targets[k.id] = k.target;
       s.settings.mathsTargets[k.id] = k.mathsTarget;
       s.settings.partners[k.id] = 0;
-      s.kids[k.id] = { entries: [], maths: [] };
+      s.kids[k.id] = { entries: [], maths: [], practice: [] };
     });
     return s;
   }
@@ -464,6 +502,7 @@
       if (parsed && parsed.settings && parsed.kids) {
         KIDS.forEach(function (k) {
           if (parsed.kids[k.id]) base.kids[k.id] = parsed.kids[k.id];
+          if (!base.kids[k.id].practice) base.kids[k.id].practice = [];
           if (parsed.settings.targets[k.id]) base.settings.targets[k.id] = parsed.settings.targets[k.id];
           if (parsed.settings.mathsTargets[k.id]) base.settings.mathsTargets[k.id] = parsed.settings.mathsTargets[k.id];
           if (parsed.settings.partners && parsed.settings.partners[k.id]) base.settings.partners[k.id] = parsed.settings.partners[k.id];
@@ -573,9 +612,10 @@
   var MATHS_CATCH_MIN = 50;
   var MATHS_RULE_FROM = 1792913612973;
   function mathsCatches(m) { return m.correct >= (loggedAt(m) < MATHS_RULE_FROM ? 1 : MATHS_CATCH_MIN); }
+  function practiceCatches(p) { var cfg = PRACTICES[p.type]; return !!cfg && p.correct >= cfg.min; }
   function catchOrder() {
     var d = data();
-    var list = d.entries.filter(isPass).concat(d.maths.filter(mathsCatches));
+    var list = d.entries.filter(isPass).concat(d.maths.filter(mathsCatches), d.practice.filter(practiceCatches));
     return list.sort(function (a, b) { return loggedAt(a) - loggedAt(b); });
   }
   function hashOf(s) {
@@ -648,13 +688,23 @@
   }
 
   function renderMissions() {
+    var practices = kid().practices;
     el("openMaths").className = "mission maths" + (kid().maths ? "" : " hidden");
-    el("missions").className = "missions" + (kid().maths ? "" : " one");
+    Object.keys(PRACTICES).forEach(function (type) {
+      el("open-" + type).className = "mission " + type + (practices.indexOf(type) >= 0 ? "" : " hidden");
+    });
+    var count = 1 + (kid().maths ? 1 : 0) + practices.length;
+    el("missions").className = "missions" + (count === 1 ? " one" : count === 3 ? " three" : "");
     var t = clampDay(todayIndex());
     var books = data().entries.filter(function (e) { return e.day === t && isPass(e); }).length;
     var correct = data().maths.filter(function (m) { return m.day === t; }).reduce(function (s, m) { return s + m.correct; }, 0);
     var msg = "Today: " + (books ? "✅ " + books + " book" + (books > 1 ? "s" : "") : "📖 no book yet");
     if (kid().maths) msg += "  ·  " + (correct ? "✅ " + correct + " correct" : "🎸 no times tables yet");
+    practices.forEach(function (type) {
+      var cfg = PRACTICES[type];
+      var n = data().practice.filter(function (p) { return p.type === type && p.day === t; }).reduce(function (s, p) { return s + p.correct; }, 0);
+      msg += "  ·  " + (n ? "✅ " + cfg.name + " " + n : cfg.icon + " no " + cfg.name + " yet");
+    });
     el("todayDone").textContent = msg;
   }
 
@@ -774,6 +824,27 @@
       card.appendChild(deleteButton(m, "maths", m.correct + " correct answers"));
       log.appendChild(card);
     });
+
+    el("practiceLogWrap").className = kid().practices.length ? "" : "hidden";
+    var plog = el("practiceLog");
+    plog.innerHTML = "";
+    if (!data().practice.length) plog.appendChild(make("div", "empty-dex", "No Latin or MyMaths yet."));
+    data().practice.forEach(function (p) {
+      var cfg = PRACTICES[p.type] || { name: p.type, icon: "" };
+      var card = make("div", "entry");
+      if (p.id in nos) {
+        var top = make("div", "top");
+        top.appendChild(make("div", "ball"));
+        var info = make("div");
+        top.appendChild(info);
+        monLine(info, top, nos[p.id]);
+        card.appendChild(top);
+      }
+      card.appendChild(make("div", "title", cfg.icon + " " + cfg.name + ": " + p.correct + " correct"));
+      card.appendChild(make("div", "meta", fmt(dayDate(p.day))));
+      card.appendChild(deleteButton(p, "practice", cfg.name + " " + p.correct + " correct answers"));
+      plog.appendChild(card);
+    });
   }
 
   function deleteButton(item, listName, label) {
@@ -843,6 +914,7 @@
     res.entries.forEach(function (e) {
       if (!next.kids[e.kid]) return;
       if (e.type === "maths") next.kids[e.kid].maths.push(e);
+      else if (PRACTICES[e.type]) next.kids[e.kid].practice.push(e);
       else next.kids[e.kid].entries.push(e);
     });
     state = next;
@@ -882,7 +954,7 @@
 
   // ---------- sheets & overlay ----------
   function openSheet(id) { el(id).className = "sheet show"; window.scrollTo(0, 0); }
-  function closeSheets() { el("readSheet").className = "sheet"; el("mathsSheet").className = "sheet"; }
+  function closeSheets() { el("readSheet").className = "sheet"; el("mathsSheet").className = "sheet"; el("practiceSheet").className = "sheet"; }
   Array.prototype.forEach.call(document.querySelectorAll("[data-close]"), function (b) { b.onclick = closeSheets; });
   el("openRead").onclick = function () { openSheet("readSheet"); };
   el("openMaths").onclick = function () { openSheet("mathsSheet"); };
@@ -975,6 +1047,40 @@
       var mid = "Total: " + after.correct + " correct answers" + tierUpMessage(before, after);
       if (mathsCatches(item)) catchPokemon(item, "", "+" + correct + "! ", mid);
       else show(beySvg("blade"), "LET IT RIP! +" + correct, mid + "  ·  Get " + MATHS_CATCH_MIN + " or more in one go to catch a Pokémon!");
+    });
+  };
+
+  // ---------- Latin / MyMaths ----------
+  var practiceType = null;
+  Object.keys(PRACTICES).forEach(function (type) {
+    el("open-" + type).onclick = function () {
+      var cfg = PRACTICES[type];
+      practiceType = type;
+      el("pTitle").textContent = cfg.icon + " " + cfg.name;
+      el("pRule").textContent = "Get " + cfg.min + " or more in one go to catch a Pokémon!";
+      openSheet("practiceSheet");
+    };
+  });
+  el("practiceForm").onsubmit = function (ev) {
+    ev.preventDefault();
+    var cfg = PRACTICES[practiceType];
+    if (!cfg) return;
+    var correct = parseInt(el("pCorrect").value, 10);
+    if (isNaN(correct) || correct < 0 || correct > 2000) { window.alert("Please type how many you got right (0 to 2000)."); return; }
+    var item = { id: newId(), kid: current, type: practiceType, day: parseInt(el("pDate").value, 10), site: cfg.name, correct: correct };
+    var who = current;
+    var button = el("practiceForm").querySelector("button[type=submit]");
+    button.disabled = true;
+    commit({ action: "add", entry: item }, function () {
+      state.kids[who].practice = state.kids[who].practice.concat([item]);
+    }, function (ok) {
+      button.disabled = false;
+      if (!ok) return;
+      el("pCorrect").value = "";
+      closeSheets();
+      var mid = cfg.name + ": " + correct + " correct";
+      if (practiceCatches(item)) catchPokemon(item, "", "+" + correct + "! ", mid);
+      else show(make("div", "ball huge empty"), cfg.icon + " +" + correct, mid + "  ·  Get " + cfg.min + " or more in one go to catch a Pokémon!");
     });
   };
 
