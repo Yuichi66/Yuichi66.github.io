@@ -501,8 +501,37 @@
     ["Dratini", "Dragon", "#4b3fd1", 147], ["Cubone", "Ground", "#c79a4b", 104],
     ["Flareon", "Fire", "#e3350d", 136], ["Gardevoir", "Psychic", "#d1477a", 282],
     ["Magikarp", "Water", "#2a75bb", 129], ["Abra", "Psychic", "#d1477a", 63],
-    ["Geodude", "Rock", "#a38c21", 74], ["Chansey", "Normal", "#9c8f6b", 113]
+    ["Geodude", "Rock", "#a38c21", 74], ["Chansey", "Normal", "#9c8f6b", 113],
+    // Added 25 Oct 2026 (all can evolve). Only records logged from NEW_MONS_FROM can catch them,
+    // so Pokémon already caught stay the same.
+    ["Chikorita", "Grass", "#2fb36d", 152], ["Cyndaquil", "Fire", "#e3350d", 155],
+    ["Totodile", "Water", "#2a75bb", 158], ["Treecko", "Grass", "#2fb36d", 252],
+    ["Torchic", "Fire", "#e3350d", 255], ["Mudkip", "Water", "#2a75bb", 258],
+    ["Turtwig", "Grass", "#2fb36d", 387], ["Chimchar", "Fire", "#e3350d", 390],
+    ["Snivy", "Grass", "#2fb36d", 495], ["Tepig", "Fire", "#e3350d", 498],
+    ["Oshawott", "Water", "#2a75bb", 501], ["Chespin", "Grass", "#2fb36d", 650],
+    ["Fennekin", "Fire", "#e3350d", 653], ["Froakie", "Water", "#2a75bb", 656],
+    ["Rowlet", "Grass", "#2fb36d", 722], ["Litten", "Fire", "#e3350d", 725],
+    ["Popplio", "Water", "#2a75bb", 728], ["Grookey", "Grass", "#2fb36d", 810],
+    ["Scorbunny", "Fire", "#e3350d", 813], ["Sobble", "Water", "#2a75bb", 816],
+    ["Riolu", "Fighting", "#b0542c", 447], ["Mareep", "Electric", "#d9a400", 179],
+    ["Larvitar", "Rock", "#a38c21", 246], ["Gible", "Dragon", "#4b3fd1", 443],
+    ["Bagon", "Dragon", "#4b3fd1", 371], ["Beldum", "Steel", "#8a8fa0", 374],
+    ["Ralts", "Psychic", "#d1477a", 280], ["Axew", "Dragon", "#4b3fd1", 610],
+    ["Deino", "Dark", "#4a3b30", 633], ["Goomy", "Dragon", "#4b3fd1", 704],
+    ["Frigibax", "Dragon", "#4b3fd1", 996], ["Applin", "Grass", "#2fb36d", 840],
+    ["Rookidee", "Flying", "#6f8fd8", 821], ["Pidgey", "Flying", "#6f8fd8", 16],
+    ["Caterpie", "Bug", "#8aa31a", 10], ["Oddish", "Grass", "#2fb36d", 43],
+    ["Poliwag", "Water", "#2a75bb", 60], ["Machop", "Fighting", "#b0542c", 66],
+    ["Growlithe", "Fire", "#e3350d", 58], ["Vulpix", "Fire", "#e3350d", 37],
+    ["Horsea", "Water", "#2a75bb", 116], ["Shinx", "Electric", "#d9a400", 403],
+    ["Swablu", "Flying", "#6f8fd8", 333], ["Aron", "Steel", "#8a8fa0", 304],
+    ["Zubat", "Poison", "#a33ea1", 41], ["Sandshrew", "Ground", "#c79a4b", 27],
+    ["Slowpoke", "Water", "#2a75bb", 79], ["Fletchling", "Flying", "#6f8fd8", 661],
+    ["Tinkatink", "Fairy", "#d685ad", 957], ["Pawmi", "Electric", "#d9a400", 921]
   ];
+  var ORIGINAL_MON_COUNT = 50;
+  var NEW_MONS_FROM = 1792953639420;
   // What each Pokémon above evolves into, stage by stage, then its Mega / Gigantamax / special forms.
   // Keyed by the dex number in MONS; [name, dex number]. Not listed = already fully evolved.
   var EVOLVES = {
@@ -520,7 +549,7 @@
     131: [["Gigantamax Lapras", 10204]],
     68: [["Gigantamax Machamp", 10201]],
     149: [["Mega Dragonite", 10281]],
-    658: [["Ash-Greninja", 10117]],
+    658: [["Ash-Greninja", 10117], ["Mega Greninja", 10294]],
     906: [["Floragato", 907], ["Meowscarada", 908]],
     909: [["Crocalor", 910], ["Skeledirge", 911]],
     912: [["Quaxwell", 913], ["Quaquaval", 914]],
@@ -544,7 +573,57 @@
     129: [["Gyarados", 130], ["Mega Gyarados", 10041]],
     63: [["Kadabra", 64], ["Alakazam", 65], ["Mega Alakazam", 10037]],
     74: [["Graveler", 75], ["Golem", 76]],
-    113: [["Blissey", 242]]
+    113: [["Blissey", 242]],
+    152: [["Bayleef", 153], ["Meganium", 154], ["Mega Meganium", 10282]],
+    155: [["Quilava", 156], ["Typhlosion", 157]],
+    158: [["Croconaw", 159], ["Feraligatr", 160], ["Mega Feraligatr", 10283]],
+    252: [["Grovyle", 253], ["Sceptile", 254], ["Mega Sceptile", 10065]],
+    255: [["Combusken", 256], ["Blaziken", 257], ["Mega Blaziken", 10050]],
+    258: [["Marshtomp", 259], ["Swampert", 260], ["Mega Swampert", 10064]],
+    387: [["Grotle", 388], ["Torterra", 389]],
+    390: [["Monferno", 391], ["Infernape", 392]],
+    495: [["Servine", 496], ["Serperior", 497]],
+    498: [["Pignite", 499], ["Emboar", 500], ["Mega Emboar", 10286]],
+    501: [["Dewott", 502], ["Samurott", 503]],
+    650: [["Quilladin", 651], ["Chesnaught", 652], ["Mega Chesnaught", 10292]],
+    653: [["Braixen", 654], ["Delphox", 655], ["Mega Delphox", 10293]],
+    656: [["Frogadier", 657], ["Greninja", 658], ["Ash-Greninja", 10117], ["Mega Greninja", 10294]],
+    722: [["Dartrix", 723], ["Decidueye", 724]],
+    725: [["Torracat", 726], ["Incineroar", 727]],
+    728: [["Brionne", 729], ["Primarina", 730]],
+    810: [["Thwackey", 811], ["Rillaboom", 812]],
+    813: [["Raboot", 814], ["Cinderace", 815]],
+    816: [["Drizzile", 817], ["Inteleon", 818]],
+    447: [["Lucario", 448], ["Mega Lucario", 10059]],
+    179: [["Flaaffy", 180], ["Ampharos", 181], ["Mega Ampharos", 10045]],
+    246: [["Pupitar", 247], ["Tyranitar", 248], ["Mega Tyranitar", 10049]],
+    443: [["Gabite", 444], ["Garchomp", 445], ["Mega Garchomp", 10058]],
+    371: [["Shelgon", 372], ["Salamence", 373], ["Mega Salamence", 10089]],
+    374: [["Metang", 375], ["Metagross", 376], ["Mega Metagross", 10076]],
+    280: [["Kirlia", 281], ["Gardevoir", 282], ["Mega Gardevoir", 10051]],
+    610: [["Fraxure", 611], ["Haxorus", 612]],
+    633: [["Zweilous", 634], ["Hydreigon", 635]],
+    704: [["Sliggoo", 705], ["Goodra", 706]],
+    996: [["Arctibax", 997], ["Baxcalibur", 998]],
+    840: [["Flapple", 841]],
+    821: [["Corvisquire", 822], ["Corviknight", 823], ["Gigantamax Corviknight", 10212]],
+    16: [["Pidgeotto", 17], ["Pidgeot", 18], ["Mega Pidgeot", 10073]],
+    10: [["Metapod", 11], ["Butterfree", 12], ["Gigantamax Butterfree", 10198]],
+    43: [["Gloom", 44], ["Vileplume", 45]],
+    60: [["Poliwhirl", 61], ["Poliwrath", 62]],
+    66: [["Machoke", 67], ["Machamp", 68], ["Gigantamax Machamp", 10201]],
+    58: [["Arcanine", 59]],
+    37: [["Ninetales", 38]],
+    116: [["Seadra", 117], ["Kingdra", 230]],
+    403: [["Luxio", 404], ["Luxray", 405]],
+    333: [["Altaria", 334], ["Mega Altaria", 10067]],
+    304: [["Lairon", 305], ["Aggron", 306], ["Mega Aggron", 10053]],
+    41: [["Golbat", 42], ["Crobat", 169]],
+    27: [["Sandslash", 28]],
+    79: [["Slowbro", 80], ["Mega Slowbro", 10071]],
+    661: [["Fletchinder", 662], ["Talonflame", 663]],
+    957: [["Tinkatuff", 958], ["Tinkaton", 959]],
+    921: [["Pawmo", 922], ["Pawmot", 923]]
   };
   var SPRITE_BASE ="https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/";
   var ART_BASE = SPRITE_BASE + "other/official-artwork/";
@@ -727,20 +806,31 @@
     for (var i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619) >>> 0; }
     return h;
   }
-  function allMonIndexes() { return MONS.map(function (m, k) { return k; }); }
+  // Pokémon that can be caught: the first 50, plus the new ones once `withNew`.
+  function allMonIndexes(withNew) {
+    return MONS.map(function (m, k) { return k; }).filter(function (k) { return withNew || k < ORIGINAL_MON_COUNT; });
+  }
   // Random part of an id ("time-random"); it decides the Pokémon, the time decides the order.
   function seedOf(id) { var parts = String(id).split("-"); return parts[1] || parts[0]; }
   // A random Pokémon not caught yet, chosen from the record's id so every phone shows the same one.
   function pickFrom(pool, id) { return pool[hashOf(seedOf(id)) % pool.length]; }
   // byId: id -> { no: catch number (0-based), mon }; pool: Pokémon still to catch
   function catches() {
-    var pool = allMonIndexes(), byId = {};
+    var pool = allMonIndexes(false), byId = {}, withNew = false;
+    // The new Pokémon join the pool from the first record logged after they were added.
+    function addNew() {
+      if (withNew) return;
+      withNew = true;
+      pool = pool.concat(allMonIndexes(true).slice(ORIGINAL_MON_COUNT));
+    }
     catchOrder().forEach(function (x, i) {
+      if (loggedAt(x) >= NEW_MONS_FROM) addNew();
       var k = pickFrom(pool, x.id);
       pool = pool.filter(function (j) { return j !== k; });
-      if (!pool.length) pool = allMonIndexes();
+      if (!pool.length) pool = allMonIndexes(withNew);
       byId[x.id] = { no: i, mon: MONS[k], steps: 0 };
     });
+    if (Date.now() >= NEW_MONS_FROM) addNew();
     // Evolutions, oldest first: each one moves its Pokémon one stage up (only while it is still in the collection).
     // bySource: record id -> "Charmander → Charmeleon", shown on the record that paid for it.
     var bySource = {};
