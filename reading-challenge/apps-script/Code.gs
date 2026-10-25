@@ -33,7 +33,11 @@ function doPost(e) {
   lock.waitLock(10000);
   try {
     var body = JSON.parse((e && e.postData && e.postData.contents) || "{}");
-    if (body.action === "add") addEntry_(body.entry);
+    if (body.action === "add") {
+      addEntry_(body.entry);
+      // A reward used to evolve a Pokémon is saved with the record that won it.
+      if (body.evolve) addEntry_(body.evolve);
+    }
     else if (body.action === "delete") deleteEntry_(String(body.id || ""));
     else if (body.action === "settings") saveSettings_(String(body.kid || ""), body.settings);
     else if (body.action === "partner") savePartner_(String(body.kid || ""), Number(body.partner));
@@ -51,7 +55,7 @@ function snapshot_() {
   var entries = rows.filter(function (r) { return r[0] !== ""; }).map(function (r) {
     var base = { id: String(r[0]), kid: String(r[1]), type: String(r[2]), day: Number(r[3]), site: String(r[5]) };
     if (base.type === "maths" || PRACTICE_SITES.hasOwnProperty(base.type)) base.correct = Number(r[8]);
-    else if (base.type === "evolve") return base;
+    else if (base.type === "evolve") base.source = String(r[4]);
     else {
       base.title = String(r[4]);
       base.score = Number(r[6]);
@@ -86,11 +90,14 @@ function addEntry_(x) {
     return;
   }
 
-  // Evolution of one caught Pokémon; "site" holds the id of the record that caught it.
+  // Evolution of one caught Pokémon: "site" holds the id of the record that caught it,
+  // "title" the id of the record whose reward paid for it.
   if (x.type === "evolve") {
     var target = String(x.target || "").slice(0, 40);
+    var source = String(x.source || "").slice(0, 40);
     if (!target || !hasEntry_(target, kid)) throw new Error("Unknown Pokémon to evolve");
-    entriesSheet_().appendRow([id, kid, "evolve", day, "", target, "", "", "", new Date()]);
+    if (!source || !hasEntry_(source, kid)) throw new Error("Unknown reward for the evolution");
+    entriesSheet_().appendRow([id, kid, "evolve", day, source, target, "", "", "", new Date()]);
     return;
   }
 
@@ -112,9 +119,10 @@ function hasEntry_(id, kid) {
 
 function deleteEntry_(id) {
   var sheet = entriesSheet_();
-  var ids = sheet.getRange(1, 1, sheet.getLastRow(), 1).getValues();
-  for (var i = ids.length - 1; i >= 1; i--) {
-    if (String(ids[i][0]) === id) sheet.deleteRow(i + 1);
+  // Also removes the evolution paid for by this record.
+  var rows = sheet.getRange(1, 1, sheet.getLastRow(), 5).getValues();
+  for (var i = rows.length - 1; i >= 1; i--) {
+    if (String(rows[i][0]) === id || (rows[i][2] === "evolve" && String(rows[i][4]) === id)) sheet.deleteRow(i + 1);
   }
 }
 

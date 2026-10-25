@@ -153,6 +153,12 @@
   .partner-btn { display: block; margin-top: 4px; font-family: inherit; font-size: 12px; font-weight: bold; cursor: pointer; border: 2px solid #000; border-radius: 10px; padding: 2px 8px; background: #fff; }
   .partner-btn.on { background: var(--yellow); cursor: default; }
   .evo-mark { display: block; margin-top: 4px; font-size: 11px; font-weight: bold; color: var(--purple); }
+  .reward-pick { display: grid; gap: 12px; margin-top: 14px; }
+  .evo-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; margin-top: 12px; }
+  .evo-choice { font-family: inherit; cursor: pointer; border: 3px solid #000; border-radius: 12px; background: #fff; padding: 6px; text-align: center; font-size: 13px; font-weight: bold; box-shadow: 0 3px 0 #000; }
+  .evo-choice .sprite { width: 56px; height: 56px; }
+  .evo-choice .pair { display: flex; align-items: center; justify-content: center; }
+  .evo-choice .arrow { font-size: 18px; color: var(--purple); }
   .evo-btn { display: block; margin-top: 4px; font-family: inherit; font-size: 13px; font-weight: bold; cursor: pointer; border: 2px solid #000; border-radius: 10px; padding: 3px 10px; color: #fff; background: linear-gradient(135deg, var(--purple), var(--blue)); animation: glow 1.2s ease-in-out infinite; }
   .evo-btn[disabled] { opacity: .6; cursor: wait; animation: none; }
   @keyframes glow { 50% { box-shadow: 0 0 10px 2px var(--yellow); } }
@@ -380,7 +386,7 @@
       <button class="btn ghost" type="button" data-close>Cancel</button>
       <button class="btn purple" type="submit">🚀 LET IT RIP!</button>
     </div>
-    <div class="rule">Every correct answer counts. The app adds them up for you. Get 50 or more in one go to catch a Pokémon AND win an evolution!</div>
+    <div class="rule">Every correct answer counts. The app adds them up for you. Get 50 or more in one go: catch a NEW Pokémon OR evolve one!</div>
   </form>
 </div>
 
@@ -401,6 +407,23 @@
     </div>
     <div class="rule" id="pRule"></div>
   </form>
+</div>
+
+<!-- Reward: catch a new Pokémon or evolve one -->
+<div class="sheet" id="rewardSheet">
+  <div class="sheet-card">
+    <h3>🎉 You did it! Pick your reward</h3>
+    <div class="reward-pick" id="rwPick">
+      <button class="btn" type="button" id="rwCatch">🎯 Catch a NEW Pokémon</button>
+      <button class="btn purple" type="button" id="rwEvolve">✨ EVOLVE a Pokémon</button>
+    </div>
+    <div class="hidden" id="rwListWrap">
+      <b>Which one will evolve?</b>
+      <div class="evo-list" id="rwList"></div>
+      <button class="btn ghost small" type="button" id="rwBack" style="margin-top:12px">⬅ Back</button>
+    </div>
+    <div class="sheet-actions"><button class="btn ghost small" type="button" id="rwCancel">Cancel</button></div>
+  </div>
 </div>
 
 <div class="overlay" id="overlay">
@@ -687,16 +710,17 @@
     return cfg.oldMin && loggedAt(p) < PRACTICE_RULE_FROM ? cfg.oldMin : cfg.min;
   }
   function practiceCatches(p) { return !!PRACTICES[p.type] && p.correct >= practiceMin(p); }
-  // Every record that catches a Pokémon also gives the right to evolve one.
-  function givesEvolve(x) {
-    if (x.type === "maths") return mathsCatches(x);
-    if (PRACTICES[x.type]) return practiceCatches(x);
-    return isPass(x);
+  // A record that wins a reward either catches a new Pokémon or (if chosen) evolves one.
+  // The evolution is saved as an "evolve" entry whose source is that record.
+  function usedForEvolve() {
+    var used = {};
+    data().evolves.forEach(function (v) { if (v.source) used[v.source] = true; });
+    return used;
   }
   function catchOrder() {
-    var d = data();
+    var d = data(), used = usedForEvolve();
     var list = d.entries.filter(isPass).concat(d.maths.filter(mathsCatches), d.practice.filter(practiceCatches));
-    return list.sort(function (a, b) { return loggedAt(a) - loggedAt(b); });
+    return list.filter(function (x) { return !used[x.id]; }).sort(function (a, b) { return loggedAt(a) - loggedAt(b); });
   }
   function hashOf(s) {
     var h = 2166136261;
@@ -717,33 +741,37 @@
       if (!pool.length) pool = allMonIndexes();
       byId[x.id] = { no: i, mon: MONS[k], steps: 0 };
     });
-    // Evolutions: each one moves its Pokémon one stage up (only for Pokémon still in the collection).
-    var used = 0;
-    data().evolves.forEach(function (v) {
+    // Evolutions, oldest first: each one moves its Pokémon one stage up (only while it is still in the collection).
+    // bySource: record id -> "Charmander → Charmeleon", shown on the record that paid for it.
+    var bySource = {};
+    data().evolves.slice().sort(function (a, b) { return loggedAt(a) - loggedAt(b); }).forEach(function (v) {
       var c = byId[v.target];
       if (!c) return;
-      used++;
+      var chain = EVOLVES[c.mon[3]] || [];
+      if (c.steps >= chain.length) return;
+      var from = c.steps ? chain[c.steps - 1][0] : c.mon[0];
       c.steps++;
+      if (v.source) bySource[v.source] = from + " → " + chain[c.steps - 1][0];
     });
     Object.keys(byId).forEach(function (id) {
       var c = byId[id];
       var chain = EVOLVES[c.mon[3]] || [];
-      c.steps = Math.min(c.steps, chain.length);
       var form = c.steps ? chain[c.steps - 1] : [c.mon[0], c.mon[3]];
       c.name = form[0];
       c.dex = form[1];
       c.next = chain[c.steps] || null;
     });
-    return { byId: byId, pool: pool, used: used };
+    return { byId: byId, pool: pool, bySource: bySource };
   }
-  // Evolutions earned but not used yet.
-  function evolvesLeft(cs) {
-    var d = data();
-    var earned = d.entries.concat(d.maths, d.practice).filter(givesEvolve).length;
-    return Math.max(0, earned - (cs || catches()).used);
+  // Caught Pokémon that can still evolve, in catch order: [{ id, c }].
+  function evolvable() {
+    var byId = catches().byId;
+    return Object.keys(byId).filter(function (id) { return byId[id].next; })
+      .map(function (id) { return { id: id, c: byId[id] }; })
+      .sort(function (a, b) { return a.c.no - b.c.no; });
   }
   function nextMon(id) { return MONS[pickFrom(catches().pool, id)]; }
-  function monLine(info, top, c, id, left) {
+  function monLine(info, top, c) {
     var mon = c.mon;
     info.appendChild(make("div", "mon", "#" + (c.no + 1) + " " + c.name));
     var type = make("span", "type", mon[1]);
@@ -751,27 +779,15 @@
     info.appendChild(type);
     top.appendChild(sprite(c.dex, "mon-sprite", c.name));
     info.appendChild(partnerButton(mon));
-    if (c.next) info.appendChild(evolveButton(c, id, left));
+    // Marked so the children can plan which one to evolve next time.
+    if (c.next) info.appendChild(make("span", "evo-mark", "⬆ Can evolve"));
   }
-  // Pokémon that can still evolve are marked; the mark becomes a button while an evolution is ready.
-  function evolveButton(c, id, left) {
-    if (!left) return make("span", "evo-mark", "⬆ Can evolve");
-    var b = make("button", "evo-btn", "✨ Evolve!");
-    b.type = "button";
-    b.onclick = function () {
-      if (!window.confirm("Evolve " + c.name + " into " + c.next[0] + "?")) return;
-      var who = current;
-      var from = [c.name, c.dex], to = c.next;
-      var item = { id: newId(), kid: who, type: "evolve", day: clampDay(todayIndex()), target: id };
-      b.disabled = true;
-      commit({ action: "add", entry: item }, function () {
-        state.kids[who].evolves = state.kids[who].evolves.concat([item]);
-      }, function (ok) {
-        b.disabled = false;
-        if (ok) celebrateEvolve(from, to);
-      });
-    };
-    return b;
+  // Card top for a record that was used to evolve a Pokémon instead of catching one.
+  function evolvedLine(card, text) {
+    var top = make("div", "top");
+    top.appendChild(make("div", "ball"));
+    top.appendChild(make("div", "mon", "✨ Evolved: " + text));
+    card.appendChild(top);
   }
 
   // Chosen partner, only while that Pokémon is still in the collection.
@@ -829,8 +845,6 @@
       var n = data().practice.filter(function (p) { return p.type === type && p.day === t; }).reduce(function (s, p) { return s + p.correct; }, 0);
       msg += "  ·  " + (n ? "✅ " + cfg.name + " " + n : cfg.icon + " no " + cfg.name + " yet");
     });
-    var left = evolvesLeft();
-    if (left) msg += "  ·  ✨ " + left + " evolution" + (left > 1 ? "s" : "") + " ready! Open My collection";
     el("todayDone").textContent = msg;
   }
 
@@ -899,7 +913,7 @@
     dex.innerHTML = "";
     var list = data().entries;
     if (!list.length) dex.appendChild(make("div", "empty-dex", "No books yet. Read a book and catch your first Pokémon!"));
-    var cs = catches(), nos = cs.byId, left = evolvesLeft(cs);
+    var cs = catches(), nos = cs.byId, evolved = cs.bySource;
     list.forEach(function (e) {
       var pass = isPass(e);
       var card = make("div", "entry" + (pass ? "" : " fail"));
@@ -907,8 +921,10 @@
       top.appendChild(make("div", "ball " + ballClass(e)));
       var info = make("div");
       top.appendChild(info);
-      if (pass) {
-        monLine(info, top, nos[e.id], e.id, left);
+      if (pass && nos[e.id]) {
+        monLine(info, top, nos[e.id]);
+      } else if (pass) {
+        info.appendChild(make("div", "mon", "✨ Evolved: " + (evolved[e.id] || "a Pokémon")));
       } else {
         info.appendChild(make("div", "mon", "It broke free!"));
       }
@@ -942,9 +958,9 @@
         top.appendChild(make("div", "ball"));
         var info = make("div");
         top.appendChild(info);
-        monLine(info, top, nos[m.id], m.id, left);
+        monLine(info, top, nos[m.id]);
         card.appendChild(top);
-      }
+      } else if (evolved[m.id]) evolvedLine(card, evolved[m.id]);
       card.appendChild(make("div", "title", "🎸 " + m.correct + " correct"));
       card.appendChild(make("div", "meta", fmt(dayDate(m.day))));
       card.appendChild(deleteButton(m, "maths", m.correct + " correct answers"));
@@ -963,9 +979,9 @@
         top.appendChild(make("div", "ball"));
         var info = make("div");
         top.appendChild(info);
-        monLine(info, top, nos[p.id], p.id, left);
+        monLine(info, top, nos[p.id]);
         card.appendChild(top);
-      }
+      } else if (evolved[p.id]) evolvedLine(card, evolved[p.id]);
       card.appendChild(make("div", "title", cfg.icon + " " + cfg.name + ": " + p.correct + " correct"));
       card.appendChild(make("div", "meta", fmt(dayDate(p.day))));
       card.appendChild(deleteButton(p, "practice", cfg.name + " " + p.correct + " correct answers"));
@@ -982,6 +998,7 @@
       var who = current;
       commit({ action: "delete", id: item.id }, function () {
         state.kids[who][listName] = state.kids[who][listName].filter(function (x) { return x.id !== item.id; });
+        state.kids[who].evolves = state.kids[who].evolves.filter(function (v) { return v.source !== item.id; });
       }, function () {});
     };
     return del;
@@ -1041,7 +1058,7 @@
       if (!next.kids[e.kid]) return;
       if (e.type === "maths") next.kids[e.kid].maths.push(e);
       else if (PRACTICES[e.type]) next.kids[e.kid].practice.push(e);
-      else if (e.type === "evolve") next.kids[e.kid].evolves.push({ id: e.id, kid: e.kid, type: e.type, day: e.day, target: e.site });
+      else if (e.type === "evolve") next.kids[e.kid].evolves.push({ id: e.id, kid: e.kid, type: e.type, day: e.day, target: e.site, source: e.source || "" });
       else next.kids[e.kid].entries.push(e);
     });
     state = next;
@@ -1081,7 +1098,7 @@
 
   // ---------- sheets & overlay ----------
   function openSheet(id) { el(id).className = "sheet show"; window.scrollTo(0, 0); }
-  function closeSheets() { el("readSheet").className = "sheet"; el("mathsSheet").className = "sheet"; el("practiceSheet").className = "sheet"; }
+  function closeSheets() { ["readSheet", "mathsSheet", "practiceSheet", "rewardSheet"].forEach(function (id) { el(id).className = "sheet"; }); }
   Array.prototype.forEach.call(document.querySelectorAll("[data-close]"), function (b) { b.onclick = closeSheets; });
   el("openRead").onclick = function () { openSheet("readSheet"); };
   el("openMaths").onclick = function () { openSheet("mathsSheet"); };
@@ -1114,21 +1131,85 @@
     }
     var entry = { id: newId(pendingSeed), kid: current, type: "read", day: parseInt(el("fDate").value, 10), title: title, site: site, score: score, total: total };
     var before = summary();
-    var who = current;
-    var button = el("readForm").querySelector("button[type=submit]");
-    button.disabled = true;
-    commit({ action: "add", entry: entry }, function () {
-      state.kids[who].entries = state.kids[who].entries.concat([entry]);
-    }, function (ok) {
-      button.disabled = false;
+    addWithReward(entry, "entries", isPass(entry), el("readForm").querySelector("button[type=submit]"), function (ok, evo) {
       if (!ok) return;
       pendingSeed = newSeed();
       renderSheets();
       el("fTitle").value = "";
       el("fScore").value = "";
       closeSheets();
-      celebrateBook(entry, before, summary());
+      var mid = (noQuiz(entry) ? "Book done!" : entry.score + "/" + entry.total) + tierUpMessage(before, summary());
+      if (evo) celebrateEvolve(evo, mid);
+      else celebrateBook(entry, before, summary());
     });
+  };
+
+  // ---------- reward: catch or evolve ----------
+  var rewardDone = null;
+  // A record that wins asks first: catch a new Pokémon, or evolve one already caught (if any can).
+  // done(ok, evo): evo = { from: [name, dex], to: [name, dex] } when a Pokémon evolved.
+  function addWithReward(item, listName, wins, button, done) {
+    var pick = wins ? evolvable() : [];
+    if (!pick.length) { saveRecord(item, listName, null, button, done); return; }
+    rewardDone = function (choice) {
+      if (!choice) { saveRecord(item, listName, null, button, done); return; }
+      var ev = { id: newId(), kid: item.kid, type: "evolve", day: item.day, target: choice.id, source: item.id };
+      saveRecord(item, listName, ev, button, function (ok) {
+        done(ok, { from: [choice.c.name, choice.c.dex], to: choice.c.next });
+      });
+    };
+    showReward(pick);
+  }
+  function saveRecord(item, listName, ev, button, done) {
+    var who = item.kid;
+    button.disabled = true;
+    commit({ action: "add", entry: item, evolve: ev }, function () {
+      state.kids[who][listName] = state.kids[who][listName].concat([item]);
+      if (ev) state.kids[who].evolves = state.kids[who].evolves.concat([ev]);
+    }, function (ok) {
+      button.disabled = false;
+      done(ok, null);
+    });
+  }
+  function showReward(pick) {
+    el("rwPick").className = "reward-pick";
+    el("rwListWrap").className = "hidden";
+    var list = el("rwList");
+    list.innerHTML = "";
+    pick.forEach(function (p) {
+      var b = make("button", "evo-choice");
+      b.type = "button";
+      var pair = make("div", "pair");
+      pair.appendChild(sprite(p.c.dex, "", p.c.name));
+      pair.appendChild(make("span", "arrow", "➜"));
+      pair.appendChild(sprite(p.c.next[1], "", p.c.next[0]));
+      b.appendChild(pair);
+      b.appendChild(make("div", "", p.c.name + " ➜ " + p.c.next[0]));
+      b.onclick = function () { finishReward(p); };
+      list.appendChild(b);
+    });
+    el("rewardSheet").className = "sheet show";
+    window.scrollTo(0, 0);
+  }
+  function finishReward(choice) {
+    el("rewardSheet").className = "sheet";
+    var cb = rewardDone;
+    rewardDone = null;
+    if (cb) cb(choice);
+  }
+  el("rwCatch").onclick = function () { finishReward(null); };
+  el("rwEvolve").onclick = function () {
+    el("rwPick").className = "reward-pick hidden";
+    el("rwListWrap").className = "";
+  };
+  el("rwBack").onclick = function () {
+    el("rwPick").className = "reward-pick";
+    el("rwListWrap").className = "hidden";
+  };
+  // Cancel: nothing is saved; the form stays open.
+  el("rwCancel").onclick = function () {
+    rewardDone = null;
+    el("rewardSheet").className = "sheet";
   };
 
   function celebrateBook(entry, before, after) {
@@ -1136,18 +1217,15 @@
       show(make("div", "ball huge empty"), "Oh no! It broke free!", "You got " + entry.score + "/" + entry.total + ". Read it again and try once more!");
       return;
     }
-    catchPokemon(entry, ballClass(entry), "", (noQuiz(entry) ? "Book done!" : entry.score + "/" + entry.total) + tierUpMessage(before, after) + evolveMessage(entry));
-  }
-
-  function evolveMessage(item) {
-    return givesEvolve(item) ? "  ✨ You can evolve a Pokémon! Open My collection and tap ✨ Evolve!" : "";
+    catchPokemon(entry, ballClass(entry), "", (noQuiz(entry) ? "Book done!" : entry.score + "/" + entry.total) + tierUpMessage(before, after));
   }
 
   // The old Pokémon glows white, then the evolved one pops out.
-  function celebrateEvolve(from, to) {
+  function celebrateEvolve(evo, mid) {
+    var from = evo.from, to = evo.to;
     var old = artwork(from[1], from[0]);
     old.className = "pop evolving";
-    show(old, "What? " + from[0] + " is evolving!", "");
+    show(old, "What? " + from[0] + " is evolving!", mid || "");
     setTimeout(function () {
       var art = el("ovArt");
       if (!art.contains(old)) return;
@@ -1178,19 +1256,15 @@
     if (isNaN(correct) || correct < 0 || correct > 2000) { window.alert("Please type how many you got right (0 to 2000)."); return; }
     var item = { id: newId(), kid: current, type: "maths", day: parseInt(el("mDate").value, 10), site: "Times Tables Rock Stars", correct: correct };
     var before = summary();
-    var who = current;
-    var button = el("mathsForm").querySelector("button[type=submit]");
-    button.disabled = true;
-    commit({ action: "add", entry: item }, function () {
-      state.kids[who].maths = state.kids[who].maths.concat([item]);
-    }, function (ok) {
-      button.disabled = false;
+    var wins = mathsCatches(item);
+    addWithReward(item, "maths", wins, el("mathsForm").querySelector("button[type=submit]"), function (ok, evo) {
       if (!ok) return;
       el("mCorrect").value = "";
       closeSheets();
       var after = summary();
       var mid = "Total: " + after.correct + " correct answers" + tierUpMessage(before, after);
-      if (mathsCatches(item)) catchPokemon(item, "", "+" + correct + "! ", mid + evolveMessage(item));
+      if (evo) celebrateEvolve(evo, "+" + correct + "!  " + mid);
+      else if (wins) catchPokemon(item, "", "+" + correct + "! ", mid);
       else show(beySvg("blade"), "LET IT RIP! +" + correct, mid + "  ·  Get " + mathsMin(item) + " or more in one go to catch a Pokémon!");
     });
   };
@@ -1202,7 +1276,7 @@
       var cfg = PRACTICES[type];
       practiceType = type;
       el("pTitle").textContent = cfg.icon + " " + cfg.name;
-      el("pRule").textContent = "Get " + cfg.min + " or more in one go to catch a Pokémon AND win an evolution!";
+      el("pRule").textContent = "Get " + cfg.min + " or more in one go: catch a NEW Pokémon OR evolve one!";
       openSheet("practiceSheet");
     };
   });
@@ -1213,18 +1287,14 @@
     var correct = parseInt(el("pCorrect").value, 10);
     if (isNaN(correct) || correct < 0 || correct > 2000) { window.alert("Please type how many you got right (0 to 2000)."); return; }
     var item = { id: newId(), kid: current, type: practiceType, day: parseInt(el("pDate").value, 10), site: cfg.name, correct: correct };
-    var who = current;
-    var button = el("practiceForm").querySelector("button[type=submit]");
-    button.disabled = true;
-    commit({ action: "add", entry: item }, function () {
-      state.kids[who].practice = state.kids[who].practice.concat([item]);
-    }, function (ok) {
-      button.disabled = false;
+    var wins = practiceCatches(item);
+    addWithReward(item, "practice", wins, el("practiceForm").querySelector("button[type=submit]"), function (ok, evo) {
       if (!ok) return;
       el("pCorrect").value = "";
       closeSheets();
       var mid = cfg.name + ": " + correct + " correct";
-      if (practiceCatches(item)) catchPokemon(item, "", "+" + correct + "! ", mid + evolveMessage(item));
+      if (evo) celebrateEvolve(evo, "+" + correct + "!  " + mid);
+      else if (wins) catchPokemon(item, "", "+" + correct + "! ", mid);
       else show(make("div", "ball huge empty"), cfg.icon + " +" + correct, mid + "  ·  Get " + practiceMin(item) + " or more in one go to catch a Pokémon!");
     });
   };
@@ -1235,7 +1305,7 @@
     var quiz = el("fSite").value !== NO_QUIZ;
     el("quizPart").className = quiz ? "" : "hidden";
     el("fScore").required = quiz;
-    el("readRule").textContent = quiz ? "80% or more catches it (8 out of 10). Every book caught also lets you evolve a Pokémon!" : "Finished the whole book? Throw the ball! Every book also lets you evolve a Pokémon!";
+    el("readRule").textContent = quiz ? "80% or more wins (8 out of 10): catch a NEW Pokémon OR evolve one!" : "Finished the whole book? Catch a NEW Pokémon OR evolve one!";
   }
   el("fSite").onchange = updateQuizPart;
   updateQuizPart();
