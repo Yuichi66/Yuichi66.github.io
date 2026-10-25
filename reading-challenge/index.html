@@ -361,7 +361,7 @@
       <button class="btn ghost" type="button" data-close>Cancel</button>
       <button class="btn purple" type="submit">🚀 LET IT RIP!</button>
     </div>
-    <div class="rule">Every correct answer counts. The app adds them up for you. Each game catches a Pokémon!</div>
+    <div class="rule">Every correct answer counts. The app adds them up for you. Get 50 or more in one go to catch a Pokémon!</div>
   </form>
 </div>
 
@@ -565,12 +565,17 @@
   }
   function need(goal, pctNeeded) { return Math.ceil(goal * pctNeeded / 100); }
 
-  // Every passed book and every times tables game catches the next Pokémon,
+  // Every passed book and every big enough times tables game catches the next Pokémon,
   // in the order they were logged (ids start with the time they were made).
   function loggedAt(x) { return parseInt(String(x.id), 10) || 0; }
+  // A times tables game needs MATHS_CATCH_MIN correct answers to catch a Pokémon.
+  // Games logged before MATHS_RULE_FROM keep the old rule (1 or more), so nothing already caught changes.
+  var MATHS_CATCH_MIN = 50;
+  var MATHS_RULE_FROM = 1792913612973;
+  function mathsCatches(m) { return m.correct >= (loggedAt(m) < MATHS_RULE_FROM ? 1 : MATHS_CATCH_MIN); }
   function catchOrder() {
     var d = data();
-    var list = d.entries.filter(isPass).concat(d.maths.filter(function (m) { return m.correct > 0; }));
+    var list = d.entries.filter(isPass).concat(d.maths.filter(mathsCatches));
     return list.sort(function (a, b) { return loggedAt(a) - loggedAt(b); });
   }
   function hashOf(s) {
@@ -968,8 +973,8 @@
       closeSheets();
       var after = summary();
       var mid = "Total: " + after.correct + " correct answers" + tierUpMessage(before, after);
-      if (correct > 0) catchPokemon(item, "", "+" + correct + "! ", mid);
-      else show(beySvg("blade"), "LET IT RIP! +0", mid);
+      if (mathsCatches(item)) catchPokemon(item, "", "+" + correct + "! ", mid);
+      else show(beySvg("blade"), "LET IT RIP! +" + correct, mid + "  ·  Get " + MATHS_CATCH_MIN + " or more in one go to catch a Pokémon!");
     });
   };
 
