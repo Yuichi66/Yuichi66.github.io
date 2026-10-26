@@ -446,7 +446,9 @@
   var REFRESH_MS = 60000;
   // Change on every release: a page left open with older code reloads itself,
   // so every phone works out the same Pokémon.
-  var APP_VERSION = "2026-10-25-3";
+  var APP_VERSION = "2026-10-26-1";
+  // Sent with every change; the sheet refuses changes from older pages (MIN_CLIENT_GEN in Code.gs).
+  var CLIENT_GEN = 1;
   var STORAGE_KEY = "htrc-2026-autumn-v3";
   var START = new Date(2026, 9, 24);   // Sat 24 Oct 2026
   var DAY_COUNT = 9;                   // to Sun 1 Nov 2026
@@ -835,7 +837,8 @@
   }
   function catchOrder() {
     var d = data(), used = usedForEvolve();
-    var list = d.entries.filter(isPass).concat(d.maths.filter(mathsCatches), d.practice.filter(practiceCatches));
+    var list = d.entries.filter(function (x) { return x.mon || isPass(x); })
+      .concat(d.maths.filter(function (x) { return x.mon || mathsCatches(x); }), d.practice.filter(function (x) { return x.mon || practiceCatches(x); }));
     return list.filter(function (x) { return !used[x.id]; }).sort(function (a, b) { return loggedAt(a) - loggedAt(b); });
   }
   function hashOf(s) {
@@ -890,7 +893,9 @@
     var owned = {};   // families already in the collection
     catchOrder().forEach(function (x, i) {
       if (loggedAt(x) >= NEW_MONS_FROM) addNew();
-      var k = loggedAt(x) >= FAMILY_RULE_FROM ? pickFrom(freshPool(owned, withNew), x.id) : pickFrom(pool, x.id);
+      // The Pokémon saved with the record is used as it is, so it can never change later.
+      var k = x.mon ? monIndex(x.mon) : -1;
+      if (k < 0) k = loggedAt(x) >= FAMILY_RULE_FROM ? pickFrom(freshPool(owned, withNew), x.id) : pickFrom(pool, x.id);
       owned[FAMILY(MONS[k][3])] = true;
       pool = pool.filter(function (j) { return j !== k; });
       if (!pool.length) pool = allMonIndexes(withNew);
@@ -929,6 +934,16 @@
       .sort(function (a, b) { return a.c.no - b.c.no; });
   }
   function nextMon(id) { return MONS[pickFrom(catches().pool, id)]; }
+  function monIndex(dex) {
+    for (var k = 0; k < MONS.length; k++) if (MONS[k][3] === dex) return k;
+    return -1;
+  }
+  // Runs fn with another child selected (catches() works on the selected child).
+  function forKid(id, fn) {
+    var was = current;
+    current = id;
+    try { return fn(); } finally { current = was; }
+  }
   function monLine(info, top, c) {
     var mon = c.mon;
     info.appendChild(make("div", "mon", "#" + (c.no + 1) + " " + c.name));
@@ -1220,19 +1235,71 @@
       else if (e.type === "evolve") next.kids[e.kid].evolves.push({ id: e.id, kid: e.kid, type: e.type, day: e.day, target: e.site, source: e.source || "" });
       else next.kids[e.kid].entries.push(e);
     });
+    // The last "Not saved" record turned out to be saved: start fresh next time.
+    if (lastTry && KIDS.some(function (k) {
+      var d = next.kids[k.id];
+      return d.entries.concat(d.maths, d.practice).some(function (x) { return x.id === lastTry.id; });
+    })) lastTry = null;
     state = next;
     save();
     render();
     setSync("☁ Shared · updated " + new Date().toTimeString().slice(0, 5), false);
   }
+  // A save's reply is always used. A reload's reply is skipped if a save was sent after it started
+  // or is still on its way, because the reload may have read the sheet before that save.
+  var sentSeq = 0, lastSaveSeq = 0, savesInFlight = 0, appliedSaveSeq = 0;
+  var REQUEST_TIMEOUT_MS = 30000;
   function api(payload) {
+    var seq = ++sentSeq;
+    if (payload) {
+      payload.gen = CLIENT_GEN;
+      lastSaveSeq = seq;
+      savesInFlight++;
+    }
+    var finished = false;
+    function finish() { if (payload && !finished) { finished = true; savesInFlight--; } }
+    // A request that hangs is given up after REQUEST_TIMEOUT_MS, so reloads are not held back for ever.
+    var ctrl = window.AbortController ? new AbortController() : null;
+    if (ctrl) setTimeout(function () { ctrl.abort(); }, REQUEST_TIMEOUT_MS);
+    var signal = ctrl ? ctrl.signal : undefined;
     var req = payload
-      ? fetch(API_URL, { method: "POST", body: JSON.stringify(payload) })
-      : fetch(API_URL, { cache: "no-store" });
+      ? fetch(API_URL, { method: "POST", body: JSON.stringify(payload), signal: signal })
+      : fetch(API_URL, { cache: "no-store", signal: signal });
     return req.then(function (r) {
       if (!r.ok) throw new Error("HTTP " + r.status);
       return r.json();
-    }).then(applyRemote);
+    }).then(function (res) {
+      finish();
+      if (res && !res.ok && /reload/i.test(res.error || "")) {
+        window.alert("This page is out of date. It will reload now. Please try again.");
+        location.reload();
+        var stale = new Error(res.error);
+        stale.reloading = true;
+        throw stale;
+      }
+      if (!payload && (lastSaveSeq > seq || savesInFlight > 0)) return;
+      // Two saves at once: an older save's reply never replaces a newer one's.
+      if (payload) { if (seq < appliedSaveSeq) return; appliedSaveSeq = seq; }
+      applyRemote(res);
+      freezeOlderCatches();
+    }, function (err) { finish(); throw err; });
+  }
+  // Records saved before Pokémon were stored: save the Pokémon they show now, once.
+  var freezeSent = false;
+  function freezeOlderCatches() {
+    if (freezeSent || !API_URL) return;
+    var mons = [];
+    KIDS.forEach(function (k) {
+      forKid(k.id, function () {
+        var d = data(), byId = catches().byId;
+        d.entries.concat(d.maths, d.practice).forEach(function (x) {
+          if (!x.mon && byId[x.id]) mons.push({ id: x.id, mon: byId[x.id].mon[3] });
+        });
+      });
+    });
+    if (!mons.length) return;
+    freezeSent = true;
+    api({ action: "freeze", mons: mons }).catch(function () { freezeSent = false; });
   }
   function refresh() {
     if (!API_URL) return;
@@ -1244,6 +1311,7 @@
     if (location.protocol === "file:") return;
     fetch(location.pathname, { cache: "no-store" }).then(function (r) { return r.ok ? r.text() : ""; }).then(function (text) {
       var busy = document.querySelector(".sheet.show, .overlay.show");
+      // Busy now: the next check (every minute) tries again; the sheet also refuses changes from old pages.
       if (text && text.indexOf('var APP_VERSION = "' + APP_VERSION + '"') < 0 && !busy) location.reload();
     }).catch(function () { /* offline: try again next time */ });
   }
@@ -1257,7 +1325,8 @@
       return;
     }
     setSync("Saving...", false);
-    api(payload).then(function () { done(true); }).catch(function () {
+    api(payload).then(function () { done(true); }).catch(function (err) {
+      if (err && err.reloading) return;
       setSync("⚠ Not saved. Check the internet and try again.", true);
       window.alert("Sorry, it could not be saved. Check the internet and try again.");
       done(false);
@@ -1299,7 +1368,8 @@
       window.alert("Please check the score. It must be between 0 and " + (isNaN(total) ? "the total" : total) + ".");
       return;
     }
-    var entry = { id: newId(pendingSeed), kid: current, type: "read", day: parseInt(el("fDate").value, 10), title: title, site: site, score: score, total: total };
+    var entry = { kid: current, type: "read", day: parseInt(el("fDate").value, 10), title: title, site: site, score: score, total: total };
+    entry.id = recordId(entry, pendingSeed);
     var before = summary();
     addWithReward(entry, "entries", isPass(entry), el("readForm").querySelector("button[type=submit]"), function (ok, evo) {
       if (!ok) return;
@@ -1319,27 +1389,42 @@
   // A record that wins asks first: catch a new Pokémon, or evolve one already caught (if any can).
   // done(ok, evo): evo = { from: [name, dex], to: [name, dex] } when a Pokémon evolved.
   function addWithReward(item, listName, wins, button, done) {
+    // Trying again after "Not saved": use the same reward as the first try (it may have been saved).
+    if (lastTry && lastTry.id === item.id && lastTry.chosen) {
+      var again = lastTry;
+      saveRecord(item, listName, again.ev, button, function (ok) { done(ok, again.evo); });
+      return;
+    }
     var pick = wins ? evolvable() : [];
     if (!pick.length) { saveRecord(item, listName, null, button, done); return; }
     rewardDone = function (choice) {
       if (!choice) { saveRecord(item, listName, null, button, done); return; }
       var ev = { id: newId(), kid: item.kid, type: "evolve", day: item.day, target: choice.id, source: item.id };
-      saveRecord(item, listName, ev, button, function (ok) {
-        done(ok, { from: [choice.c.name, choice.c.dex], to: choice.c.next });
-      });
+      var evo = { from: [choice.c.name, choice.c.dex], to: choice.c.next };
+      saveRecord(item, listName, ev, button, function (ok) { done(ok, evo); }, evo);
     };
     showReward(pick);
   }
-  function saveRecord(item, listName, ev, button, done) {
+  function saveRecord(item, listName, ev, button, done, evo) {
     var who = item.kid;
+    // A record that catches saves its Pokémon now, so no later change can turn it into another one.
+    var wins = listName === "entries" ? isPass(item) : listName === "maths" ? forKid(who, function () { return mathsCatches(item); }) : practiceCatches(item);
+    if (wins && !ev) item.mon = forKid(who, function () { return nextMon(item.id)[3]; });
     button.disabled = true;
     commit({ action: "add", entry: item, evolve: ev }, function () {
       state.kids[who][listName] = state.kids[who][listName].concat([item]);
       if (ev) state.kids[who].evolves = state.kids[who].evolves.concat([ev]);
     }, function (ok) {
       button.disabled = false;
+      lastTry = ok ? null : { key: tryKey(item), id: item.id, chosen: true, ev: ev, evo: evo || null };
       done(ok, null);
     });
+  }
+  // After "Not saved", sending the same thing again reuses the id, so the sheet never gets two copies.
+  var lastTry = null;
+  function tryKey(item) { return [item.kid, item.type, item.day, item.title || "", item.score || "", item.correct || ""].join("|"); }
+  function recordId(item, seed) {
+    return lastTry && lastTry.key === tryKey(item) ? lastTry.id : newId(seed);
   }
   function showReward(pick) {
     el("rwPick").className = "reward-pick";
@@ -1424,7 +1509,8 @@
     ev.preventDefault();
     var correct = parseInt(el("mCorrect").value, 10);
     if (isNaN(correct) || correct < 0 || correct > 2000) { window.alert("Please type how many you got right (0 to 2000)."); return; }
-    var item = { id: newId(), kid: current, type: "maths", day: parseInt(el("mDate").value, 10), site: "Times Tables Rock Stars", correct: correct };
+    var item = { kid: current, type: "maths", day: parseInt(el("mDate").value, 10), site: "Times Tables Rock Stars", correct: correct };
+    item.id = recordId(item);
     var before = summary();
     var wins = mathsCatches(item);
     addWithReward(item, "maths", wins, el("mathsForm").querySelector("button[type=submit]"), function (ok, evo) {
@@ -1456,7 +1542,8 @@
     if (!cfg) return;
     var correct = parseInt(el("pCorrect").value, 10);
     if (isNaN(correct) || correct < 0 || correct > 2000) { window.alert("Please type how many you got right (0 to 2000)."); return; }
-    var item = { id: newId(), kid: current, type: practiceType, day: parseInt(el("pDate").value, 10), site: cfg.name, correct: correct };
+    var item = { kid: current, type: practiceType, day: parseInt(el("pDate").value, 10), site: cfg.name, correct: correct };
+    item.id = recordId(item);
     var wins = practiceCatches(item);
     addWithReward(item, "practice", wins, el("practiceForm").querySelector("button[type=submit]"), function (ok, evo) {
       if (!ok) return;

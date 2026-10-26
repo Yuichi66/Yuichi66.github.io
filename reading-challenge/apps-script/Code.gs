@@ -20,9 +20,14 @@ var MAX_TARGET = 60;
 var MIN_MATHS_TARGET = 10;
 var MAX_MATHS_TARGET = 20000;
 var MAX_DEX = 1025;
+var MAX_FORM = 20000;
 var READ_SITES = ["ReadnQuiz", "Free Book Quiz", "School AR", "No quiz"];
 var MATHS_SITE = "Times Tables Rock Stars";
-var ENTRY_HEADERS = ["id", "kid", "type", "day", "title", "site", "score", "total", "correct", "createdAt"];
+// "mon": national dex number of the Pokémon a record caught, saved once so it can never change later.
+var ENTRY_HEADERS = ["id", "kid", "type", "day", "title", "site", "score", "total", "correct", "createdAt", "mon"];
+var MON_COL = 11;
+// Pages older than this may work out Pokémon differently, so their changes are refused.
+var MIN_CLIENT_GEN = 1;
 
 function doGet() {
   return json_(snapshot_());
@@ -33,11 +38,9 @@ function doPost(e) {
   lock.waitLock(10000);
   try {
     var body = JSON.parse((e && e.postData && e.postData.contents) || "{}");
-    if (body.action === "add") {
-      addEntry_(body.entry);
-      // A reward used to evolve a Pokémon is saved with the record that won it.
-      if (body.evolve) addEntry_(body.evolve);
-    }
+    if (!(Number(body.gen) >= MIN_CLIENT_GEN)) throw new Error("Old page: please reload");
+    if (body.action === "add") addWithEvolve_(body.entry, body.evolve);
+    else if (body.action === "freeze") freezeMons_(body.mons);
     else if (body.action === "delete") deleteEntry_(String(body.id || ""));
     else if (body.action === "settings") saveSettings_(String(body.kid || ""), body.settings);
     else if (body.action === "partner") savePartner_(String(body.kid || ""), Number(body.partner));
@@ -53,7 +56,7 @@ function doPost(e) {
 function snapshot_() {
   var rows = entriesSheet_().getDataRange().getValues().slice(1);
   var entries = rows.filter(function (r) { return r[0] !== ""; }).map(function (r) {
-    var base = { id: String(r[0]), kid: String(r[1]), type: String(r[2]), day: Number(r[3]), site: String(r[5]) };
+    var base = { id: String(r[0]), kid: String(r[1]), type: String(r[2]), day: Number(r[3]), site: String(r[5]), mon: Number(r[MON_COL - 1]) || 0 };
     if (base.type === "maths" || PRACTICE_SITES.hasOwnProperty(base.type)) base.correct = Number(r[8]);
     else if (base.type === "evolve") base.source = String(r[4]);
     else {
@@ -64,6 +67,45 @@ function snapshot_() {
     return base;
   });
   return { ok: true, entries: entries, settings: readSettings_() };
+}
+
+// Saves a record, and the evolution it paid for, all or nothing. Sending the same record twice
+// (a retry after a lost reply) does not make a copy.
+function addWithEvolve_(entry, evolve) {
+  if (!entry) throw new Error("Missing entry");
+  var id = String(entry.id || "").slice(0, 40);
+  if (!id) throw new Error("Missing id");
+  if (rowOf_(id) > 0) return;
+  if (evolve) {
+    if (evolve.type !== "evolve" || Number(evolve.day) !== Number(entry.day) || !evolve.id) throw new Error("Bad evolution");
+    var target = String(evolve.target || "").slice(0, 40);
+    if (String(evolve.kid) !== String(entry.kid)) throw new Error("Bad evolution");
+    if (String(evolve.source || "") !== id) throw new Error("Unknown reward for the evolution");
+    if (!target || !hasEntry_(target, String(entry.kid))) throw new Error("Unknown Pokémon to evolve");
+  }
+  addEntry_(entry);
+  if (evolve) addEntry_(evolve);
+}
+
+// Saves the caught Pokémon of older records (only where none is saved yet).
+function freezeMons_(mons) {
+  if (!mons || !mons.length) return;
+  var want = {};
+  mons.forEach(function (m) {
+    var dex = Number(m && m.mon);
+    if (m && m.id && isInt_(dex) && dex > 0 && dex <= MAX_FORM) want[String(m.id)] = dex;
+  });
+  var sheet = entriesSheet_();
+  var rows = sheet.getRange(1, 1, sheet.getLastRow(), MON_COL).getValues();
+  for (var i = 1; i < rows.length; i++) {
+    var id = String(rows[i][0]);
+    if (want.hasOwnProperty(id) && rows[i][MON_COL - 1] === "") sheet.getRange(i + 1, MON_COL).setValue(want[id]);
+  }
+}
+
+function monOf_(x) {
+  var dex = Number(x.mon);
+  return isInt_(dex) && dex > 0 && dex <= MAX_FORM ? dex : "";
 }
 
 function addEntry_(x) {
@@ -78,7 +120,7 @@ function addEntry_(x) {
     var correct = Number(x.correct);
     if (!KIDS[kid].maths) throw new Error("No maths for this kid");
     if (!isInt_(correct) || correct < 0 || correct > MAX_CORRECT) throw new Error("Bad correct answers");
-    entriesSheet_().appendRow([id, kid, "maths", day, "", MATHS_SITE, "", "", correct, new Date()]);
+    entriesSheet_().appendRow([id, kid, "maths", day, "", MATHS_SITE, "", "", correct, new Date(), monOf_(x)]);
     return;
   }
 
@@ -86,7 +128,7 @@ function addEntry_(x) {
     var n = Number(x.correct);
     if (KIDS[kid].practices.indexOf(x.type) < 0) throw new Error("No " + PRACTICE_SITES[x.type] + " for this kid");
     if (!isInt_(n) || n < 0 || n > MAX_CORRECT) throw new Error("Bad correct answers");
-    entriesSheet_().appendRow([id, kid, x.type, day, "", PRACTICE_SITES[x.type], "", "", n, new Date()]);
+    entriesSheet_().appendRow([id, kid, x.type, day, "", PRACTICE_SITES[x.type], "", "", n, new Date(), monOf_(x)]);
     return;
   }
 
@@ -97,7 +139,7 @@ function addEntry_(x) {
     var source = String(x.source || "").slice(0, 40);
     if (!target || !hasEntry_(target, kid)) throw new Error("Unknown Pokémon to evolve");
     if (!source || !hasEntry_(source, kid)) throw new Error("Unknown reward for the evolution");
-    entriesSheet_().appendRow([id, kid, "evolve", day, source, target, "", "", "", new Date()]);
+    entriesSheet_().appendRow([id, kid, "evolve", day, source, target, "", "", "", new Date(), ""]);
     return;
   }
 
@@ -108,7 +150,14 @@ function addEntry_(x) {
   if (!title || title.length > MAX_TITLE) throw new Error("Bad title");
   if (!isInt_(total) || total < 1 || total > MAX_SCORE) throw new Error("Bad total");
   if (!isInt_(score) || score < 0 || score > total) throw new Error("Bad score");
-  entriesSheet_().appendRow([id, kid, "read", day, asText_(title), site, score, total, "", new Date()]);
+  entriesSheet_().appendRow([id, kid, "read", day, asText_(title), site, score, total, "", new Date(), monOf_(x)]);
+}
+
+function rowOf_(id) {
+  var sheet = entriesSheet_();
+  var ids = sheet.getRange(1, 1, sheet.getLastRow(), 1).getValues();
+  for (var i = 1; i < ids.length; i++) if (String(ids[i][0]) === id) return i + 1;
+  return 0;
 }
 
 function hasEntry_(id, kid) {
@@ -118,6 +167,7 @@ function hasEntry_(id, kid) {
 }
 
 function deleteEntry_(id) {
+  if (!id) throw new Error("Missing id");
   var sheet = entriesSheet_();
   // Also removes the evolution paid for by this record.
   var rows = sheet.getRange(1, 1, sheet.getLastRow(), 5).getValues();
