@@ -21,13 +21,16 @@ var MIN_MATHS_TARGET = 10;
 var MAX_MATHS_TARGET = 20000;
 var MAX_DEX = 1025;
 var MAX_FORM = 20000;
+var MAX_RANK = 20;
 var READ_SITES = ["ReadnQuiz", "Free Book Quiz", "School AR", "No quiz"];
 var MATHS_SITE = "Times Tables Rock Stars";
 // "mon": national dex number of the Pokémon a record caught, saved once so it can never change later.
 var ENTRY_HEADERS = ["id", "kid", "type", "day", "title", "site", "score", "total", "correct", "createdAt", "mon"];
 var MON_COL = 11;
 // Pages older than this may work out Pokémon differently, so their changes are refused.
-var MIN_CLIENT_GEN = 1;
+var MIN_CLIENT_GEN = 2;
+// Tells pages that this sheet code knows trades.
+var SERVER_GEN = 2;
 
 function doGet() {
   return json_(snapshot_());
@@ -39,7 +42,9 @@ function doPost(e) {
   try {
     var body = JSON.parse((e && e.postData && e.postData.contents) || "{}");
     if (!(Number(body.gen) >= MIN_CLIENT_GEN)) throw new Error("Old page: please reload");
-    if (body.action === "add") addWithEvolve_(body.entry, body.evolve);
+    if (body.action === "add") addWithReward_(body.entry, body.evolve, body.trade);
+    else if (body.action === "trade") addTicketTrade_(body.trade);
+    else if (body.action === "peak") savePeak_(String(body.kid || ""), Number(body.rank));
     else if (body.action === "freeze") freezeMons_(body.mons);
     else if (body.action === "delete") deleteEntry_(String(body.id || ""));
     else if (body.action === "settings") saveSettings_(String(body.kid || ""), body.settings);
@@ -59,6 +64,12 @@ function snapshot_() {
     var base = { id: String(r[0]), kid: String(r[1]), type: String(r[2]), day: Number(r[3]), site: String(r[5]), mon: Number(r[MON_COL - 1]) || 0 };
     if (base.type === "maths" || PRACTICE_SITES.hasOwnProperty(base.type)) base.correct = Number(r[8]);
     else if (base.type === "evolve") base.source = String(r[4]);
+    else if (base.type === "trade") {
+      base.source = String(r[4]);
+      base.get = String(r[6]);
+      base.with = String(r[7]);
+      base.ticket = Number(r[8]) || 0;
+    }
     else {
       base.title = String(r[4]);
       base.score = Number(r[6]);
@@ -66,25 +77,84 @@ function snapshot_() {
     }
     return base;
   });
-  return { ok: true, entries: entries, settings: readSettings_() };
+  return { ok: true, gen: SERVER_GEN, entries: entries, settings: readSettings_() };
 }
 
-// Saves a record, and the evolution it paid for, all or nothing. Sending the same record twice
+// Saves a record, and the evolution or trade it paid for, all or nothing. Sending the same record twice
 // (a retry after a lost reply) does not make a copy.
-function addWithEvolve_(entry, evolve) {
+function addWithReward_(entry, evolve, trade) {
   if (!entry) throw new Error("Missing entry");
   var id = String(entry.id || "").slice(0, 40);
   if (!id) throw new Error("Missing id");
   if (rowOf_(id) > 0) return;
+  if (evolve && trade) throw new Error("One reward only");
   if (evolve) {
     if (evolve.type !== "evolve" || Number(evolve.day) !== Number(entry.day) || !evolve.id) throw new Error("Bad evolution");
     var target = String(evolve.target || "").slice(0, 40);
     if (String(evolve.kid) !== String(entry.kid)) throw new Error("Bad evolution");
     if (String(evolve.source || "") !== id) throw new Error("Unknown reward for the evolution");
-    if (!target || !hasEntry_(target, String(entry.kid))) throw new Error("Unknown Pokémon to evolve");
+    if (!target || owners_()[target] !== String(entry.kid)) throw new Error(NOT_POSSIBLE);
+  }
+  if (trade) {
+    if (trade.type !== "trade" || Number(trade.day) !== Number(entry.day) || !trade.id) throw new Error("Bad trade");
+    if (String(trade.kid) !== String(entry.kid)) throw new Error("Bad trade");
+    if (String(trade.source || "") !== id) throw new Error("Unknown reward for the trade");
+    checkTrade_(trade);
   }
   addEntry_(entry);
   if (evolve) addEntry_(evolve);
+  if (trade) addEntry_(trade);
+}
+
+// A trade paid with a trade ticket (the page counts the tickets). Same id twice = one row.
+function addTicketTrade_(trade) {
+  if (!trade || trade.type !== "trade") throw new Error("Bad trade");
+  var id = String(trade.id || "").slice(0, 40);
+  if (!id) throw new Error("Missing id");
+  if (rowOf_(id) > 0) return;
+  if (String(trade.source || "") !== "ticket") throw new Error("Bad trade");
+  var kid = String(trade.kid || "");
+  if (!KIDS.hasOwnProperty(kid)) throw new Error("Unknown kid");
+  // Each ticket number once: a ticket used on another phone (or a retry of a saved trade) is refused.
+  if (Number(trade.ticket) !== ticketsUsed_(kid) + 1) throw new Error("Not possible: that trade ticket was already used.");
+  checkTrade_(trade);
+  addEntry_(trade);
+}
+
+var NOT_POSSIBLE = "Not possible: the Pokémon boxes changed on another phone. Please choose again.";
+
+// The initiator must have the Pokémon they give, and the other child the one they give back, right now.
+function checkTrade_(t) {
+  var kid = String(t.kid || ""), other = String(t.with || "");
+  var give = String(t.give || "").slice(0, 40);
+  var get = String(t.get || "").slice(0, 40);
+  if (!KIDS.hasOwnProperty(kid) || !KIDS.hasOwnProperty(other) || kid === other) throw new Error("Bad trade");
+  if (!give || !get || give === get) throw new Error("Bad trade");
+  var owner = owners_();
+  if (owner[give] !== kid || owner[get] !== other) throw new Error(NOT_POSSIBLE);
+}
+
+// Who has each caught Pokémon now (catch record id -> kid): each record's own child,
+// then the trades in sheet order. The page works it out the same way.
+function owners_() {
+  var owner = {};
+  entriesSheet_().getDataRange().getValues().slice(1).forEach(function (r) {
+    var type = r[2];
+    if (type === "trade") {
+      var kid = String(r[1]), give = String(r[5]), get = String(r[6]), other = String(r[7]);
+      if (owner[give] === kid && owner[get] === other) {
+        owner[give] = other;
+        owner[get] = kid;
+      }
+    } else if (type !== "evolve" && r[MON_COL - 1] !== "") owner[String(r[0])] = String(r[1]);
+  });
+  return owner;
+}
+
+function ticketsUsed_(kid) {
+  return entriesSheet_().getDataRange().getValues().slice(1).filter(function (r) {
+    return r[2] === "trade" && String(r[1]) === kid && String(r[4]) === "ticket";
+  }).length;
 }
 
 // Saves the caught Pokémon of older records (only where none is saved yet).
@@ -137,9 +207,20 @@ function addEntry_(x) {
   if (x.type === "evolve") {
     var target = String(x.target || "").slice(0, 40);
     var source = String(x.source || "").slice(0, 40);
-    if (!target || !hasEntry_(target, kid)) throw new Error("Unknown Pokémon to evolve");
+    if (!target || owners_()[target] !== kid) throw new Error(NOT_POSSIBLE);
     if (!source || !hasEntry_(source, kid)) throw new Error("Unknown reward for the evolution");
     entriesSheet_().appendRow([id, kid, "evolve", day, source, target, "", "", "", new Date(), ""]);
+    return;
+  }
+
+  // Trade: "site" holds the record id of the Pokémon given, "score" the one received, "total" the other child,
+  // "correct" the ticket number, "title" the record that paid for it ("ticket" = a trade ticket).
+  // checkTrade_ has already been run by the caller.
+  if (x.type === "trade") {
+    var src = String(x.source || "").slice(0, 40);
+    if (src !== "ticket" && !hasEntry_(src, kid)) throw new Error("Unknown reward for the trade");
+    var ticket = src === "ticket" ? Number(x.ticket) : "";
+    entriesSheet_().appendRow([id, kid, "trade", day, src, String(x.give).slice(0, 40), String(x.get).slice(0, 40), String(x.with), ticket, new Date(), ""]);
     return;
   }
 
@@ -170,7 +251,17 @@ function deleteEntry_(id) {
   if (!id) throw new Error("Missing id");
   var sheet = entriesSheet_();
   // Also removes the evolution paid for by this record.
-  var rows = sheet.getRange(1, 1, sheet.getLastRow(), 5).getValues();
+  var rows = sheet.getRange(1, 1, sheet.getLastRow(), 7).getValues();
+  // A record a trade depends on stays: one that paid for a trade, caught a traded Pokémon, or paid for an
+  // evolution of a traded Pokémon. Deleting it would change a Pokémon in another child's box.
+  var traded = {};
+  rows.forEach(function (r) {
+    if (r[2] !== "trade") return;
+    traded[String(r[5])] = traded[String(r[6])] = true;
+    if (String(r[4]) === id) traded[id] = true;
+  });
+  var paysTraded = rows.some(function (r) { return r[2] === "evolve" && String(r[4]) === id && traded[String(r[5])]; });
+  if (traded[id] || paysTraded) throw new Error("Not possible: this record was used in a trade, so it cannot be deleted.");
   for (var i = rows.length - 1; i >= 1; i--) {
     if (String(rows[i][0]) === id || (rows[i][2] === "evolve" && String(rows[i][4]) === id)) sheet.deleteRow(i + 1);
   }
@@ -187,6 +278,15 @@ function saveSettings_(kid, s) {
   setSetting_(kid + ".mathsTarget", mathsTarget);
 }
 
+// Highest trainer rank reached. The first one saved is also where trade tickets start.
+function savePeak_(kid, rank) {
+  if (!KIDS.hasOwnProperty(kid)) throw new Error("Unknown kid");
+  if (!isInt_(rank) || rank < 0 || rank > MAX_RANK) throw new Error("Bad rank");
+  var s = readSettings_()[kid];
+  if (s.ticketBase === "") setSetting_(kid + ".ticketBase", rank);
+  if (s.peak === "" || rank > s.peak) setSetting_(kid + ".peak", rank);
+}
+
 // Partner Pokémon shown next to the trainer name (national dex number; 0 = default).
 function savePartner_(kid, dexNo) {
   if (!KIDS.hasOwnProperty(kid)) throw new Error("Unknown kid");
@@ -197,12 +297,12 @@ function savePartner_(kid, dexNo) {
 function readSettings_() {
   var out = {};
   Object.keys(KIDS).forEach(function (k) {
-    out[k] = { target: KIDS[k].target, mathsTarget: KIDS[k].mathsTarget, partner: 0 };
+    out[k] = { target: KIDS[k].target, mathsTarget: KIDS[k].mathsTarget, partner: 0, ticketBase: "", peak: "" };
   });
   settingsSheet_().getDataRange().getValues().slice(1).forEach(function (r) {
     var parts = String(r[0]).split(".");
     if (!out[parts[0]] || r[1] === "") return;
-    if ((parts[1] === "target" || parts[1] === "mathsTarget" || parts[1] === "partner") && isInt_(Number(r[1]))) {
+    if (["target", "mathsTarget", "partner", "ticketBase", "peak"].indexOf(parts[1]) >= 0 && isInt_(Number(r[1]))) {
       out[parts[0]][parts[1]] = Number(r[1]);
     }
   });
