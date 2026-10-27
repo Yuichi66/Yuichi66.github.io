@@ -19,18 +19,22 @@ var MAX_CORRECT = 2000;
 var MAX_TARGET = 60;
 var MIN_MATHS_TARGET = 10;
 var MAX_MATHS_TARGET = 20000;
-var MAX_DEX = 1025;
 var MAX_FORM = 20000;
 var MAX_RANK = 20;
 var READ_SITES = ["ReadnQuiz", "Free Book Quiz", "School AR", "No quiz"];
 var MATHS_SITE = "Times Tables Rock Stars";
 // "mon": national dex number of the Pokémon a record caught, saved once so it can never change later.
-var ENTRY_HEADERS = ["id", "kid", "type", "day", "title", "site", "score", "total", "correct", "createdAt", "mon"];
+// "partner": the Pokémon (id of the record that caught it) that got the experience of a study record.
+var ENTRY_HEADERS = ["id", "kid", "type", "day", "title", "site", "score", "total", "correct", "createdAt", "mon", "partner"];
 var MON_COL = 11;
+var PARTNER_COL = 12;
+var MAX_ID = 40;
 // Pages older than this may work out Pokémon differently, so their changes are refused.
-var MIN_CLIENT_GEN = 2;
-// Tells pages that this sheet code knows trades.
-var SERVER_GEN = 2;
+var MIN_CLIENT_GEN = 3;
+// Tells pages that this sheet code knows trades (2) and levels, level-up evolutions and Mega Stones (3).
+var SERVER_GEN = 3;
+// Evolutions from a level or a Mega Stone: "title" holds this word instead of the record that paid for it.
+var GROWTH_KINDS = ["level", "stone"];
 
 function doGet() {
   return json_(snapshot_());
@@ -44,11 +48,12 @@ function doPost(e) {
     if (!(Number(body.gen) >= MIN_CLIENT_GEN)) throw new Error("Old page: please reload");
     if (body.action === "add") addWithReward_(body.entry, body.evolve, body.trade);
     else if (body.action === "trade") addTicketTrade_(body.trade);
+    else if (body.action === "evolve") addGrowthEvolve_(body.evolve);
     else if (body.action === "peak") savePeak_(String(body.kid || ""), Number(body.rank));
     else if (body.action === "freeze") freezeMons_(body.mons);
     else if (body.action === "delete") deleteEntry_(String(body.id || ""));
     else if (body.action === "settings") saveSettings_(String(body.kid || ""), body.settings);
-    else if (body.action === "partner") savePartner_(String(body.kid || ""), Number(body.partner));
+    else if (body.action === "partner") savePartner_(String(body.kid || ""), String(body.partnerId || ""));
     else throw new Error("Unknown action");
     return json_(snapshot_());
   } catch (err) {
@@ -62,8 +67,23 @@ function snapshot_() {
   var rows = entriesSheet_().getDataRange().getValues().slice(1);
   var entries = rows.filter(function (r) { return r[0] !== ""; }).map(function (r) {
     var base = { id: String(r[0]), kid: String(r[1]), type: String(r[2]), day: Number(r[3]), site: String(r[5]), mon: Number(r[MON_COL - 1]) || 0 };
-    if (base.type === "maths" || PRACTICE_SITES.hasOwnProperty(base.type)) base.correct = Number(r[8]);
-    else if (base.type === "evolve") base.source = String(r[4]);
+    if (base.type === "maths" || PRACTICE_SITES.hasOwnProperty(base.type)) {
+      base.correct = Number(r[8]);
+      base.partner = String(r[PARTNER_COL - 1] || "");
+    }
+    else if (base.type === "evolve") {
+      var kind = String(r[4]);
+      if (GROWTH_KINDS.indexOf(kind) >= 0) {
+        base.kind = kind;
+        base.source = "";
+        base.to = Number(r[6]) || 0;
+        base.from = Number(r[7]) || 0;
+        base.stone = Number(r[8]) || 0;
+      } else {
+        base.kind = "old";
+        base.source = kind;
+      }
+    }
     else if (base.type === "trade") {
       base.source = String(r[4]);
       base.get = String(r[6]);
@@ -74,6 +94,7 @@ function snapshot_() {
       base.title = String(r[4]);
       base.score = Number(r[6]);
       base.total = Number(r[7]);
+      base.partner = String(r[PARTNER_COL - 1] || "");
     }
     return base;
   });
@@ -87,14 +108,9 @@ function addWithReward_(entry, evolve, trade) {
   var id = String(entry.id || "").slice(0, 40);
   if (!id) throw new Error("Missing id");
   if (rowOf_(id) > 0) return;
-  if (evolve && trade) throw new Error("One reward only");
-  if (evolve) {
-    if (evolve.type !== "evolve" || Number(evolve.day) !== Number(entry.day) || !evolve.id) throw new Error("Bad evolution");
-    var target = String(evolve.target || "").slice(0, 40);
-    if (String(evolve.kid) !== String(entry.kid)) throw new Error("Bad evolution");
-    if (String(evolve.source || "") !== id) throw new Error("Unknown reward for the evolution");
-    if (!target || owners_()[target] !== String(entry.kid)) throw new Error(NOT_POSSIBLE);
-  }
+  // A win no longer evolves a Pokémon (evolutions now come from levels and Mega Stones).
+  if (evolve) throw new Error("Bad evolution");
+  checkPartner_(entry);
   if (trade) {
     if (trade.type !== "trade" || Number(trade.day) !== Number(entry.day) || !trade.id) throw new Error("Bad trade");
     if (String(trade.kid) !== String(entry.kid)) throw new Error("Bad trade");
@@ -102,8 +118,61 @@ function addWithReward_(entry, evolve, trade) {
     checkTrade_(trade);
   }
   addEntry_(entry);
-  if (evolve) addEntry_(evolve);
   if (trade) addEntry_(trade);
+}
+
+// The partner saved with a study record must be in that child's box now (empty = no experience).
+function checkPartner_(x) {
+  var partner = String(x.partner || "");
+  if (!partner) return;
+  if (partner.length > MAX_ID || owners_()[partner] !== String(x.kid)) throw new Error(NOT_POSSIBLE);
+}
+function partnerOf_(x) { return String(x.partner || "").slice(0, MAX_ID); }
+
+function isGrowthRow_(r) { return r[2] === "evolve" && GROWTH_KINDS.indexOf(String(r[4])) >= 0; }
+
+// An evolution from reaching a level, or from a Mega Stone. The page checks the level and the species
+// (the sheet has no Pokémon data); the sheet checks the box, the order of evolutions and the stones.
+// "site" = the Pokémon (record that caught it), "score" = new form, "total" = form before, "correct" = stone number.
+function addGrowthEvolve_(ev) {
+  if (!ev || ev.type !== "evolve" || GROWTH_KINDS.indexOf(ev.kind) < 0) throw new Error("Bad evolution");
+  var id = String(ev.id || "").slice(0, MAX_ID);
+  var kid = String(ev.kid || "");
+  var target = String(ev.target || "").slice(0, MAX_ID);
+  var to = Number(ev.to), from = Number(ev.from), day = Number(ev.day);
+  if (!id || !KIDS.hasOwnProperty(kid) || !target) throw new Error("Bad evolution");
+  if (!isInt_(to) || to <= 0 || to > MAX_FORM || !isInt_(from) || from <= 0 || from > MAX_FORM || to === from) throw new Error("Bad evolution");
+  if (!isInt_(day) || day < 0 || day >= DAY_COUNT) throw new Error("Bad day");
+  if (ev.kind === "level" && id !== "lv-" + target + "-" + from) throw new Error("Bad evolution");
+  var rows = entriesSheet_().getDataRange().getValues().slice(1);
+  var same = rows.filter(function (r) { return String(r[0]) === id; })[0];
+  if (same) {
+    // A retry of the same evolution is fine; the same Pokémon evolved differently on another phone is not.
+    if (isGrowthRow_(same) && Number(same[6]) === to) return;
+    throw new Error(NOT_POSSIBLE);
+  }
+  if (owners_()[target] !== kid) throw new Error(NOT_POSSIBLE);
+  // Evolutions of one Pokémon (saved by any child) follow each other: this one starts where the last one ended.
+  var last = rows.filter(function (r) { return isGrowthRow_(r) && String(r[5]) === target; }).pop();
+  if (last && Number(last[6]) !== from) throw new Error(NOT_POSSIBLE);
+  var stone = "";
+  if (ev.kind === "stone") {
+    var used = stonesUsed_(kid, rows);
+    if (Number(ev.stone) !== used + 1) throw new Error("Not possible: that Mega Stone was already used.");
+    if (used >= stonesEarned_(kid)) throw new Error("Not possible: no Mega Stone left.");
+    stone = used + 1;
+  }
+  entriesSheet_().appendRow([id, kid, "evolve", day, ev.kind, target, to, from, stone, new Date(), "", ""]);
+}
+
+function stonesUsed_(kid, rows) {
+  return rows.filter(function (r) { return isGrowthRow_(r) && String(r[1]) === kid && String(r[4]) === "stone"; }).length;
+}
+// One Mega Stone for each rank reached after Mega Stones started.
+function stonesEarned_(kid) {
+  var s = readSettings_()[kid];
+  if (s.stoneBase === "" || s.peak === "") return 0;
+  return Math.max(0, s.peak - s.stoneBase);
 }
 
 // A trade paid with a trade ticket (the page counts the tickets). Same id twice = one row.
@@ -190,7 +259,7 @@ function addEntry_(x) {
     var correct = Number(x.correct);
     if (!KIDS[kid].maths) throw new Error("No maths for this kid");
     if (!isInt_(correct) || correct < 0 || correct > MAX_CORRECT) throw new Error("Bad correct answers");
-    entriesSheet_().appendRow([id, kid, "maths", day, "", MATHS_SITE, "", "", correct, new Date(), monOf_(x)]);
+    entriesSheet_().appendRow([id, kid, "maths", day, "", MATHS_SITE, "", "", correct, new Date(), monOf_(x), partnerOf_(x)]);
     return;
   }
 
@@ -198,18 +267,7 @@ function addEntry_(x) {
     var n = Number(x.correct);
     if (KIDS[kid].practices.indexOf(x.type) < 0) throw new Error("No " + PRACTICE_SITES[x.type] + " for this kid");
     if (!isInt_(n) || n < 0 || n > MAX_CORRECT) throw new Error("Bad correct answers");
-    entriesSheet_().appendRow([id, kid, x.type, day, "", PRACTICE_SITES[x.type], "", "", n, new Date(), monOf_(x)]);
-    return;
-  }
-
-  // Evolution of one caught Pokémon: "site" holds the id of the record that caught it,
-  // "title" the id of the record whose reward paid for it.
-  if (x.type === "evolve") {
-    var target = String(x.target || "").slice(0, 40);
-    var source = String(x.source || "").slice(0, 40);
-    if (!target || owners_()[target] !== kid) throw new Error(NOT_POSSIBLE);
-    if (!source || !hasEntry_(source, kid)) throw new Error("Unknown reward for the evolution");
-    entriesSheet_().appendRow([id, kid, "evolve", day, source, target, "", "", "", new Date(), ""]);
+    entriesSheet_().appendRow([id, kid, x.type, day, "", PRACTICE_SITES[x.type], "", "", n, new Date(), monOf_(x), partnerOf_(x)]);
     return;
   }
 
@@ -231,7 +289,7 @@ function addEntry_(x) {
   if (!title || title.length > MAX_TITLE) throw new Error("Bad title");
   if (!isInt_(total) || total < 1 || total > MAX_SCORE) throw new Error("Bad total");
   if (!isInt_(score) || score < 0 || score > total) throw new Error("Bad score");
-  entriesSheet_().appendRow([id, kid, "read", day, asText_(title), site, score, total, "", new Date(), monOf_(x)]);
+  entriesSheet_().appendRow([id, kid, "read", day, asText_(title), site, score, total, "", new Date(), monOf_(x), partnerOf_(x)]);
 }
 
 function rowOf_(id) {
@@ -262,6 +320,12 @@ function deleteEntry_(id) {
   });
   var paysTraded = rows.some(function (r) { return r[2] === "evolve" && String(r[4]) === id && traded[String(r[5])]; });
   if (traded[id] || paysTraded) throw new Error("Not possible: this record was used in a trade, so it cannot be deleted.");
+  // An old evolution under a later level-up or Mega Stone evolution stays (the later one starts from its form).
+  var grown = {};
+  rows.forEach(function (r) { if (isGrowthRow_(r)) grown[String(r[5])] = true; });
+  if (rows.some(function (r) { return r[2] === "evolve" && String(r[4]) === id && grown[String(r[5])]; })) {
+    throw new Error("Not possible: this record evolved a Pokémon that has grown since, so it cannot be deleted.");
+  }
   for (var i = rows.length - 1; i >= 1; i--) {
     if (String(rows[i][0]) === id || (rows[i][2] === "evolve" && String(rows[i][4]) === id)) sheet.deleteRow(i + 1);
   }
@@ -284,27 +348,30 @@ function savePeak_(kid, rank) {
   if (!isInt_(rank) || rank < 0 || rank > MAX_RANK) throw new Error("Bad rank");
   var s = readSettings_()[kid];
   if (s.ticketBase === "") setSetting_(kid + ".ticketBase", rank);
+  // Mega Stones count from the peak saved before the first rank this sheet code saves.
+  if (s.stoneBase === "") setSetting_(kid + ".stoneBase", s.peak === "" ? rank : s.peak);
   if (s.peak === "" || rank > s.peak) setSetting_(kid + ".peak", rank);
 }
 
-// Partner Pokémon shown next to the trainer name (national dex number; 0 = default).
-function savePartner_(kid, dexNo) {
+// Partner Pokémon shown next to the trainer name, which gets the experience (id of the record that caught it).
+function savePartner_(kid, partnerId) {
   if (!KIDS.hasOwnProperty(kid)) throw new Error("Unknown kid");
-  if (!isInt_(dexNo) || dexNo < 0 || dexNo > MAX_DEX) throw new Error("Bad partner");
-  setSetting_(kid + ".partner", dexNo);
+  if (!partnerId || partnerId.length > MAX_ID || owners_()[partnerId] !== kid) throw new Error(NOT_POSSIBLE);
+  setSetting_(kid + ".partnerId", partnerId);
 }
 
 function readSettings_() {
   var out = {};
   Object.keys(KIDS).forEach(function (k) {
-    out[k] = { target: KIDS[k].target, mathsTarget: KIDS[k].mathsTarget, partner: 0, ticketBase: "", peak: "" };
+    out[k] = { target: KIDS[k].target, mathsTarget: KIDS[k].mathsTarget, partnerId: "", ticketBase: "", peak: "", stoneBase: "" };
   });
   settingsSheet_().getDataRange().getValues().slice(1).forEach(function (r) {
     var parts = String(r[0]).split(".");
     if (!out[parts[0]] || r[1] === "") return;
-    if (["target", "mathsTarget", "partner", "ticketBase", "peak"].indexOf(parts[1]) >= 0 && isInt_(Number(r[1]))) {
+    if (["target", "mathsTarget", "ticketBase", "peak", "stoneBase"].indexOf(parts[1]) >= 0 && isInt_(Number(r[1]))) {
       out[parts[0]][parts[1]] = Number(r[1]);
     }
+    if (parts[1] === "partnerId") out[parts[0]].partnerId = String(r[1]).slice(0, MAX_ID);
   });
   return out;
 }

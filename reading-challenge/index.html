@@ -180,9 +180,16 @@
   .box-mon .no { position: absolute; top: 3px; left: 0; right: 0; font-size: 11px; color: #333; }
   .box-mon .star { position: absolute; top: 2px; left: 5px; font-size: 16px; }
   .box-mon .up { position: absolute; top: 3px; right: 4px; font-size: 11px; font-weight: bold; color: #fff; background: var(--purple); border-radius: 8px; padding: 0 5px; }
-  .stage { display: flex; justify-content: center; gap: 3px; margin-top: 4px; }
-  .stage i { width: 8px; height: 8px; border-radius: 50%; border: 1.5px solid #000; background: #fff; }
-  .stage i.on { background: var(--yellow); }
+  .box-mon .lv { display: block; font-size: 11px; font-weight: bold; color: #333; }
+  .grow { margin: -4px 0 12px; }
+  .grow-top { display: flex; justify-content: space-between; font-size: 14px; margin-bottom: 4px; }
+  .grow .bar { height: 16px; }
+  .grow small { display: block; margin-top: 4px; color: #555; }
+  .grow .btn { margin-top: 8px; width: 100%; }
+  .bar.exp > div { background: linear-gradient(90deg, var(--yellow), #ffe066); }
+  .stones { font-size: 13px; font-weight: bold; margin: -6px 0 12px; }
+  .md-exp { font-size: 13px; color: #555; margin: 6px 0; }
+  .mon-card #mdPartner .btn { margin: 6px auto 0; display: block; }
   .mon-card { text-align: center; }
   .mon-card .md-art { display: block; margin: 0 auto; width: min(60vw, 240px); height: min(60vw, 240px); object-fit: contain; animation: pop .5s ease-out; filter: drop-shadow(0 6px 10px rgba(0,0,0,.35)); }
   .mon-card .md-type { display: inline-block; color: #fff; padding: 2px 10px; border-radius: 8px; font-size: 13px; }
@@ -314,6 +321,7 @@
       <img class="sprite" id="partner" alt="">
       <div><b id="trainerName"></b><span class="rank" id="rank"></span></div>
     </div>
+    <div class="grow" id="grow"></div>
     <div class="goal">
       <div class="goal-label"><span>📖 Books passed</span><span id="readText"></span></div>
       <div class="bar read" id="readBar"><div></div></div>
@@ -332,6 +340,7 @@
   <section class="panel">
     <h2 id="boxTitle"></h2>
     <button class="btn blue small trade-btn" type="button" id="boxTrade"></button>
+    <div class="stones" id="boxStones"></div>
     <div class="box" id="box"></div>
   </section>
 
@@ -429,7 +438,7 @@
       <button class="btn ghost" type="button" data-close>Cancel</button>
       <button class="btn purple" type="submit">🚀 LET IT RIP!</button>
     </div>
-    <div class="rule">Every correct answer counts. The app adds them up for you. Get 50 or more in one go: catch a NEW Pokémon OR evolve one!</div>
+    <div class="rule">Every correct answer counts. The app adds them up for you. Get 50 or more in one go: catch a NEW Pokémon! Every correct answer gives your partner 2 EXP.</div>
   </form>
 </div>
 
@@ -452,21 +461,24 @@
   </form>
 </div>
 
-<!-- Reward: catch a new Pokémon or evolve one -->
+<!-- Reward: catch a new Pokémon or trade -->
 <div class="sheet" id="rewardSheet">
   <div class="sheet-card">
     <h3>🎉 You did it! Pick your reward</h3>
     <div class="reward-pick" id="rwPick">
       <button class="btn" type="button" id="rwCatch">🎯 Catch a NEW Pokémon</button>
-      <button class="btn purple" type="button" id="rwEvolve">✨ EVOLVE a Pokémon</button>
       <button class="btn blue" type="button" id="rwTrade">🔁 TRADE with a friend</button>
     </div>
-    <div class="hidden" id="rwListWrap">
-      <b>Which one will evolve?</b>
-      <div class="evo-list" id="rwList"></div>
-      <button class="btn ghost small" type="button" id="rwBack" style="margin-top:12px">⬅ Back</button>
-    </div>
     <div class="sheet-actions"><button class="btn ghost small" type="button" id="rwCancel">Cancel</button></div>
+  </div>
+</div>
+
+<!-- Evolve by level, or Mega Evolve with a Mega Stone: pick the new form -->
+<div class="sheet" id="evoSheet">
+  <div class="sheet-card">
+    <h3 id="evTitle"></h3>
+    <div class="evo-list" id="evList"></div>
+    <div class="sheet-actions"><button class="btn ghost small" type="button" id="evLater">Not now</button></div>
   </div>
 </div>
 
@@ -519,6 +531,9 @@
   </div>
 </div>
 
+<!-- ?v= must change with APP_VERSION so phones fetch the new files -->
+<script src="evo-data.js?v=2026-10-28-1"></script>
+<script src="growth.js?v=2026-10-28-1"></script>
 <script>
 (function () {
   "use strict";
@@ -528,9 +543,9 @@
   var REFRESH_MS = 60000;
   // Change on every release: a page left open with older code reloads itself,
   // so every phone works out the same Pokémon.
-  var APP_VERSION = "2026-10-27-2";
+  var APP_VERSION = "2026-10-28-1";
   // Sent with every change; the sheet refuses changes from older pages (MIN_CLIENT_GEN in Code.gs).
-  var CLIENT_GEN = 2;
+  var CLIENT_GEN = 3;
   var STORAGE_KEY = "htrc-2026-autumn-v3";
   var START = new Date(2026, 9, 24);   // Sat 24 Oct 2026
   var DAY_COUNT = 9;                   // to Sun 1 Nov 2026
@@ -746,11 +761,11 @@
 
   // ---------- local cache (works even when storage is blocked) ----------
   function emptyState() {
-    var s = { settings: { targets: {}, mathsTargets: {}, partners: {}, ticketBase: {}, peaks: {} }, kids: {}, serverGen: 0 };
+    var s = { settings: { targets: {}, mathsTargets: {}, partnerIds: {}, ticketBase: {}, peaks: {}, stoneBase: {} }, kids: {}, serverGen: 0 };
     KIDS.forEach(function (k) {
       s.settings.targets[k.id] = k.target;
       s.settings.mathsTargets[k.id] = k.mathsTarget;
-      s.settings.partners[k.id] = 0;
+      s.settings.partnerIds[k.id] = "";
       s.kids[k.id] = { entries: [], maths: [], practice: [], evolves: [], trades: [] };
     });
     return s;
@@ -768,7 +783,7 @@
           if (!base.kids[k.id].trades) base.kids[k.id].trades = [];
           if (parsed.settings.targets[k.id]) base.settings.targets[k.id] = parsed.settings.targets[k.id];
           if (parsed.settings.mathsTargets[k.id]) base.settings.mathsTargets[k.id] = parsed.settings.mathsTargets[k.id];
-          if (parsed.settings.partners && parsed.settings.partners[k.id]) base.settings.partners[k.id] = parsed.settings.partners[k.id];
+          if (parsed.settings.partnerIds && parsed.settings.partnerIds[k.id]) base.settings.partnerIds[k.id] = parsed.settings.partnerIds[k.id];
         });
       }
     } catch (e) { /* storage unavailable: start fresh */ }
@@ -991,7 +1006,7 @@
     // Evolutions, oldest first: each one moves its Pokémon one stage up (only while it is still in the collection).
     // bySource: record id -> "Charmander → Charmeleon", shown on the record that paid for it.
     var bySource = {};
-    data().evolves.slice().sort(function (a, b) { return loggedAt(a) - loggedAt(b); }).forEach(function (v) {
+    data().evolves.filter(isOldEvolve).sort(function (a, b) { return loggedAt(a) - loggedAt(b); }).forEach(function (v) {
       var c = byId[v.target];
       if (!c) return;
       var chain = EVOLVES[c.mon[3]] || [];
@@ -1006,15 +1021,11 @@
       var form = c.steps ? chain[c.steps - 1] : [c.mon[0], c.mon[3]];
       c.name = form[0];
       c.dex = form[1];
-      c.next = chain[c.steps] || null;
     });
     return { byId: byId, pool: pool, bySource: bySource };
   }
-  // Caught Pokémon that can still evolve, in catch order: [{ id, c }].
-  function evolvable() {
-    return boxOf(current).filter(function (m) { return m.c.next; })
-      .map(function (m) { return { id: m.id, c: m.c }; });
-  }
+  // Evolutions paid for by a win (before levels): replayed along EVOLVES. Level-up and Mega Stone ones are not.
+  function isOldEvolve(v) { return (v.kind || "old") === "old"; }
   function nextMon(id) { return MONS[pickFrom(catches().pool, id)]; }
   function monIndex(dex) {
     for (var k = 0; k < MONS.length; k++) if (MONS[k][3] === dex) return k;
@@ -1045,24 +1056,27 @@
     return traded[id] ? "🔁 " + traded[id] : "✨ Evolved: " + (evolved[id] || "a Pokémon");
   }
 
-  // Chosen partner, only while that Pokémon is still in the collection.
-  function partnerMon() {
-    var dexNo = state.settings.partners[current];
-    if (!dexNo) return null;
-    var box = boxOf(current);
-    for (var i = 0; i < box.length; i++) if (box[i].c.mon[3] === dexNo) return [box[i].c.name, box[i].c.dex];
-    return null;
+  // The partner gets the experience: the chosen one while it is in the box, otherwise the first Pokémon in the box.
+  function partnerOf(kidId, w) {
+    var box = boxOf(kidId, w);
+    var id = state.settings.partnerIds[kidId];
+    return box.filter(function (m) { return m.id === id; })[0] || box[0] || null;
   }
-  function partnerButton(mon) {
-    var isPartner = state.settings.partners[current] === mon[3];
+  // Id of the partner the child chose, while it is in the box ("" otherwise).
+  function chosenPartnerId(kidId, w) {
+    var p = partnerOf(kidId, w);
+    return p && p.id === state.settings.partnerIds[kidId] ? p.id : "";
+  }
+  function partnerButton(m, w) {
+    var isPartner = chosenPartnerId(current, w) === m.id;
     var b = make("button", "partner-btn" + (isPartner ? " on" : ""), isPartner ? "⭐ My partner" : "☆ Partner");
     b.type = "button";
     b.onclick = function () {
       if (isPartner) return;
       var who = current;
       b.disabled = true;
-      commit({ action: "partner", kid: who, partner: mon[3] }, function () {
-        state.settings.partners[who] = mon[3];
+      commit({ action: "partner", kid: who, partnerId: m.id }, function () {
+        state.settings.partnerIds[who] = m.id;
       }, function () { b.disabled = false; });
     };
     return b;
@@ -1116,14 +1130,44 @@
     });
   }
 
+  // Partner level, experience bar and what comes next.
+  function renderGrow(p, chosen) {
+    var box = el("grow");
+    box.innerHTML = "";
+    if (!p) return;
+    var top = make("div", "grow-top");
+    top.appendChild(make("b", "", p.c.name + " Lv." + p.level));
+    top.appendChild(make("span", "", p.progress ? p.progress.have + " / " + p.progress.need + " EXP" : "MAX level!"));
+    box.appendChild(top);
+    var bar = make("div", "bar exp");
+    var fill = make("div", "");
+    fill.style.width = (p.progress ? p.progress.have / p.progress.need * 100 : 100) + "%";
+    bar.appendChild(fill);
+    box.appendChild(bar);
+    if (p.ready.length) {
+      var b = make("button", "btn purple small", "✨ " + p.c.name + " is ready to evolve!");
+      b.type = "button";
+      b.onclick = function () { openEvolve(p.id, "level"); };
+      box.appendChild(b);
+    } else {
+      var hint = [];
+      if (p.evolvesAt) hint.push("Evolves at Lv." + p.evolvesAt);
+      if (kid().maths) hint.push("🎸 1 correct answer = " + Growth.EXP.maths + " EXP");
+      if (hint.length) box.appendChild(make("small", "", hint.join(" · ")));
+    }
+    if (!chosen) box.appendChild(make("small", "", "☆ Choose your partner in the box: it gets the EXP!"));
+  }
+
   function renderProgress(s) {
     var stage = Math.min(2, s.tier === 0 ? (s.pct >= 50 ? 1 : 0) : 2);
-    var chosen = partnerMon();
-    var partnerDex = chosen ? chosen[1] : EVOLUTION_IDS[stage];
-    var partnerName = chosen ? chosen[0] : EVOLUTION[stage];
+    var w = world();
+    var partner = partnerOf(current, w);
+    var partnerDex = partner ? partner.c.dex : EVOLUTION_IDS[stage];
+    var partnerName = partner ? partner.c.name : EVOLUTION[stage];
     setSprite(el("partner"), partnerDex, partnerName);
     el("trainerName").textContent = "Trainer " + kid().name + " & " + partnerName;
-    el("rank").textContent = "Lv." + (s.rank + 1) + " " + RANKS[s.rank];
+    renderGrow(partner, !!chosenPartnerId(current, w));
+    el("rank").textContent = "Rank " + (s.rank + 1) + " " + RANKS[s.rank];
     el("rankMsg").textContent = rankNextMessage(s);
 
     el("readText").textContent = s.caught + " / " + target() + " books (" + s.readPct + "%)";
@@ -1262,7 +1306,6 @@
     var form = c.steps ? chain[c.steps - 1] : [c.mon[0], c.mon[3]];
     c.name = form[0];
     c.dex = form[1];
-    c.next = chain[c.steps] || null;
   }
   // Every child's Pokémon after trades. Which Pokémon each record caught comes from catches(), which trades never change.
   // Evolutions and trades are then replayed in sheet order (the sheet refuses ones that do not fit, see Code.gs).
@@ -1297,15 +1340,49 @@
       }
       var m = mons[x.target];
       if (!m || m.owner !== x.kid) return;
+      if (!isOldEvolve(x)) {
+        // Level-up or Mega Stone: only from the form it was saved from (the sheet keeps them in order).
+        if (m.c.dex !== x.from) return;
+        if (m.startDex === undefined) m.startDex = m.c.dex;
+        m.evos.push({ v: x, from: [m.c.name, m.c.dex], to: [Growth.nameOf(x.to), x.to] });
+        m.c.name = Growth.nameOf(x.to);
+        m.c.dex = x.to;
+        return;
+      }
+      if (m.startDex !== undefined) return;
       var chain = EVOLVES[m.c.mon[3]] || [];
       if (m.c.steps >= chain.length) return;
-      var was = m.c.name;
+      var was = [m.c.name, m.c.dex];
       m.c.steps++;
       setForm(m.c);
-      m.evos.push(x);
-      if (x.source) evolved[x.source] = was + " → " + m.c.name;
+      m.evos.push({ v: x, from: was, to: [m.c.name, m.c.dex] });
+      if (x.source) evolved[x.source] = was[0] + " → " + m.c.name;
     });
+    addGrowth(mons);
     return { mons: mons, traded: traded, evolved: evolved };
+  }
+  // Experience goes to the partner saved with each study record, and stays with that Pokémon (also after a trade).
+  // Level = lowest level of its form before any level-up evolution + experience, never below its form now.
+  function addGrowth(mons) {
+    var exp = {};
+    KIDS.forEach(function (k) {
+      var d = state.kids[k.id];
+      d.entries.concat(d.maths, d.practice).forEach(function (x) {
+        if (x.partner) exp[x.partner] = (exp[x.partner] || 0) + Growth.expOf(x);
+      });
+    });
+    Object.keys(mons).forEach(function (id) {
+      var m = mons[id];
+      var start = m.startDex === undefined ? m.c.dex : m.startDex;
+      m.exp = exp[id] || 0;
+      var fromExp = Growth.levelOf(start, m.exp);
+      m.level = Math.max(Growth.minLevel(m.c.dex), fromExp);
+      // After a deleted record the form can be above its EXP: start the bar again from 0.
+      m.progress = m.level > fromExp ? { have: 0, need: Growth.EXP_PER_LEVEL } : Growth.progress(start, m.exp);
+      m.ready = Growth.readyOf(m.c.dex, m.level);
+      m.evolvesAt = Growth.evolvesAt(m.c.dex);
+      m.stones = Growth.stoneOf(m.c.dex);
+    });
   }
   // The Pokémon a child has now, in the order they got them (m.no = place in the box).
   function boxOf(kidId, w) {
@@ -1332,6 +1409,15 @@
     if (start === undefined || peak === undefined) return 0;
     return Math.max(0, peak - start - ticketsUsed(kidId));
   }
+  // One Mega Stone for each rank reached after Mega Stones started (stoneBase is saved by the sheet).
+  function stonesUsed(kidId) {
+    return state.kids[kidId].evolves.filter(function (v) { return v.kind === "stone"; }).length;
+  }
+  function stonesLeft(kidId) {
+    var start = state.settings.stoneBase[kidId], peak = state.settings.peaks[kidId];
+    if (start === undefined || peak === undefined) return 0;
+    return Math.max(0, peak - start - stonesUsed(kidId));
+  }
   // A record a trade depends on is never deleted: one that paid for a trade, caught a traded Pokémon,
   // or paid for an evolution of a traded Pokémon (deleting it would change a Pokémon in another box).
   function inTrade(id) {
@@ -1340,8 +1426,13 @@
       state.kids[k.id].trades.forEach(function (t) { traded[t.give] = traded[t.get] = true; all.push(t); });
     });
     if (traded[id] || all.some(function (t) { return t.source === id; })) return true;
+    // Also an old evolution of a Pokémon that has grown since (by level or Mega Stone): the later one starts from it.
+    var grown = {};
+    KIDS.forEach(function (k) {
+      state.kids[k.id].evolves.forEach(function (v) { if (!isOldEvolve(v)) grown[v.target] = true; });
+    });
     return KIDS.some(function (k) {
-      return state.kids[k.id].evolves.some(function (v) { return v.source === id && traded[v.target]; });
+      return state.kids[k.id].evolves.some(function (v) { return v.source === id && isOldEvolve(v) && (traded[v.target] || grown[v.target]); });
     });
   }
   function tradeRow(kidId, day, source, pair) {
@@ -1352,25 +1443,21 @@
   }
 
   // One Pokémon as a tile (box, trade lists).
-  function monTile(m, ownerId, onclick) {
+  // partnerId: the owner's chosen partner (worked out once by the caller).
+  function monTile(m, partnerId, onclick) {
     var c = m.c;
-    var isPartner = state.settings.partners[ownerId] === c.mon[3];
-    var total = (EVOLVES[c.mon[3]] || []).length + 1;
+    var isPartner = partnerId === m.id;
     var b = make("button", "box-mon" + (isPartner ? " partner" : ""));
     b.type = "button";
     b.style.setProperty("--tint", c.mon[2]);
-    b.setAttribute("aria-label", "#" + (m.no + 1) + " " + c.name + (isPartner ? ", partner" : "") +
-      (c.next ? ", can evolve" : "") + (total > 1 ? ", stage " + (c.steps + 1) + " of " + total : ""));
+    b.setAttribute("aria-label", "#" + (m.no + 1) + " " + c.name + " level " + m.level + (isPartner ? ", partner" : "") +
+      (m.ready.length ? ", ready to evolve" : ""));
     b.appendChild(make("span", "no", "#" + (m.no + 1)));
     if (isPartner) b.appendChild(make("span", "star", "⭐"));
-    if (c.next) b.appendChild(make("span", "up", "⬆"));
+    if (m.ready.length) b.appendChild(make("span", "up", "⬆"));
     b.appendChild(artwork(c.dex, c.name, "box-art"));
     b.appendChild(make("span", "name", c.name));
-    if (total > 1) {
-      var dots = make("span", "stage");
-      for (var i = 0; i < total; i++) dots.appendChild(make("i", i <= c.steps ? "on" : ""));
-      b.appendChild(dots);
-    }
+    b.appendChild(make("span", "lv", "Lv." + m.level));
     b.onclick = onclick;
     return b;
   }
@@ -1381,16 +1468,20 @@
     el("boxTitle").textContent = "🎒 " + kid().name + "'s Pokémon box";
     var box = el("box");
     box.innerHTML = "";
-    var list = boxOf(current);
+    var w = world();
+    var list = boxOf(current, w);
+    var pid = chosenPartnerId(current, w);
     if (!list.length) box.appendChild(make("div", "empty-dex", "No Pokémon yet. Win a mission to catch your first one!"));
     list.forEach(function (m) {
-      box.appendChild(monTile(m, current, function () { openMon(m.id); }));
+      box.appendChild(monTile(m, pid, function () { openMon(m.id); }));
     });
     var left = ticketsLeft(current);
     var tb = el("boxTrade");
     var retry = ticketTry && ticketTry.tx.kid === current;
     tb.textContent = retry ? "🔁 Not saved yet · Tap to send the trade again" : "🎟 Trade tickets: " + left + (left ? " · Tap to trade!" : " · Rank up to get one");
     tb.disabled = !retry && (!left || !canTrade(current));
+    var stones = stonesLeft(current);
+    el("boxStones").textContent = "💎 Mega Stones: " + stones + (stones ? " · Tap a Pokémon that can Mega Evolve" : " · Rank up to get one");
     if (openMonId && el("monSheet").className.indexOf("show") >= 0) fillMon(openMonId);
   }
   var openMonId = null;
@@ -1433,7 +1524,7 @@
       art.appendChild(artwork(c.dex, c.name, "md-art"));
       art.setAttribute("data-dex", c.dex);
     }
-    el("mdName").textContent = "#" + (m.no + 1) + " " + c.name;
+    el("mdName").textContent = "#" + (m.no + 1) + " " + c.name + " Lv." + m.level;
     var typeBox = el("mdType");
     typeBox.innerHTML = "";
     var type = make("span", "md-type", c.mon[1]);
@@ -1441,7 +1532,20 @@
     typeBox.appendChild(type);
     var pb = el("mdPartner");
     pb.innerHTML = "";
-    pb.appendChild(partnerButton(c.mon));
+    pb.appendChild(partnerButton(m, w));
+    pb.appendChild(make("div", "md-exp", m.exp + " EXP" + (m.progress ? " · " + (m.progress.need - m.progress.have) + " more to Lv." + (m.level + 1) : "")));
+    if (m.ready.length) {
+      var eb = make("button", "btn purple small", "✨ Evolve!");
+      eb.type = "button";
+      eb.onclick = function () { openEvolve(m.id, "level"); };
+      pb.appendChild(eb);
+    }
+    if (m.stones.length && stonesLeft(current) > 0) {
+      var sb = make("button", "btn blue small", "💎 Mega Evolve (" + stonesLeft(current) + " left)");
+      sb.type = "button";
+      sb.onclick = function () { openEvolve(m.id, "stone"); };
+      pb.appendChild(sb);
+    }
     var how = el("mdHow");
     how.innerHTML = "";
     var rec = recordOf(id);
@@ -1455,21 +1559,22 @@
     });
     var evo = el("mdEvo");
     evo.innerHTML = "";
-    var forms = [[c.mon[0], c.mon[3]]].concat(EVOLVES[c.mon[3]] || []);
     var done = m.evos;
-    done.forEach(function (v, k) {
+    done.forEach(function (e) {
       var row = make("div", "md-line");
-      row.appendChild(sprite(forms[k][1], "", forms[k][0]));
-      row.appendChild(document.createTextNode(forms[k][0] + " → "));
-      row.appendChild(sprite(forms[k + 1][1], "", forms[k + 1][0]));
-      row.appendChild(document.createTextNode(forms[k + 1][0]));
-      var src = v.source && recordOf(v.source);
-      row.appendChild(make("small", "", "✨ " + (src ? recordText(src) + " · " + whenText(src) : whenText(v))));
+      row.appendChild(sprite(e.from[1], "", e.from[0]));
+      row.appendChild(document.createTextNode(e.from[0] + " → "));
+      row.appendChild(sprite(e.to[1], "", e.to[0]));
+      row.appendChild(document.createTextNode(e.to[0]));
+      var v = e.v, src = v.source && recordOf(v.source);
+      var how = v.kind === "level" ? "⬆ Level up" : v.kind === "stone" ? "💎 Mega Stone" : src ? recordText(src) : "";
+      row.appendChild(make("small", "", "✨ " + (how ? how + " · " : "") + whenText(src || v)));
       evo.appendChild(row);
     });
-    if (c.next) evo.appendChild(make("div", "md-line", "⬆ Next: " + c.next[0] + " (win a mission and choose EVOLVE)"));
-    else if (!done.length) evo.appendChild(make("div", "md-line", "This Pokémon does not evolve."));
-    else evo.appendChild(make("div", "md-line", "🏁 Final form!"));
+    var next = Growth.nextOf(c.dex);
+    if (next.length) evo.appendChild(make("div", "md-line", "⬆ Next: " + next.map(function (n) { return n.name + " (Lv." + n.level + ")"; }).join(", ")));
+    if (m.stones.length) evo.appendChild(make("div", "md-line", "💎 With a Mega Stone: " + m.stones.map(function (n) { return n.name; }).join(", ")));
+    if (!next.length && !m.stones.length) evo.appendChild(make("div", "md-line", done.length ? "🏁 Final form!" : "This Pokémon does not evolve."));
     return true;
   }
 
@@ -1495,13 +1600,15 @@
         var box = k.id === tr.kid ? [] : boxOf(k.id, w);
         if (!box.length) return;
         list.appendChild(make("div", "sub-h tr-who", k.name + "'s box"));
-        box.forEach(function (m) { list.appendChild(monTile(m, k.id, function () { tr.get = m; tradeStep(); })); });
+        var pid = chosenPartnerId(k.id, w);
+        box.forEach(function (m) { list.appendChild(monTile(m, pid, function () { tr.get = m; tradeStep(); })); });
       });
       return;
     }
     if (!tr.give) {
       el("trStep").textContent = "Which one will you give to " + kidName(tr.get.owner) + "?";
-      boxOf(tr.kid, w).forEach(function (m) { list.appendChild(monTile(m, tr.kid, function () { tr.give = m; tradeStep(); })); });
+      var pid = chosenPartnerId(tr.kid, w);
+      boxOf(tr.kid, w).forEach(function (m) { list.appendChild(monTile(m, pid, function () { tr.give = m; tradeStep(); })); });
       return;
     }
     var friend = kidName(tr.get.owner);
@@ -1642,8 +1749,9 @@
       var st = res.settings[k.id] || {};
       if (st.target) next.settings.targets[k.id] = st.target;
       if (st.mathsTarget) next.settings.mathsTargets[k.id] = st.mathsTarget;
-      if (st.partner) next.settings.partners[k.id] = st.partner;
+      if (st.partnerId) next.settings.partnerIds[k.id] = st.partnerId;
       if (st.ticketBase !== undefined && st.ticketBase !== "") next.settings.ticketBase[k.id] = st.ticketBase;
+      if (st.stoneBase !== undefined && st.stoneBase !== "") next.settings.stoneBase[k.id] = st.stoneBase;
       if (st.peak !== undefined && st.peak !== "") next.settings.peaks[k.id] = st.peak;
     });
     next.serverGen = res.gen || 0;
@@ -1653,7 +1761,8 @@
       e.seq = seq;
       if (e.type === "maths") next.kids[e.kid].maths.push(e);
       else if (PRACTICES[e.type]) next.kids[e.kid].practice.push(e);
-      else if (e.type === "evolve") next.kids[e.kid].evolves.push({ id: e.id, kid: e.kid, type: e.type, day: e.day, target: e.site, source: e.source || "", seq: seq });
+      else if (e.type === "evolve") next.kids[e.kid].evolves.push({ id: e.id, kid: e.kid, type: e.type, day: e.day, target: e.site, source: e.source || "",
+        kind: e.kind || "old", to: e.to || 0, from: e.from || 0, stone: e.stone || 0, seq: seq });
       else if (e.type === "trade") next.kids[e.kid].trades.push({ id: e.id, kid: e.kid, type: e.type, day: e.day, source: e.source || "", give: e.site, get: e.get || "", with: e.with || "", ticket: e.ticket || 0, seq: seq });
       else next.kids[e.kid].entries.push(e);
     });
@@ -1731,7 +1840,8 @@
   // Saves a child's rank when it is higher than any rank saved before (the first time: where tickets start).
   var peakSent = {};
   function savePeaks() {
-    if (!API_URL || !(state.serverGen >= 2)) return;
+    // Needs the sheet code that starts Mega Stones (gen 3), or the first rank-up after the update gives no stone.
+    if (!API_URL || !(state.serverGen >= 3)) return;
     KIDS.forEach(function (k) {
       var rank = forKid(k.id, function () { return summary().rank; });
       var saved = state.settings.peaks[k.id];
@@ -1764,6 +1874,13 @@
       done(true);
       return;
     }
+    // Until the sheet code knows levels (gen 3), nothing is saved: an older sheet would store it wrongly.
+    if (!(state.serverGen >= 3)) {
+      window.alert(state.serverGen ? "Updating... please try again in a minute." : "Loading... please check the internet and try again in a moment.");
+      refresh();
+      done(false, true);
+      return;
+    }
     setSync("Saving...", false);
     api(payload).then(function () { done(true); }).catch(function (err) {
       if (err && err.reloading) return;
@@ -1778,7 +1895,7 @@
 
   // ---------- sheets & overlay ----------
   function openSheet(id) { el(id).className = "sheet show"; window.scrollTo(0, 0); }
-  function closeSheets() { ["readSheet", "mathsSheet", "practiceSheet", "rewardSheet", "monSheet", "tradeSheet"].forEach(function (id) { el(id).className = "sheet"; }); }
+  function closeSheets() { ["readSheet", "mathsSheet", "practiceSheet", "rewardSheet", "monSheet", "tradeSheet", "evoSheet"].forEach(function (id) { el(id).className = "sheet"; }); }
   Array.prototype.forEach.call(document.querySelectorAll("[data-close]"), function (b) { b.onclick = closeSheets; });
   el("openRead").onclick = function () { openSheet("readSheet"); };
   el("openMaths").onclick = function () { openSheet("mathsSheet"); };
@@ -1788,10 +1905,20 @@
     art.innerHTML = "";
     if (artNode) art.appendChild(artNode);
     el("ovBig").textContent = big;
+    if (growthNote) {
+      mid = (mid ? mid + "  " : "") + growthNote.text;
+      evolveAfterOk = growthNote.evolve;
+      growthNote = null;
+    }
     el("ovMid").textContent = mid;
     el("overlay").className = "overlay show";
   }
-  el("ovClose").onclick = function () { el("overlay").className = "overlay"; };
+  el("ovClose").onclick = function () {
+    el("overlay").className = "overlay";
+    var id = evolveAfterOk;
+    evolveAfterOk = null;
+    if (id) openEvolve(id, "level");
+  };
   function tierUpMessage(before, after) {
     var msg = after.tier > before.tier ? "  🏆 " + TIERS[after.tier - 1].name + " unlocked! (" + TIERS[after.tier - 1].reward + ")" : "";
     if (after.rank > before.rank) msg += "  ⭐ RANK UP! You are now a " + RANKS[after.rank] + "!";
@@ -1838,29 +1965,45 @@
       saveRecord(item, listName, again.ev, button, function (ok) { done(ok, again.evo); });
       return;
     }
-    var pick = wins ? evolvable() : [];
     var trade = wins && canTrade(item.kid);
-    if (!pick.length && !trade) { saveRecord(item, listName, null, button, done); return; }
+    if (!trade) { saveRecord(item, listName, null, button, done); return; }
     rewardKid = item.kid;
     rewardDone = function (choice) {
       if (!choice) { saveRecord(item, listName, null, button, done); return; }
-      if (choice.trade) {
-        var tx = tradeRow(item.kid, item.day, item.id, choice);
-        var info = tradeInfo(choice, item.kid);
-        saveRecord(item, listName, tx, button, function (ok) { done(ok, info); }, info);
-        return;
-      }
-      var ev = { id: newId(), kid: item.kid, type: "evolve", day: item.day, target: choice.id, source: item.id };
-      var evo = { from: [choice.c.name, choice.c.dex], to: choice.c.next };
-      saveRecord(item, listName, ev, button, function (ok) { done(ok, evo); }, evo);
+      var tx = tradeRow(item.kid, item.day, item.id, choice);
+      var info = tradeInfo(choice, item.kid);
+      saveRecord(item, listName, tx, button, function (ok) { done(ok, info); }, info);
     };
-    showReward(pick, trade);
+    showReward();
+  }
+  // Shown with the next result screen: the experience the partner got. OK then offers the evolution if it is ready.
+  var growthNote = null, evolveAfterOk = null;
+  function noteGrowth(partner, exp) {
+    if (!partner || !exp) return;
+    var now = world().mons[partner.id];
+    if (!now) return;
+    growthNote = {
+      text: now.level > partner.level ? "⭐ " + now.c.name + " grew to Lv." + now.level + "! (+" + exp + " EXP)" : "⭐ +" + exp + " EXP for " + now.c.name,
+      evolve: now.ready.length && now.owner === partner.owner ? now.id : null
+    };
   }
   function saveRecord(item, listName, ev, button, done, evo) {
     var who = item.kid;
     // A record that catches saves its Pokémon now, so no later change can turn it into another one.
     var wins = listName === "entries" ? isPass(item) : listName === "maths" ? forKid(who, function () { return mathsCatches(item); }) : practiceCatches(item);
     if (wins && !ev) item.mon = forKid(who, function () { return nextMon(item.id)[3]; });
+    // The partner now gets this record's experience (saved with the record, so it never moves).
+    // A resend after "Not saved" keeps the first try's partner (the sheet may already have it).
+    var w = world();
+    var again = lastTry && lastTry.id === item.id && lastTry.partner !== undefined;
+    var partner = again ? w.mons[lastTry.partner] || null : partnerOf(who, w);
+    item.partner = again ? lastTry.partner : partner ? partner.id : "";
+    var exp = Growth.expOf(item);
+    var innerDone = done;
+    done = function (ok, x) {
+      if (ok) noteGrowth(partner, exp);
+      innerDone(ok, x);
+    };
     button.disabled = true;
     var isTrade = !!ev && ev.type === "trade";
     commit({ action: "add", entry: item, evolve: isTrade ? undefined : ev, trade: isTrade ? ev : undefined }, function () {
@@ -1870,7 +2013,7 @@
       else if (ev) state.kids[who].evolves = state.kids[who].evolves.concat([ev]);
     }, function (ok, refused) {
       button.disabled = false;
-      lastTry = ok || refused ? null : { key: tryKey(item), id: item.id, chosen: true, ev: ev, evo: evo || null };
+      lastTry = ok || refused ? null : { key: tryKey(item), id: item.id, chosen: true, ev: ev, evo: evo || null, partner: item.partner };
       done(ok, null);
     });
   }
@@ -1880,25 +2023,7 @@
   function recordId(item, seed) {
     return lastTry && lastTry.key === tryKey(item) ? lastTry.id : newId(seed);
   }
-  function showReward(pick, trade) {
-    el("rwEvolve").className = "btn purple" + (pick.length ? "" : " hidden");
-    el("rwTrade").className = "btn blue" + (trade ? "" : " hidden");
-    el("rwPick").className = "reward-pick";
-    el("rwListWrap").className = "hidden";
-    var list = el("rwList");
-    list.innerHTML = "";
-    pick.forEach(function (p) {
-      var b = make("button", "evo-choice");
-      b.type = "button";
-      var pair = make("div", "pair");
-      pair.appendChild(sprite(p.c.dex, "", p.c.name));
-      pair.appendChild(make("span", "arrow", "➜"));
-      pair.appendChild(sprite(p.c.next[1], "", p.c.next[0]));
-      b.appendChild(pair);
-      b.appendChild(make("div", "", p.c.name + " ➜ " + p.c.next[0]));
-      b.onclick = function () { finishReward(p); };
-      list.appendChild(b);
-    });
+  function showReward() {
     el("rewardSheet").className = "sheet show";
     window.scrollTo(0, 0);
   }
@@ -1909,10 +2034,6 @@
     if (cb) cb(choice);
   }
   el("rwCatch").onclick = function () { finishReward(null); };
-  el("rwEvolve").onclick = function () {
-    el("rwPick").className = "reward-pick hidden";
-    el("rwListWrap").className = "";
-  };
   var rewardKid = null;
   // Trade instead of catching: the reward screen comes back if the friend says no.
   el("rwTrade").onclick = function () {
@@ -1922,10 +2043,6 @@
     }, function () {
       el("rewardSheet").className = "sheet show";
     });
-  };
-  el("rwBack").onclick = function () {
-    el("rwPick").className = "reward-pick";
-    el("rwListWrap").className = "hidden";
   };
   // Cancel: nothing is saved; the form stays open.
   el("rwCancel").onclick = function () {
@@ -1955,6 +2072,54 @@
       art.appendChild(artwork(to[1], to[0]));
       el("ovBig").textContent = "Congratulations! " + from[0] + " evolved into " + to[0] + "!";
     }, EVOLVE_MS);
+  }
+
+  // Level-up evolution or Mega Stone: the child picks the new form (there can be more than one).
+  // A Mega Stone retry after "Not saved" sends the same row again, so the stone is never used twice.
+  var stoneTry = null;
+  function openEvolve(id, kind) {
+    var m = world().mons[id];
+    if (!m || m.owner !== current) return;
+    var options = kind === "level" ? m.ready : m.stones;
+    if (!options.length || (kind === "stone" && !stonesLeft(current))) return;
+    el("evTitle").textContent = kind === "level" ? "What? " + m.c.name + " is evolving!" : "💎 Mega Evolve " + m.c.name + "?";
+    var list = el("evList");
+    list.innerHTML = "";
+    options.forEach(function (o) {
+      var b = make("button", "evo-choice");
+      b.type = "button";
+      var pair = make("div", "pair");
+      pair.appendChild(sprite(m.c.dex, "", m.c.name));
+      pair.appendChild(make("span", "arrow", "➜"));
+      pair.appendChild(sprite(o.to, "", o.name));
+      b.appendChild(pair);
+      b.appendChild(make("div", "", (options.length > 1 ? "" : "✨ ") + m.c.name + " ➜ " + o.name));
+      b.onclick = function () { saveEvolve(m, kind, o, b); };
+      list.appendChild(b);
+    });
+    closeSheets();
+    openSheet("evoSheet");
+  }
+  el("evLater").onclick = function () { el("evoSheet").className = "sheet"; };
+  function saveEvolve(m, kind, o, button) {
+    var who = current;
+    var ev = { kid: who, type: "evolve", kind: kind, day: clampDay(todayIndex()), target: m.id, from: m.c.dex, to: o.to };
+    if (kind === "level") ev.id = "lv-" + m.id + "-" + m.c.dex;
+    else if (stoneTry && stoneTry.target === m.id && stoneTry.from === m.c.dex && stoneTry.to === o.to) ev = stoneTry;
+    else { ev.id = newId(); ev.stone = stonesUsed(who) + 1; }
+    var evo = { from: [m.c.name, m.c.dex], to: [o.name, o.to] };
+    button.disabled = true;
+    commit({ action: "evolve", evolve: ev }, function () {
+      if (state.kids[who].evolves.some(function (v) { return v.id === ev.id; })) return;
+      var row = { id: ev.id, kid: who, type: "evolve", day: ev.day, target: ev.target, source: "", kind: kind, to: ev.to, from: ev.from, stone: ev.stone || 0, seq: localSeq() };
+      state.kids[who].evolves = state.kids[who].evolves.concat([row]);
+    }, function (ok, refused) {
+      button.disabled = false;
+      stoneTry = kind === "stone" && !ok && !refused ? ev : null;
+      if (!ok) return;
+      el("evoSheet").className = "sheet";
+      celebrateEvolve(evo, kind === "stone" ? "💎 Mega Stone used!" : "Lv." + m.level);
+    });
   }
 
   function celebrateTrade(t, mid) {
@@ -2009,7 +2174,7 @@
       var cfg = PRACTICES[type];
       practiceType = type;
       el("pTitle").textContent = cfg.icon + " " + cfg.name;
-      el("pRule").textContent = "Get " + cfg.min + " or more in one go: catch a NEW Pokémon OR evolve one!";
+      el("pRule").textContent = "Get " + cfg.min + " or more in one go: catch a NEW Pokémon! Every correct answer gives your partner EXP.";
       openSheet("practiceSheet");
     };
   });
@@ -2039,7 +2204,7 @@
     var quiz = el("fSite").value !== NO_QUIZ;
     el("quizPart").className = quiz ? "" : "hidden";
     el("fScore").required = quiz;
-    el("readRule").textContent = quiz ? "80% or more wins (8 out of 10): catch a NEW Pokémon OR evolve one!" : "Finished the whole book? Catch a NEW Pokémon OR evolve one!";
+    el("readRule").textContent = (quiz ? "80% or more wins (8 out of 10): catch a NEW Pokémon!" : "Finished the whole book? Catch a NEW Pokémon!") + " Your partner gets " + Growth.EXP.book + " EXP.";
   }
   el("fSite").onchange = updateQuizPart;
   updateQuizPart();
