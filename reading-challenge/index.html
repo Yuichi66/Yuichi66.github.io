@@ -240,6 +240,35 @@
   .sheet.show, .overlay.show { display: block; }
   .sheet-card { max-width: 520px; margin: 20px auto; background: var(--paper); border: 4px solid #000; border-radius: 20px; padding: 18px; }
   .sheet-card h3 { margin: 0 0 4px; font-size: 24px; }
+  button.pill { font: inherit; cursor: pointer; }
+  /* Parent dashboard (parent.js) */
+  .sheet-card.wide { max-width: 760px; }
+  #parentRoot { position: relative; font-family: Arial, sans-serif; }
+  .pd-cards { display: grid; gap: 10px; }
+  .pd-card { border: 2px solid #000; border-radius: 12px; padding: 10px; background: #fff; }
+  .pd-head { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; flex-wrap: wrap; }
+  .pd-head b { font-size: 18px; }
+  .pd-muted { color: #52514e; font-size: 13px; margin: 4px 0; }
+  .pd-alert { color: #b3261e; font-weight: bold; margin: 6px 0; }
+  .pd-line { display: flex; flex-wrap: wrap; gap: 4px 12px; margin: 4px 0; }
+  .pd-label { font-weight: bold; min-width: 88px; }
+  .pd-val { white-space: nowrap; }
+  .pd-dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 4px; vertical-align: middle; }
+  .pd-goal { font-size: 14px; margin-top: 2px; }
+  .pd-h { margin: 18px 0 6px; font-size: 16px; }
+  .pd-chart { margin: 8px 0 12px; }
+  .pd-chart-title { font-size: 13px; color: #0b0b0b; margin-bottom: 4px; }
+  .pd-plot { display: flex; align-items: flex-end; gap: 2px; height: 90px; border-bottom: 1px solid #c9c8c2; }
+  .pd-col { flex: 1; height: 100%; display: flex; align-items: flex-end; cursor: pointer; outline: none; }
+  .pd-col:focus .pd-bar, .pd-col:hover .pd-bar { opacity: .75; }
+  .pd-bar { width: 100%; border-radius: 4px 4px 0 0; }
+  .pd-axis { display: flex; justify-content: space-between; font-size: 12px; color: #52514e; margin-top: 2px; }
+  .pd-tip { position: absolute; display: none; background: #0b0b0b; color: #fff; font-size: 13px; padding: 4px 8px; border-radius: 6px; pointer-events: none; white-space: nowrap; z-index: 2; }
+  .pd-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  .pd-table th, .pd-table td { text-align: left; padding: 4px; border-bottom: 1px solid #e3e2dc; vertical-align: top; }
+  .pd-table td { overflow-wrap: anywhere; }
+  .pd-num { text-align: right; white-space: nowrap; }
+  .pin-row input { width: 140px; text-align: center; font-size: 26px; letter-spacing: 6px; }
   .step { display: flex; gap: 10px; align-items: flex-start; margin: 14px 0; }
   .step .num { flex-shrink: 0; width: 32px; height: 32px; border-radius: 50%; background: var(--yellow); border: 3px solid #000; font-weight: bold; display: flex; align-items: center; justify-content: center; }
   .step .body { flex: 1; min-width: 0; }
@@ -290,6 +319,7 @@
     <div class="meta-row">
       <span class="pill" id="dates"></span>
       <a class="pill help" href="how-to.html">❓ How to use</a>
+      <button class="pill help" id="openParent" type="button">👪 Parent</button>
     </div>
     <div class="sync" id="sync"></div>
   </header>
@@ -422,6 +452,32 @@
   </form>
 </div>
 
+<!-- Parent: number, then the dashboard -->
+<div class="sheet" id="pinSheet">
+  <form class="sheet-card" id="pinForm" autocomplete="off">
+    <h3>👪 Parent</h3>
+    <div class="step"><div class="num">🔒</div><div class="body">
+      <b>Enter the 4-digit number</b>
+      <div class="pin-row"><input id="pinInput" type="password" inputmode="numeric" pattern="[0-9]*" maxlength="4" autocomplete="one-time-code" required></div>
+    </div></div>
+    <div class="sheet-actions">
+      <button class="btn ghost" type="button" data-close>Cancel</button>
+      <button class="btn purple" type="submit">Open</button>
+    </div>
+  </form>
+</div>
+
+<div class="sheet" id="parentSheet">
+  <div class="sheet-card wide">
+    <h3>👪 Parent dashboard</h3>
+    <div id="parentRoot"></div>
+    <div class="sheet-actions">
+      <span></span>
+      <button class="btn ghost" type="button" data-close>Close</button>
+    </div>
+  </div>
+</div>
+
 <!-- Maths steps -->
 <div class="sheet" id="mathsSheet">
   <form class="sheet-card" id="mathsForm" autocomplete="off">
@@ -535,10 +591,11 @@
 </div>
 
 <!-- ?v= must change with APP_VERSION so phones fetch the new files -->
-<script src="evo-data.js?v=2026-10-28-5"></script>
-<script src="dex-data.js?v=2026-10-28-5"></script>
-<script src="growth.js?v=2026-10-28-5"></script>
-<script src="regions.js?v=2026-10-28-5"></script>
+<script src="evo-data.js?v=2026-10-28-6"></script>
+<script src="dex-data.js?v=2026-10-28-6"></script>
+<script src="growth.js?v=2026-10-28-6"></script>
+<script src="regions.js?v=2026-10-28-6"></script>
+<script src="parent.js?v=2026-10-28-6"></script>
 <script>
 (function () {
   "use strict";
@@ -548,7 +605,7 @@
   var REFRESH_MS = 60000;
   // Change on every release: a page left open with older code reloads itself,
   // so every phone works out the same Pokémon.
-  var APP_VERSION = "2026-10-28-5";
+  var APP_VERSION = "2026-10-28-6";
   // Sent with every change; the sheet refuses changes from older pages (MIN_CLIENT_GEN in Code.gs).
   var CLIENT_GEN = 6;
   var STORAGE_KEY = "htrc-2026-autumn-v3";
@@ -1268,6 +1325,19 @@
     if (!chosen) box.appendChild(make("small", "", "☆ Choose your partner in the box: it gets the EXP!"));
   }
 
+  // "Next: Great Ball (£2) - 4 more books and 846 more correct answers"
+  function prizeNextMessage(s) {
+    var next = TIERS[s.tier];
+    if (!next) return "🏆 MASTER BALL! You got the top prize!";
+    var parts = [];
+    var moreBooks = need(target(), next.pct) - s.caught;
+    if (moreBooks > 0) parts.push(moreBooks + " more book" + (moreBooks > 1 ? "s" : ""));
+    if (kid().maths) {
+      var moreCorrect = need(mathsTarget(), next.pct) - s.correct;
+      if (moreCorrect > 0) parts.push(moreCorrect + " more correct answers");
+    }
+    return "Next: " + next.name + " (" + next.reward + ") — " + parts.join(" and ");
+  }
   function renderProgress(s) {
     var stage = Math.min(2, s.tier === 0 ? (s.pct >= 50 ? 1 : 0) : 2);
     var w = world();
@@ -1301,20 +1371,7 @@
       ladder.appendChild(box);
     });
 
-    var next = TIERS[s.tier];
-    var msg;
-    if (!next) msg = "🏆 MASTER BALL! You got the top prize!";
-    else {
-      var parts = [];
-      var moreBooks = need(target(), next.pct) - s.caught;
-      if (moreBooks > 0) parts.push(moreBooks + " more book" + (moreBooks > 1 ? "s" : ""));
-      if (kid().maths) {
-        var moreCorrect = need(mathsTarget(), next.pct) - s.correct;
-        if (moreCorrect > 0) parts.push(moreCorrect + " more correct answers");
-      }
-      msg = "Next: " + next.name + " (" + next.reward + ") — " + parts.join(" and ");
-    }
-    el("nextMsg").textContent = msg;
+    el("nextMsg").textContent = prizeNextMessage(s);
     el("ruleMsg").textContent = (kid().maths ? "Both goals count. " : "") + "You get ONE prize: the highest ball you reach. Prizes are given on Sun 1 Nov.";
   }
 
@@ -1888,11 +1945,14 @@
     state = next;
     save();
     render();
-    setSync("☁ Shared · updated " + new Date().toTimeString().slice(0, 5), false);
+    sheetLoadedAt = new Date();
+    setSync("☁ Shared · updated " + sheetLoadedAt.toTimeString().slice(0, 5), false);
   }
   // A save's reply is always used. A reload's reply is skipped if a save was sent after it started
   // or is still on its way, because the reload may have read the sheet before that save.
   var sentSeq = 0, lastSaveSeq = 0, savesInFlight = 0, appliedSaveSeq = 0;
+  // When the records last came from the sheet (null until the first load). Shown on the parent dashboard.
+  var sheetLoadedAt = null;
   var REQUEST_TIMEOUT_MS = 30000;
   function api(payload) {
     var seq = ++sentSeq;
@@ -2008,7 +2068,7 @@
 
   // ---------- sheets & overlay ----------
   function openSheet(id) { el(id).className = "sheet show"; window.scrollTo(0, 0); }
-  function closeSheets() { ["readSheet", "mathsSheet", "practiceSheet", "rewardSheet", "monSheet", "tradeSheet", "evoSheet"].forEach(function (id) { el(id).className = "sheet"; }); }
+  function closeSheets() { ["readSheet", "mathsSheet", "practiceSheet", "rewardSheet", "monSheet", "tradeSheet", "evoSheet", "pinSheet", "parentSheet"].forEach(function (id) { el(id).className = "sheet"; }); }
   Array.prototype.forEach.call(document.querySelectorAll("[data-close]"), function (b) { b.onclick = closeSheets; });
   el("openRead").onclick = function () { openSheet("readSheet"); };
   el("openMaths").onclick = function () { openSheet("mathsSheet"); };
@@ -2037,6 +2097,46 @@
     if (after.rank > before.rank) msg += "  ⭐ RANK UP! You are now a " + RANKS[after.rank] + "!";
     return msg;
   }
+
+  // ---------- parent dashboard (read only; parent.js draws it) ----------
+  // Only stops children opening it by chance: anyone who reads the page code can see it.
+  var PARENT_PIN = "4719";
+  function parentRecords(kidId) {
+    var d = state.kids[kidId], out = [];
+    function add(x, subject, amount, tried, text) {
+      var w = Parent.studyDay(loggedAt(x), x.day, START, DAY_COUNT);
+      out.push({ date: w.date, at: w.at, subject: subject, amount: amount, tried: tried, text: text });
+    }
+    d.entries.forEach(function (e) { add(e, "book", isPass(e) ? 1 : 0, 1, e.title + (noQuiz(e) ? " (no quiz)" : " " + e.score + "/" + e.total)); });
+    d.maths.forEach(function (m) { add(m, "maths", Number(m.correct) || 0, 0, ""); });
+    d.practice.forEach(function (p) { if (PRACTICES[p.type]) add(p, p.type, Number(p.correct) || 0, 0, ""); });
+    return out;
+  }
+  function parentKids() {
+    return KIDS.map(function (k) {
+      return forKid(k.id, function () {
+        var s = summary();
+        var goals = ["Books " + s.caught + " / " + target() + " (" + s.readPct + "%)" +
+          (k.maths ? " · TTRS " + s.correct + " / " + mathsTarget() + " (" + s.mathsPct + "%)" : ""), prizeNextMessage(s)];
+        return { name: k.name, subjects: ["book"].concat(k.maths ? ["maths"] : [], k.practices), records: parentRecords(k.id), goals: goals };
+      });
+    });
+  }
+  el("openParent").onclick = function () {
+    el("pinInput").value = "";
+    openSheet("pinSheet");
+    el("pinInput").focus();
+  };
+  el("pinForm").onsubmit = function (ev) {
+    ev.preventDefault();
+    if (el("pinInput").value !== PARENT_PIN) { window.alert("That number is not right."); el("pinInput").value = ""; return; }
+    if (typeof Parent === "undefined") { window.alert("The parent page could not load. Please reload and try again."); return; }
+    closeSheets();
+    var now = new Date();
+    var sync = sheetLoadedAt ? "☁ Shared · updated " + sheetLoadedAt.toTimeString().slice(0, 5) + " · opened " + now.toTimeString().slice(0, 5) : el("sync").textContent;
+    Parent.render(el("parentRoot"), parentKids(), now, sync, !!sheetLoadedAt);
+    openSheet("parentSheet");
+  };
 
   // ---------- reading ----------
   el("readForm").onsubmit = function (ev) {
