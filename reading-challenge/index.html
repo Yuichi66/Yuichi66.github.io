@@ -535,10 +535,10 @@
 </div>
 
 <!-- ?v= must change with APP_VERSION so phones fetch the new files -->
-<script src="evo-data.js?v=2026-10-28-3"></script>
-<script src="dex-data.js?v=2026-10-28-3"></script>
-<script src="growth.js?v=2026-10-28-3"></script>
-<script src="regions.js?v=2026-10-28-3"></script>
+<script src="evo-data.js?v=2026-10-28-4"></script>
+<script src="dex-data.js?v=2026-10-28-4"></script>
+<script src="growth.js?v=2026-10-28-4"></script>
+<script src="regions.js?v=2026-10-28-4"></script>
 <script>
 (function () {
   "use strict";
@@ -548,9 +548,9 @@
   var REFRESH_MS = 60000;
   // Change on every release: a page left open with older code reloads itself,
   // so every phone works out the same Pokémon.
-  var APP_VERSION = "2026-10-28-3";
+  var APP_VERSION = "2026-10-28-4";
   // Sent with every change; the sheet refuses changes from older pages (MIN_CLIENT_GEN in Code.gs).
-  var CLIENT_GEN = 5;
+  var CLIENT_GEN = 6;
   var STORAGE_KEY = "htrc-2026-autumn-v3";
   var START = new Date(2026, 9, 24);   // Sat 24 Oct 2026
   var DAY_COUNT = 9;                   // to Sun 1 Nov 2026
@@ -833,40 +833,52 @@
     if (rate(e) >= BURST_RATE) return "great";
     return "";
   }
-  function spriteUrl(dexNo) { return SPRITE_BASE + dexNo + ".png"; }
-  // Pixel sprite <img>; hides itself if the picture cannot load (offline).
-  function sprite(dexNo, cls, alt) {
+  // shiny: the shiny colours (falls back to the normal picture if there is none).
+  function spriteUrl(dexNo, shiny) { return SPRITE_BASE + (shiny ? "shiny/" : "") + dexNo + ".png"; }
+  function artUrl(dexNo, shiny) { return ART_BASE + (shiny ? "shiny/" : "") + dexNo + ".png"; }
+  // Pictures to try in turn: shiny ones first (if shiny), then the normal ones. pixelFirst: pixel sprite before artwork.
+  function pictureUrls(dexNo, shiny, pixelFirst) {
+    function pair(s) { return pixelFirst ? [spriteUrl(dexNo, s), artUrl(dexNo, s)] : [artUrl(dexNo, s), spriteUrl(dexNo, s)]; }
+    return (shiny ? pair(true) : []).concat(pair(false));
+  }
+  // Shows the first picture that loads; hides the <img> if none can load (offline), and forgets it so it is tried again.
+  // onTry(isPixel): called before each picture is tried.
+  function loadPicture(img, urls, onTry) {
+    var i = 0;
+    function tryNext() {
+      if (onTry) onTry(urls[i].indexOf("/other/") < 0);
+      img.src = urls[i];
+    }
+    img.onerror = function () {
+      i++;
+      if (i >= urls.length) { img.onerror = null; img.style.visibility = "hidden"; img.removeAttribute("data-key"); return; }
+      tryNext();
+    };
+    tryNext();
+  }
+  // Pixel sprite <img>.
+  function sprite(dexNo, cls, alt, shiny) {
     var img = document.createElement("img");
     img.className = "sprite " + (cls || "");
     img.alt = alt || "";
-    img.onerror = function () {
-      img.onerror = function () { img.style.visibility = "hidden"; };
-      img.src = ART_BASE + dexNo + ".png";
-    };
-    img.src = spriteUrl(dexNo);
+    loadPicture(img, pictureUrls(dexNo, shiny, true));
     return img;
   }
   // Large, smooth picture for the catch screen; falls back to the pixel sprite.
-  function artwork(dexNo, alt, cls) {
+  function artwork(dexNo, alt, cls, shiny) {
     var img = document.createElement("img");
     img.className = cls || "pop";
     img.alt = alt || "";
-    img.onerror = function () {
-      img.onerror = function () { img.style.visibility = "hidden"; };
-      img.className = (cls || "pop") + " sprite";
-      img.src = spriteUrl(dexNo);
-    };
-    img.src = ART_BASE + dexNo + ".png";
+    loadPicture(img, pictureUrls(dexNo, shiny, false), function (isPixel) { img.className = (cls || "pop") + (isPixel ? " sprite" : ""); });
     return img;
   }
-  function setSprite(img, dexNo, alt) {
-    img.onerror = function () {
-      img.onerror = function () { img.style.visibility = "hidden"; };
-      img.src = ART_BASE + dexNo + ".png";
-    };
-    img.style.visibility = "";
+  function setSprite(img, dexNo, alt, shiny) {
     img.alt = alt || "";
-    if (img.getAttribute("src") !== spriteUrl(dexNo)) img.src = spriteUrl(dexNo);
+    var key = dexNo + (shiny ? "s" : "");
+    if (img.getAttribute("data-key") === key) return;
+    img.setAttribute("data-key", key);
+    img.style.visibility = "";
+    loadPicture(img, pictureUrls(dexNo, shiny, true));
   }
   var SVG_NS = "http://www.w3.org/2000/svg";
   function beySvg(cls) {
@@ -1027,14 +1039,14 @@
       if (loggedAt(x) >= NEW_MONS_FROM) addNew();
       // A saved Pokémon outside the first 100 (all 1,025 can be caught now): used as it is,
       // and kept out of the old pool and families, which only pick older records again.
-      if (x.mon && monIndex(x.mon) < 0) { byId[x.id] = { no: i, mon: monEntry(x.mon), steps: 0 }; return; }
+      if (x.mon && monIndex(x.mon) < 0) { byId[x.id] = { no: i, mon: monEntry(x.mon), steps: 0, shiny: !!x.shiny }; return; }
       // The Pokémon saved with the record is used as it is, so it can never change later.
       var k = x.mon ? monIndex(x.mon) : -1;
       if (k < 0) k = loggedAt(x) >= FAMILY_RULE_FROM ? pickFrom(freshPool(owned, withNew), x.id) : pickFrom(pool, x.id);
       owned[FAMILY(MONS[k][3])] = true;
       pool = pool.filter(function (j) { return j !== k; });
       if (!pool.length) pool = allMonIndexes(withNew);
-      byId[x.id] = { no: i, mon: MONS[k], steps: 0 };
+      byId[x.id] = { no: i, mon: MONS[k], steps: 0, shiny: !!x.shiny };
     });
     if (Date.now() >= NEW_MONS_FROM) addNew();
     // `pool` is kept as it was, but it no longer decides the next catch: nextMon() picks from the open regions.
@@ -1064,10 +1076,26 @@
   function isOldEvolve(v) { return (v.kind || "old") === "old"; }
   // The next catch of the selected child: from the open regions (regions.js), chosen from the record's id
   // so every phone shows the same one.
-  function nextMon(id) {
-    var list = Regions.candidates(familiesOf(current));
-    return monEntry(list[hashOf(seedOf(id)) % list.length]);
+  // Common Pokémon come more often (PokeAPI catch rate). A big times tables game (LEGEND_MIN correct in one go)
+  // that fills the ball has a 1 in LEGEND_ODDS chance of a legendary or mythical Pokémon of the open regions.
+  var LEGEND_MIN = 100, LEGEND_ODDS = 10;
+  function nextMon(id, bigGame) {
+    var owned = familiesOf(current), seed = seedOf(id);
+    var legends = bigGame ? Regions.legends(owned) : [];
+    if (legends.length && hashOf("legend-" + seed) % LEGEND_ODDS === 0) return monEntry(legends[hashOf(seed) % legends.length]);
+    var list = Regions.candidates(owned);
+    var total = list.reduce(function (sum, d) { return sum + Regions.rate(d); }, 0);
+    var r = hashOf(seed) % total;
+    for (var i = 0; i < list.length; i++) {
+      r -= Regions.rate(list[i]);
+      if (r < 0) return monEntry(list[i]);
+    }
+    return monEntry(list[list.length - 1]);
   }
+  function isBigGame(item) { return item.type === "maths" && item.correct >= LEGEND_MIN; }
+  // Shiny: 1 in SHINY_ODDS, or 1 in SHINY_ODDS_MATHS when times tables filled the ball. Saved with the record.
+  var SHINY_ODDS = 50, SHINY_ODDS_MATHS = 20;
+  function isShiny(item) { return hashOf("shiny-" + seedOf(item.id)) % (item.type === "maths" ? SHINY_ODDS_MATHS : SHINY_ODDS) === 0; }
   // [name, type, colour, dex] like MONS, for any of the 1,025 (first type and its colour).
   var TYPE_COLOURS = (function () { var c = {}; MONS.forEach(function (m) { c[m[1]] = m[2]; }); return c; })();
   function monEntry(dex) {
@@ -1242,8 +1270,8 @@
     var partner = partnerOf(current, w);
     var partnerDex = partner ? partner.c.dex : EVOLUTION_IDS[stage];
     var partnerName = partner ? partner.c.name : EVOLUTION[stage];
-    setSprite(el("partner"), partnerDex, partnerName);
-    el("trainerName").textContent = "Trainer " + kid().name + " & " + partnerName;
+    setSprite(el("partner"), partnerDex, partnerName, partner && partner.c.shiny);
+    el("trainerName").textContent = "Trainer " + kid().name + " & " + (partner && partner.c.shiny ? "✨" : "") + partnerName;
     renderGrow(partner, !!chosenPartnerId(current, w));
     el("rank").textContent = "Rank " + (s.rank + 1) + " " + RANKS[s.rank];
     el("rankMsg").textContent = rankNextMessage(s);
@@ -1519,7 +1547,7 @@
     return { id: newId(), kid: kidId, type: "trade", day: day, source: source, give: pair.give.id, get: pair.get.id, with: pair.get.owner, ticket: 0 };
   }
   function tradeInfo(pair, kidId) {
-    return { trade: { give: [pair.give.c.name, pair.give.c.dex], get: [pair.get.c.name, pair.get.c.dex], with: kidName(pair.get.owner), getId: pair.get.id, kid: kidId } };
+    return { trade: { give: [pair.give.c.name, pair.give.c.dex], get: [pair.get.c.name, pair.get.c.dex], with: kidName(pair.get.owner), getId: pair.get.id, kid: kidId, shiny: pair.get.c.shiny } };
   }
 
   // One Pokémon as a tile (box, trade lists).
@@ -1535,8 +1563,8 @@
     b.appendChild(make("span", "no", "#" + (m.no + 1)));
     if (isPartner) b.appendChild(make("span", "star", "⭐"));
     if (m.ready.length) b.appendChild(make("span", "up", "⬆"));
-    b.appendChild(artwork(c.dex, c.name, "box-art"));
-    b.appendChild(make("span", "name", c.name));
+    b.appendChild(artwork(c.dex, c.name, "box-art", c.shiny));
+    b.appendChild(make("span", "name", (c.shiny ? "✨" : "") + c.name));
     b.appendChild(make("span", "lv", "Lv." + m.level));
     b.onclick = onclick;
     return b;
@@ -1600,12 +1628,12 @@
     if (!m) { el("monSheet").className = "sheet"; openMonId = null; return false; }
     var c = m.c;
     var art = el("mdArt");
-    if (art.getAttribute("data-dex") !== String(c.dex)) {
+    if (art.getAttribute("data-dex") !== c.dex + (c.shiny ? "s" : "")) {
       art.innerHTML = "";
-      art.appendChild(artwork(c.dex, c.name, "md-art"));
-      art.setAttribute("data-dex", c.dex);
+      art.appendChild(artwork(c.dex, c.name, "md-art", c.shiny));
+      art.setAttribute("data-dex", c.dex + (c.shiny ? "s" : ""));
     }
-    el("mdName").textContent = "#" + (m.no + 1) + " " + c.name + " Lv." + m.level;
+    el("mdName").textContent = "#" + (m.no + 1) + " " + (c.shiny ? "✨ Shiny " : "") + c.name + " Lv." + m.level;
     var typeBox = el("mdType");
     typeBox.innerHTML = "";
     var type = make("span", "md-type", c.mon[1]);
@@ -1643,9 +1671,9 @@
     var done = m.evos;
     done.forEach(function (e) {
       var row = make("div", "md-line");
-      row.appendChild(sprite(e.from[1], "", e.from[0]));
+      row.appendChild(sprite(e.from[1], "", e.from[0], c.shiny));
       row.appendChild(document.createTextNode(e.from[0] + " → "));
-      row.appendChild(sprite(e.to[1], "", e.to[0]));
+      row.appendChild(sprite(e.to[1], "", e.to[0], c.shiny));
       row.appendChild(document.createTextNode(e.to[0]));
       var v = e.v, src = v.source && recordOf(v.source);
       var how = v.kind === "level" ? "⬆ Level up" : v.kind === "stone" ? "💎 Mega Stone" : src ? recordText(src) : "";
@@ -1702,8 +1730,8 @@
   function fillSide(node, m, label) {
     node.innerHTML = "";
     node.appendChild(make("div", "", label));
-    node.appendChild(artwork(m.c.dex, m.c.name, "tr-art"));
-    node.appendChild(make("div", "", m.c.name));
+    node.appendChild(artwork(m.c.dex, m.c.name, "tr-art", m.c.shiny));
+    node.appendChild(make("div", "", (m.c.shiny ? "✨" : "") + m.c.name));
   }
   function endTrade() {
     var t = tr;
@@ -1921,8 +1949,8 @@
   // Saves a child's rank when it is higher than any rank saved before (the first time: where tickets start).
   var peakSent = {};
   function savePeaks() {
-    // Needs the sheet code that starts Mega Stones (gen 3), or the first rank-up after the update gives no stone.
-    if (!API_URL || !(state.serverGen >= 5)) return;
+    // Needs the current sheet code (gen 6; Mega Stones start from gen 3), or the first rank-up after an update gives no stone.
+    if (!API_URL || !(state.serverGen >= 6)) return;
     KIDS.forEach(function (k) {
       var rank = forKid(k.id, function () { return summary().rank; });
       var saved = state.settings.peaks[k.id];
@@ -1955,8 +1983,8 @@
       done(true);
       return;
     }
-    // Until the sheet code knows levels (gen 3), nothing is saved: an older sheet would store it wrongly.
-    if (!(state.serverGen >= 5)) {
+    // Until the sheet code is the current one (gen 6), nothing is saved: an older sheet would store it wrongly.
+    if (!(state.serverGen >= 6)) {
       window.alert(state.serverGen ? "Updating... please try again in a minute." : "Loading... please check the internet and try again in a moment.");
       refresh();
       done(false, true);
@@ -2073,7 +2101,10 @@
   function saveRecord(item, listName, ev, button, done, evo, wins) {
     var who = item.kid;
     // A record that catches saves its Pokémon now, so no later change can turn it into another one.
-    if (wins && !ev) item.mon = forKid(who, function () { return nextMon(item.id)[3]; });
+    if (wins && !ev) {
+      item.mon = forKid(who, function () { return nextMon(item.id, isBigGame(item))[3]; });
+      item.shiny = isShiny(item) ? 1 : 0;
+    }
     // The partner now gets this record's experience (saved with the record, so it never moves).
     // A resend after "Not saved" keeps the first try's partner (the sheet may already have it).
     var w = world();
@@ -2154,15 +2185,15 @@
   function celebrateEvolve(evo, mid) {
     if (evo.trade) { celebrateTrade(evo.trade, mid); return; }
     var from = evo.from, to = evo.to;
-    var old = artwork(from[1], from[0]);
+    var old = artwork(from[1], from[0], undefined, evo.shiny);
     old.className = "pop evolving";
     show(old, "What? " + from[0] + " is evolving!", mid || "");
     setTimeout(function () {
       var art = el("ovArt");
       if (!art.contains(old)) return;
       art.innerHTML = "";
-      art.appendChild(artwork(to[1], to[0]));
-      el("ovBig").textContent = "Congratulations! " + from[0] + " evolved into " + to[0] + "!";
+      art.appendChild(artwork(to[1], to[0], undefined, evo.shiny));
+      el("ovBig").textContent = "Congratulations! " + from[0] + " evolved into " + (evo.shiny ? "✨" : "") + to[0] + "!";
     }, EVOLVE_MS);
   }
 
@@ -2181,9 +2212,9 @@
       var b = make("button", "evo-choice");
       b.type = "button";
       var pair = make("div", "pair");
-      pair.appendChild(sprite(m.c.dex, "", m.c.name));
+      pair.appendChild(sprite(m.c.dex, "", m.c.name, m.c.shiny));
       pair.appendChild(make("span", "arrow", "➜"));
-      pair.appendChild(sprite(o.to, "", o.name));
+      pair.appendChild(sprite(o.to, "", o.name, m.c.shiny));
       b.appendChild(pair);
       b.appendChild(make("div", "", (options.length > 1 ? "" : "✨ ") + m.c.name + " ➜ " + o.name));
       b.onclick = function () { saveEvolve(m, kind, o, b); };
@@ -2199,7 +2230,7 @@
     if (kind === "level") ev.id = "lv-" + m.id + "-" + m.c.dex;
     else if (stoneTry && stoneTry.target === m.id && stoneTry.from === m.c.dex && stoneTry.to === o.to) ev = stoneTry;
     else { ev.id = newId(); ev.stone = stonesUsed(who) + 1; }
-    var evo = { from: [m.c.name, m.c.dex], to: [o.name, o.to] };
+    var evo = { from: [m.c.name, m.c.dex], to: [o.name, o.to], shiny: m.c.shiny };
     button.disabled = true;
     commit({ action: "evolve", evolve: ev }, function () {
       if (state.kids[who].evolves.some(function (v) { return v.id === ev.id; })) return;
@@ -2220,7 +2251,7 @@
       show(null, "The trade did not happen", "The boxes changed. Your Pokémon are safe. Please try again.");
       return;
     }
-    show(artwork(t.get[1], t.get[0]), "Trade complete! You got " + t.get[0] + "!",
+    show(artwork(t.get[1], t.get[0], undefined, t.shiny), "Trade complete! You got " + (t.shiny ? "✨ " : "") + t.get[0] + "!",
       "You sent " + t.give[0] + " to " + t.with + "." + (mid ? "  " + mid : ""));
   }
 
@@ -2229,12 +2260,14 @@
     var ball = make("div", "ball huge " + ballCls);
     var c = catches().byId[item.id];
     var mon = c ? c.mon : MONS[0];
-    show(ball, bigPrefix + "Gotcha! " + mon[0] + " was caught!", mid);
+    var shiny = !!(c && c.shiny);
+    var legend = DEX_DATA[mon[3]] && DEX_DATA[mon[3]][5];
+    show(ball, bigPrefix + "Gotcha! " + (shiny ? "✨ A SHINY " : legend ? "🌟 The legendary " : "") + mon[0] + " was caught!", mid);
     setTimeout(function () {
       var art = el("ovArt");
       if (!art.contains(ball)) return;
       art.innerHTML = "";
-      art.appendChild(artwork(mon[3], mon[0]));
+      art.appendChild(artwork(mon[3], mon[0], undefined, shiny));
     }, CATCH_WOBBLE_MS);
   }
 

@@ -61,9 +61,19 @@ var Regions = (function () {
     var fresh = pickable(true);
     return fresh.length ? fresh : pickable(false);
   }
+  // Legendary and mythical Pokémon of the open regions that start their family, and whose family the child does not have.
+  function legends(owned) {
+    var open = progress(owned).open;
+    return Object.keys(DEX).map(Number).filter(function (d) {
+      var x = DEX[d];
+      return x[5] && x[4] === 0 && x[3] < open && !owned[x[2]];
+    }).sort(function (a, b) { return a - b; });
+  }
+  // How common a species is (PokeAPI catch rate: 3 rare ... 255 common).
+  function rate(dex) { return DEX[dex] ? DEX[dex][6] || 1 : 1; }
   // [name, type, dex] of a species, for Pokémon that are not in the first 100.
   function info(dex) { var d = DEX[dex]; return d ? [d[0], d[1], dex] : null; }
 
-  return { NAMES: NAMES, familyOf: familyOf, progress: progress, toOpen: toOpen, candidates: candidates, info: info };
+  return { NAMES: NAMES, familyOf: familyOf, progress: progress, toOpen: toOpen, candidates: candidates, legends: legends, rate: rate, info: info };
 })();
 if (typeof module !== "undefined") module.exports = Regions;

@@ -25,14 +25,16 @@ var READ_SITES = ["ReadnQuiz", "Free Book Quiz", "School AR", "No quiz"];
 var MATHS_SITE = "Times Tables Rock Stars";
 // "mon": national dex number of the Pokémon a record caught, saved once so it can never change later.
 // "partner": the Pokémon (id of the record that caught it) that got the experience of a study record.
-var ENTRY_HEADERS = ["id", "kid", "type", "day", "title", "site", "score", "total", "correct", "createdAt", "mon", "partner"];
+// "shiny": 1 when the Pokémon a record caught is shiny (saved once, like "mon").
+var ENTRY_HEADERS = ["id", "kid", "type", "day", "title", "site", "score", "total", "correct", "createdAt", "mon", "partner", "shiny"];
 var MON_COL = 11;
 var PARTNER_COL = 12;
+var SHINY_COL = 13;
 var MAX_ID = 40;
 // Pages older than this may work out Pokémon differently, so their changes are refused.
-var MIN_CLIENT_GEN = 5;
-// Tells pages that this sheet code knows trades (2) and levels, level-up evolutions and Mega Stones (3), the Poké Ball meter (4), all 1,025 Pokémon and regions (5).
-var SERVER_GEN = 5;
+var MIN_CLIENT_GEN = 6;
+// Tells pages that this sheet code knows trades (2) and levels, level-up evolutions and Mega Stones (3), the Poké Ball meter (4), all 1,025 Pokémon and regions (5), shiny Pokémon (6).
+var SERVER_GEN = 6;
 // Evolutions from a level or a Mega Stone: "title" holds this word instead of the record that paid for it.
 var GROWTH_KINDS = ["level", "stone"];
 
@@ -70,6 +72,7 @@ function snapshot_() {
     if (base.type === "maths" || PRACTICE_SITES.hasOwnProperty(base.type)) {
       base.correct = Number(r[8]);
       base.partner = String(r[PARTNER_COL - 1] || "");
+      base.shiny = r[SHINY_COL - 1] === 1 || r[SHINY_COL - 1] === "1" ? 1 : 0;
     }
     else if (base.type === "evolve") {
       var kind = String(r[4]);
@@ -95,6 +98,7 @@ function snapshot_() {
       base.score = Number(r[6]);
       base.total = Number(r[7]);
       base.partner = String(r[PARTNER_COL - 1] || "");
+      base.shiny = r[SHINY_COL - 1] === 1 || r[SHINY_COL - 1] === "1" ? 1 : 0;
     }
     return base;
   });
@@ -128,6 +132,8 @@ function checkPartner_(x) {
   if (partner.length > MAX_ID || owners_()[partner] !== String(x.kid)) throw new Error(NOT_POSSIBLE);
 }
 function partnerOf_(x) { return String(x.partner || "").slice(0, MAX_ID); }
+// Only a record that caught a Pokémon can be shiny.
+function shinyOf_(x) { return x.shiny === 1 && monOf_(x) !== "" ? 1 : ""; }
 
 function isGrowthRow_(r) { return r[2] === "evolve" && GROWTH_KINDS.indexOf(String(r[4])) >= 0; }
 
@@ -259,7 +265,7 @@ function addEntry_(x) {
     var correct = Number(x.correct);
     if (!KIDS[kid].maths) throw new Error("No maths for this kid");
     if (!isInt_(correct) || correct < 0 || correct > MAX_CORRECT) throw new Error("Bad correct answers");
-    entriesSheet_().appendRow([id, kid, "maths", day, "", MATHS_SITE, "", "", correct, new Date(), monOf_(x), partnerOf_(x)]);
+    entriesSheet_().appendRow([id, kid, "maths", day, "", MATHS_SITE, "", "", correct, new Date(), monOf_(x), partnerOf_(x), shinyOf_(x)]);
     return;
   }
 
@@ -267,7 +273,7 @@ function addEntry_(x) {
     var n = Number(x.correct);
     if (KIDS[kid].practices.indexOf(x.type) < 0) throw new Error("No " + PRACTICE_SITES[x.type] + " for this kid");
     if (!isInt_(n) || n < 0 || n > MAX_CORRECT) throw new Error("Bad correct answers");
-    entriesSheet_().appendRow([id, kid, x.type, day, "", PRACTICE_SITES[x.type], "", "", n, new Date(), monOf_(x), partnerOf_(x)]);
+    entriesSheet_().appendRow([id, kid, x.type, day, "", PRACTICE_SITES[x.type], "", "", n, new Date(), monOf_(x), partnerOf_(x), shinyOf_(x)]);
     return;
   }
 
@@ -289,7 +295,7 @@ function addEntry_(x) {
   if (!title || title.length > MAX_TITLE) throw new Error("Bad title");
   if (!isInt_(total) || total < 1 || total > MAX_SCORE) throw new Error("Bad total");
   if (!isInt_(score) || score < 0 || score > total) throw new Error("Bad score");
-  entriesSheet_().appendRow([id, kid, "read", day, asText_(title), site, score, total, "", new Date(), monOf_(x), partnerOf_(x)]);
+  entriesSheet_().appendRow([id, kid, "read", day, asText_(title), site, score, total, "", new Date(), monOf_(x), partnerOf_(x), shinyOf_(x)]);
 }
 
 function rowOf_(id) {
