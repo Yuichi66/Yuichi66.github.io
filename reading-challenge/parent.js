@@ -7,7 +7,8 @@ var Parent = (function () {
     book: { name: "Books", unit: "books", color: "#eda100" },
     maths: { name: "TTRS", unit: "correct", color: "#2a78d6" },
     latin: { name: "Latin", unit: "correct", color: "#eb6834" },
-    mymaths: { name: "MyMaths", unit: "correct", color: "#1baf7a" }
+    mymaths: { name: "MyMaths", unit: "correct", color: "#1baf7a" },
+    french: { name: "French", unit: "correct", color: "#e87ba4" }
   };
   var CHART_DAYS = 14;
   var WEEK_DAYS = 7;

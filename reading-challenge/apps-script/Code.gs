@@ -6,12 +6,16 @@
  */
 
 var KIDS = {
-  taiga: { maths: true, target: 7, mathsTarget: 2500, practices: [] },
-  leo: { maths: true, target: 7, mathsTarget: 2500, practices: [] },
-  yudai: { maths: false, target: 10, mathsTarget: 0, practices: ["latin", "mymaths"] }
+  taiga: { maths: true, target: 7, mathsTarget: 2500, practices: [], practiceGoals: {} },
+  leo: { maths: true, target: 7, mathsTarget: 2500, practices: [], practiceGoals: {} },
+  yudai: { maths: false, target: 10, mathsTarget: 0, practices: ["latin", "mymaths", "french"],
+    practiceGoals: { latin: 10000, mymaths: 1500, french: 5000 } }
 };
 // Extra practice types and the name stored in the "site" column.
-var PRACTICE_SITES = { latin: "Latin", mymaths: "MyMaths" };
+var PRACTICE_SITES = { latin: "Latin", mymaths: "MyMaths", french: "French" };
+// Practice goals (correct answers), saved as "<kid>.<type>Goal". Only shown as progress, not used for prizes.
+var MIN_PRACTICE_GOAL = 10;
+var MAX_PRACTICE_GOAL = 100000;
 var DAY_COUNT = 9;
 var MAX_TITLE = 120;
 var MAX_SCORE = 50;
@@ -32,9 +36,9 @@ var PARTNER_COL = 12;
 var SHINY_COL = 13;
 var MAX_ID = 40;
 // Pages older than this may work out Pokémon differently, so their changes are refused.
-var MIN_CLIENT_GEN = 6;
+var MIN_CLIENT_GEN = 7;
 // Tells pages that this sheet code knows trades (2) and levels, level-up evolutions and Mega Stones (3), the Poké Ball meter (4), all 1,025 Pokémon and regions (5), shiny Pokémon (6).
-var SERVER_GEN = 6;
+var SERVER_GEN = 7;
 // Evolutions from a level or a Mega Stone: "title" holds this word instead of the record that paid for it.
 var GROWTH_KINDS = ["level", "stone"];
 
@@ -344,8 +348,17 @@ function saveSettings_(kid, s) {
   var mathsTarget = KIDS[kid].maths ? Number(s.mathsTarget) : 0;
   if (!isInt_(target) || target < 1 || target > MAX_TARGET) throw new Error("Bad target");
   if (KIDS[kid].maths && (!isInt_(mathsTarget) || mathsTarget < MIN_MATHS_TARGET || mathsTarget > MAX_MATHS_TARGET)) throw new Error("Bad maths target");
+  var goals = s.practiceGoals || {};
+  KIDS[kid].practices.forEach(function (type) {
+    if (goals[type] === undefined) return;
+    var n = Number(goals[type]);
+    if (!isInt_(n) || n < MIN_PRACTICE_GOAL || n > MAX_PRACTICE_GOAL) throw new Error("Bad " + PRACTICE_SITES[type] + " goal");
+  });
   setSetting_(kid + ".target", target);
   setSetting_(kid + ".mathsTarget", mathsTarget);
+  KIDS[kid].practices.forEach(function (type) {
+    if (goals[type] !== undefined) setSetting_(kid + "." + type + "Goal", Number(goals[type]));
+  });
 }
 
 // Highest trainer rank reached. The first one saved is also where trade tickets start.
@@ -369,15 +382,22 @@ function savePartner_(kid, partnerId) {
 function readSettings_() {
   var out = {};
   Object.keys(KIDS).forEach(function (k) {
-    out[k] = { target: KIDS[k].target, mathsTarget: KIDS[k].mathsTarget, partnerId: "", ticketBase: "", peak: "", stoneBase: "" };
+    var goals = {};
+    KIDS[k].practices.forEach(function (type) { goals[type] = KIDS[k].practiceGoals[type]; });
+    out[k] = { target: KIDS[k].target, mathsTarget: KIDS[k].mathsTarget, practiceGoals: goals, partnerId: "", ticketBase: "", peak: "", stoneBase: "" };
   });
   settingsSheet_().getDataRange().getValues().slice(1).forEach(function (r) {
     var parts = String(r[0]).split(".");
-    if (!out[parts[0]] || r[1] === "") return;
+    if (!out.hasOwnProperty(parts[0]) || r[1] === "") return;
     if (["target", "mathsTarget", "ticketBase", "peak", "stoneBase"].indexOf(parts[1]) >= 0 && isInt_(Number(r[1]))) {
       out[parts[0]][parts[1]] = Number(r[1]);
     }
     if (parts[1] === "partnerId") out[parts[0]].partnerId = String(r[1]).slice(0, MAX_ID);
+    var type = /^(\w+)Goal$/.exec(parts[1]);
+    var n = Number(r[1]);
+    if (type && KIDS[parts[0]].practices.indexOf(type[1]) >= 0 && isInt_(n) && n >= MIN_PRACTICE_GOAL && n <= MAX_PRACTICE_GOAL) {
+      out[parts[0]].practiceGoals[type[1]] = n;
+    }
   });
   return out;
 }

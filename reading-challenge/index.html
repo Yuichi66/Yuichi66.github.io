@@ -102,6 +102,7 @@
   .mission.maths { background: linear-gradient(135deg, var(--purple), var(--blue)); }
   .mission.latin { background: linear-gradient(135deg, #2fb36d, #1f7a4a); }
   .mission.mymaths { background: linear-gradient(135deg, #f08c00, #c25e00); }
+  .mission.french { background: linear-gradient(135deg, #2a75bb, #1b4f8a); }
   .missions.three .mission.read { grid-column: 1 / -1; }
   .today-done { margin-top: 10px; font-size: 14px; text-align: center; }
 
@@ -112,6 +113,9 @@
   .bar > div { height: 100%; width: 0; transition: width .8s; }
   .bar.read > div { background: linear-gradient(90deg, var(--red), #ff8a65); }
   .bar.maths > div { background: linear-gradient(90deg, var(--blue), var(--cyan)); }
+  .bar.latin > div { background: linear-gradient(90deg, #1f7a4a, var(--green)); }
+  .bar.mymaths > div { background: linear-gradient(90deg, #c25e00, #f08c00); }
+  .bar.french > div { background: linear-gradient(90deg, #1b4f8a, var(--cyan)); }
   .bar .tick { position: absolute; top: 0; bottom: 0; width: 3px; background: rgba(255,255,255,.85); }
   .bar .tick span { position: absolute; top: 2px; left: 5px; font-size: 11px; color: #fff; font-weight: bold; white-space: nowrap; }
 
@@ -342,6 +346,9 @@
       <button class="mission mymaths hidden" type="button" id="open-mymaths">
         <div class="icon">🧮</div><b>MyMaths</b><small>Practise, then tap here</small>
       </button>
+      <button class="mission french hidden" type="button" id="open-french">
+        <div class="icon">🇫🇷</div><b>French</b><small>Memrise, then tap here</small>
+      </button>
     </div>
     <div class="today-done" id="todayDone"></div>
   </section>
@@ -362,6 +369,7 @@
       <div class="goal-label"><span>🎸 Times tables correct</span><span id="mathsText"></span></div>
       <div class="bar maths" id="mathsBar"><div></div></div>
     </div>
+    <div id="practiceGoals"></div>
     <div class="ladder" id="ladder"></div>
     <div class="next" id="nextMsg"></div>
     <div class="rank-next" id="rankMsg"></div>
@@ -390,7 +398,7 @@
         <div class="dex" id="mathsLog"></div>
       </div>
       <div id="practiceLogWrap">
-        <div class="sub-h">Latin &amp; MyMaths log</div>
+        <div class="sub-h">Latin, MyMaths &amp; French log</div>
         <div class="dex" id="practiceLog"></div>
       </div>
     </details>
@@ -409,6 +417,7 @@
           <input id="sMaths" type="number" min="10" max="20000">
         </div>
       </div>
+      <div class="row" id="sPracticeRow"></div>
       <button class="btn small blue" id="saveSettings" type="button">Save</button>
       <span id="saved" style="margin-left:8px"></span>
     </div>
@@ -501,7 +510,7 @@
   </form>
 </div>
 
-<!-- Latin / MyMaths steps -->
+<!-- Latin / MyMaths / French steps -->
 <div class="sheet" id="practiceSheet">
   <form class="sheet-card" id="practiceForm" autocomplete="off">
     <h3 id="pTitle"></h3>
@@ -591,11 +600,11 @@
 </div>
 
 <!-- ?v= must change with APP_VERSION so phones fetch the new files -->
-<script src="evo-data.js?v=2026-10-28-6"></script>
-<script src="dex-data.js?v=2026-10-28-6"></script>
-<script src="growth.js?v=2026-10-28-6"></script>
-<script src="regions.js?v=2026-10-28-6"></script>
-<script src="parent.js?v=2026-10-28-6"></script>
+<script src="evo-data.js?v=2026-10-28-7"></script>
+<script src="dex-data.js?v=2026-10-28-7"></script>
+<script src="growth.js?v=2026-10-28-7"></script>
+<script src="regions.js?v=2026-10-28-7"></script>
+<script src="parent.js?v=2026-10-28-7"></script>
 <script>
 (function () {
   "use strict";
@@ -605,9 +614,9 @@
   var REFRESH_MS = 60000;
   // Change on every release: a page left open with older code reloads itself,
   // so every phone works out the same Pokémon.
-  var APP_VERSION = "2026-10-28-6";
+  var APP_VERSION = "2026-10-28-7";
   // Sent with every change; the sheet refuses changes from older pages (MIN_CLIENT_GEN in Code.gs).
-  var CLIENT_GEN = 6;
+  var CLIENT_GEN = 7;
   var STORAGE_KEY = "htrc-2026-autumn-v3";
   var START = new Date(2026, 9, 24);   // Sat 24 Oct 2026
   var DAY_COUNT = 9;                   // to Sun 1 Nov 2026
@@ -622,17 +631,21 @@
   var RNQ_LOGIN_URL = "https://readnquiz.com/home.aspx?id=50285";
   var RNQ_FIND_URL = "https://readnquiz.com/quiz/find.aspx?xid=50285";
   var KIDS = [
-    { id: "taiga", name: "TAIGA", maths: true, target: 7, mathsTarget: 2500, ks: "KS2", practices: [] },
-    { id: "leo", name: "LEO", maths: true, target: 7, mathsTarget: 2500, ks: "KS2", practices: [] },
-    { id: "yudai", name: "YUDAI", maths: false, target: 10, mathsTarget: 0, ks: "KS3", practices: ["latin", "mymaths"] }
+    { id: "taiga", name: "TAIGA", maths: true, target: 7, mathsTarget: 2500, ks: "KS2", practices: [], practiceGoals: {} },
+    { id: "leo", name: "LEO", maths: true, target: 7, mathsTarget: 2500, ks: "KS2", practices: [], practiceGoals: {} },
+    { id: "yudai", name: "YUDAI", maths: false, target: 10, mathsTarget: 0, ks: "KS3", practices: ["latin", "mymaths", "french"],
+      practiceGoals: { latin: 10000, mymaths: 1500, french: 5000 } }
   ];
   // Extra practice. Before PACE_FROM a session with at least `min` correct answers caught a Pokémon;
-  // now it fills the Poké Ball. It does not count towards the prize.
+  // now it fills the Poké Ball. It does not count towards the prize; its goal (practiceGoals) is only shown as a bar.
   // Sessions logged before PRACTICE_RULE_FROM keep `oldMin`, so nothing already caught changes.
   var PRACTICES = {
     latin: { name: "Latin", icon: "🏛️", min: 150, oldMin: 50 },
-    mymaths: { name: "MyMaths", icon: "🧮", min: 100 }
+    mymaths: { name: "MyMaths", icon: "🧮", min: 100 },
+    french: { name: "French", icon: "🇫🇷", min: 150 }
   };
+  // Allowed practice goals (correct answers), the same as MIN/MAX_PRACTICE_GOAL in Code.gs.
+  var PRACTICE_GOAL_MIN = 10, PRACTICE_GOAL_MAX = 100000;
   var PRACTICE_RULE_FROM = 1792947578805;
   // Prize tiers: share of the goal needed, ball, reward.
   var TIERS = [
@@ -827,10 +840,11 @@
 
   // ---------- local cache (works even when storage is blocked) ----------
   function emptyState() {
-    var s = { settings: { targets: {}, mathsTargets: {}, partnerIds: {}, ticketBase: {}, peaks: {}, stoneBase: {} }, kids: {}, serverGen: 0 };
+    var s = { settings: { targets: {}, mathsTargets: {}, practiceGoals: {}, partnerIds: {}, ticketBase: {}, peaks: {}, stoneBase: {} }, kids: {}, serverGen: 0 };
     KIDS.forEach(function (k) {
       s.settings.targets[k.id] = k.target;
       s.settings.mathsTargets[k.id] = k.mathsTarget;
+      s.settings.practiceGoals[k.id] = goalsFrom(k.practiceGoals, k);
       s.settings.partnerIds[k.id] = "";
       s.kids[k.id] = { entries: [], maths: [], practice: [], evolves: [], trades: [] };
     });
@@ -850,10 +864,20 @@
           if (parsed.settings.targets[k.id]) base.settings.targets[k.id] = parsed.settings.targets[k.id];
           if (parsed.settings.mathsTargets[k.id]) base.settings.mathsTargets[k.id] = parsed.settings.mathsTargets[k.id];
           if (parsed.settings.partnerIds && parsed.settings.partnerIds[k.id]) base.settings.partnerIds[k.id] = parsed.settings.partnerIds[k.id];
+          if (parsed.settings.practiceGoals && parsed.settings.practiceGoals[k.id]) base.settings.practiceGoals[k.id] = goalsFrom(parsed.settings.practiceGoals[k.id], k);
         });
       }
     } catch (e) { /* storage unavailable: start fresh */ }
     return base;
+  }
+  // A child's practice goals: the code's ones, replaced by any allowed value in src (from the sheet or the cache).
+  function goalsFrom(src, k) {
+    var out = {};
+    k.practices.forEach(function (type) {
+      var n = Number(src && src[type]);
+      out[type] = isFinite(n) && n % 1 === 0 && n >= PRACTICE_GOAL_MIN && n <= PRACTICE_GOAL_MAX ? n : k.practiceGoals[type];
+    });
+    return out;
   }
   function save() {
     try { window.localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); }
@@ -1271,6 +1295,30 @@
     el("todayDone").textContent = msg;
   }
 
+  // Correct answers so far for each of this child's practices, against its goal: [{ type, cfg, done, goal, pct }].
+  function practiceProgress() {
+    return kid().practices.map(function (type) {
+      var done = data().practice.filter(function (p) { return p.type === type; }).reduce(function (s, p) { return s + (Number(p.correct) || 0); }, 0);
+      var goal = state.settings.practiceGoals[current][type];
+      return { type: type, cfg: PRACTICES[type], done: done, goal: goal, pct: Math.floor(done / goal * 100) };
+    });
+  }
+  // One bar per practice (full at 100%). Only shows progress: the prize still comes from books.
+  function renderPracticeGoals() {
+    var box = el("practiceGoals");
+    box.innerHTML = "";
+    practiceProgress().forEach(function (x) {
+      var g = make("div", "goal");
+      var label = make("div", "goal-label");
+      label.appendChild(make("span", "", x.cfg.icon + " " + x.cfg.name + " correct"));
+      label.appendChild(make("span", "", x.done + " / " + x.goal + " (" + x.pct + "%)"));
+      g.appendChild(label);
+      var bar = make("div", "bar " + x.type);
+      bar.appendChild(make("div")).style.width = Math.min(100, x.pct) + "%";
+      g.appendChild(bar);
+      box.appendChild(g);
+    });
+  }
   function fillBar(barId, value, goal) {
     var bar = el(barId);
     var maxPct = TIERS[TIERS.length - 1].pct;
@@ -1357,6 +1405,8 @@
       el("mathsText").textContent = s.correct + " / " + mathsTarget() + " (" + s.mathsPct + "%)";
       fillBar("mathsBar", s.correct, mathsTarget());
     }
+
+    renderPracticeGoals();
 
     var ladder = el("ladder");
     ladder.innerHTML = "";
@@ -1446,7 +1496,7 @@
     el("practiceLogWrap").className = kid().practices.length ? "" : "hidden";
     var plog = el("practiceLog");
     plog.innerHTML = "";
-    if (!data().practice.length) plog.appendChild(make("div", "empty-dex", "No Latin or MyMaths yet."));
+    if (!data().practice.length) plog.appendChild(make("div", "empty-dex", "No Latin, MyMaths or French yet."));
     data().practice.forEach(function (p) {
       var cfg = PRACTICES[p.type] || { name: p.type, icon: "" };
       var card = make("div", "entry");
@@ -1893,6 +1943,30 @@
     el("sTarget").value = target();
     el("sMaths").value = mathsTarget();
     el("sMathsField").className = "field" + (kid().maths ? "" : " hidden");
+    var row = el("sPracticeRow");
+    if (row.getAttribute("data-kid") === current) {
+      kid().practices.forEach(function (type) {
+        var input = el("sGoal-" + type);
+        if (input !== document.activeElement) input.value = state.settings.practiceGoals[current][type];
+      });
+      return;
+    }
+    row.setAttribute("data-kid", current);
+    row.innerHTML = "";
+    kid().practices.forEach(function (type) {
+      var f = make("div", "field");
+      var lab = make("label", "", PRACTICES[type].name + " goal");
+      lab.setAttribute("for", "sGoal-" + type);
+      var input = make("input");
+      input.id = "sGoal-" + type;
+      input.type = "number";
+      input.min = PRACTICE_GOAL_MIN;
+      input.max = PRACTICE_GOAL_MAX;
+      input.value = state.settings.practiceGoals[current][type];
+      f.appendChild(lab);
+      f.appendChild(input);
+      row.appendChild(f);
+    });
   }
 
   function render() {
@@ -1919,6 +1993,7 @@
       var st = res.settings[k.id] || {};
       if (st.target) next.settings.targets[k.id] = st.target;
       if (st.mathsTarget) next.settings.mathsTargets[k.id] = st.mathsTarget;
+      next.settings.practiceGoals[k.id] = goalsFrom(st.practiceGoals, k);
       if (st.partnerId) next.settings.partnerIds[k.id] = st.partnerId;
       if (st.ticketBase !== undefined && st.ticketBase !== "") next.settings.ticketBase[k.id] = st.ticketBase;
       if (st.stoneBase !== undefined && st.stoneBase !== "") next.settings.stoneBase[k.id] = st.stoneBase;
@@ -2013,8 +2088,8 @@
   // Saves a child's rank when it is higher than any rank saved before (the first time: where tickets start).
   var peakSent = {};
   function savePeaks() {
-    // Needs the current sheet code (gen 6; Mega Stones start from gen 3), or the first rank-up after an update gives no stone.
-    if (!API_URL || !(state.serverGen >= 6)) return;
+    // Needs the current sheet code (gen 7; Mega Stones start from gen 3), or the first rank-up after an update gives no stone.
+    if (!API_URL || !(state.serverGen >= CLIENT_GEN)) return;
     KIDS.forEach(function (k) {
       var rank = forKid(k.id, function () { return summary().rank; });
       var saved = state.settings.peaks[k.id];
@@ -2047,8 +2122,9 @@
       done(true);
       return;
     }
-    // Until the sheet code is the current one (gen 6), nothing is saved: an older sheet would store it wrongly.
-    if (!(state.serverGen >= 6)) {
+    // Until the sheet code is the current one (gen 7), nothing is saved: an older sheet would store it wrongly
+    // (a gen 6 sheet files French as a book).
+    if (!(state.serverGen >= CLIENT_GEN)) {
       window.alert(state.serverGen ? "Updating... please try again in a minute." : "Loading... please check the internet and try again in a moment.");
       refresh();
       done(false, true);
@@ -2118,6 +2194,8 @@
         var s = summary();
         var goals = ["Books " + s.caught + " / " + target() + " (" + s.readPct + "%)" +
           (k.maths ? " · TTRS " + s.correct + " / " + mathsTarget() + " (" + s.mathsPct + "%)" : ""), prizeNextMessage(s)];
+        var practice = practiceProgress().map(function (x) { return x.cfg.name + " " + x.done + " / " + x.goal + " (" + x.pct + "%)"; });
+        if (practice.length) goals.splice(1, 0, practice.join(" · "));
         return { name: k.name, subjects: ["book"].concat(k.maths ? ["maths"] : [], k.practices), records: parentRecords(k.id), goals: goals };
       });
     });
@@ -2396,7 +2474,7 @@
     });
   };
 
-  // ---------- Latin / MyMaths ----------
+  // ---------- Latin / MyMaths / French ----------
   var practiceType = null;
   Object.keys(PRACTICES).forEach(function (type) {
     el("open-" + type).onclick = function () {
@@ -2443,10 +2521,19 @@
     var m = kid().maths ? parseInt(el("sMaths").value, 10) : mathsTarget();
     if (isNaN(t) || t < 1 || t > 60) { window.alert("Books goal must be 1 to 60."); return; }
     if (kid().maths && (isNaN(m) || m < 10 || m > 20000)) { window.alert("Correct answers goal must be 10 to 20000."); return; }
+    var goals = {}, badGoal = null;
+    kid().practices.forEach(function (type) {
+      var raw = el("sGoal-" + type).value.trim();
+      var n = Number(raw);
+      if (!raw || !isFinite(n) || n % 1 !== 0 || n < PRACTICE_GOAL_MIN || n > PRACTICE_GOAL_MAX) badGoal = PRACTICES[type].name;
+      goals[type] = n;
+    });
+    if (badGoal) { window.alert(badGoal + " goal must be a whole number from " + PRACTICE_GOAL_MIN + " to " + PRACTICE_GOAL_MAX + "."); return; }
     var who = current;
-    commit({ action: "settings", kid: who, settings: { target: t, mathsTarget: m } }, function () {
+    commit({ action: "settings", kid: who, settings: { target: t, mathsTarget: m, practiceGoals: goals } }, function () {
       state.settings.targets[who] = t;
       state.settings.mathsTargets[who] = m;
+      state.settings.practiceGoals[who] = goals;
     }, function (ok) {
       if (!ok) return;
       el("saved").textContent = "Saved!";

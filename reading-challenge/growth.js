@@ -7,13 +7,14 @@ var Growth = (function () {
   var MAX_LEVEL = 100;
   var BOOK_PASS_RATE = 0.8;
   // Experience for each kind of record (times tables count most, to make them worth doing).
-  var EXP = { maths: 2, book: 300, latin: 0.5, mymaths: 1 };
+  var EXP = { maths: 2, book: 300, latin: 0.5, mymaths: 1, french: 0.5 };
 
   // Experience one record gives to the partner saved with it (0 for a book that was not passed).
   function expOf(x) {
     if (x.type === "maths") return Math.floor(x.correct * EXP.maths);
     if (x.type === "latin") return Math.floor(x.correct * EXP.latin);
     if (x.type === "mymaths") return Math.floor(x.correct * EXP.mymaths);
+    if (x.type === "french") return Math.floor(x.correct * EXP.french);
     if (x.type === "read") return x.total && x.score / x.total >= BOOK_PASS_RATE ? EXP.book : 0;
     return 0;
   }
