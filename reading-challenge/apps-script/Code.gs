@@ -6,9 +6,9 @@
  */
 
 var KIDS = {
-  taiga: { maths: true, target: 10, mathsTarget: 2500, practices: [] },
-  leo: { maths: true, target: 10, mathsTarget: 2500, practices: [] },
-  yudai: { maths: false, target: 18, mathsTarget: 0, practices: ["latin", "mymaths"] }
+  taiga: { maths: true, target: 7, mathsTarget: 2500, practices: [] },
+  leo: { maths: true, target: 7, mathsTarget: 2500, practices: [] },
+  yudai: { maths: false, target: 10, mathsTarget: 0, practices: ["latin", "mymaths"] }
 };
 // Extra practice types and the name stored in the "site" column.
 var PRACTICE_SITES = { latin: "Latin", mymaths: "MyMaths" };
