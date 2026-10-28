@@ -343,6 +343,7 @@
     <h2 id="boxTitle"></h2>
     <button class="btn blue small trade-btn" type="button" id="boxTrade"></button>
     <div class="stones" id="boxStones"></div>
+    <div class="stones" id="boxRegion"></div>
     <div class="box" id="box"></div>
   </section>
 
@@ -534,8 +535,10 @@
 </div>
 
 <!-- ?v= must change with APP_VERSION so phones fetch the new files -->
-<script src="evo-data.js?v=2026-10-28-2"></script>
-<script src="growth.js?v=2026-10-28-2"></script>
+<script src="evo-data.js?v=2026-10-28-3"></script>
+<script src="dex-data.js?v=2026-10-28-3"></script>
+<script src="growth.js?v=2026-10-28-3"></script>
+<script src="regions.js?v=2026-10-28-3"></script>
 <script>
 (function () {
   "use strict";
@@ -545,9 +548,9 @@
   var REFRESH_MS = 60000;
   // Change on every release: a page left open with older code reloads itself,
   // so every phone works out the same Pokémon.
-  var APP_VERSION = "2026-10-28-2";
+  var APP_VERSION = "2026-10-28-3";
   // Sent with every change; the sheet refuses changes from older pages (MIN_CLIENT_GEN in Code.gs).
-  var CLIENT_GEN = 4;
+  var CLIENT_GEN = 5;
   var STORAGE_KEY = "htrc-2026-autumn-v3";
   var START = new Date(2026, 9, 24);   // Sat 24 Oct 2026
   var DAY_COUNT = 9;                   // to Sun 1 Nov 2026
@@ -1010,7 +1013,7 @@
   function seedOf(id) { var parts = String(id).split("-"); return parts[1] || parts[0]; }
   // A random Pokémon not caught yet, chosen from the record's id so every phone shows the same one.
   function pickFrom(pool, id) { return pool[hashOf(seedOf(id)) % pool.length]; }
-  // byId: id -> { no: catch number (0-based), mon }; pool: Pokémon still to catch
+  // byId: id -> { no: catch number (0-based), mon }; pool: the old rules' Pokémon still to catch (not used for new catches)
   function catches() {
     var pool = allMonIndexes(false), byId = {}, withNew = false;
     // The new Pokémon join the pool from the first record logged after they were added.
@@ -1022,6 +1025,9 @@
     var owned = {};   // families already in the collection
     catchOrder().forEach(function (x, i) {
       if (loggedAt(x) >= NEW_MONS_FROM) addNew();
+      // A saved Pokémon outside the first 100 (all 1,025 can be caught now): used as it is,
+      // and kept out of the old pool and families, which only pick older records again.
+      if (x.mon && monIndex(x.mon) < 0) { byId[x.id] = { no: i, mon: monEntry(x.mon), steps: 0 }; return; }
       // The Pokémon saved with the record is used as it is, so it can never change later.
       var k = x.mon ? monIndex(x.mon) : -1;
       if (k < 0) k = loggedAt(x) >= FAMILY_RULE_FROM ? pickFrom(freshPool(owned, withNew), x.id) : pickFrom(pool, x.id);
@@ -1031,7 +1037,7 @@
       byId[x.id] = { no: i, mon: MONS[k], steps: 0 };
     });
     if (Date.now() >= NEW_MONS_FROM) addNew();
-    // Next catch ("Who's that Pokémon?") follows the family rule too.
+    // `pool` is kept as it was, but it no longer decides the next catch: nextMon() picks from the open regions.
     if (Date.now() >= FAMILY_RULE_FROM) pool = freshPool(owned, withNew);
     // Evolutions, oldest first: each one moves its Pokémon one stage up (only while it is still in the collection).
     // bySource: record id -> "Charmander → Charmeleon", shown on the record that paid for it.
@@ -1056,7 +1062,36 @@
   }
   // Evolutions paid for by a win (before levels): replayed along EVOLVES. Level-up and Mega Stone ones are not.
   function isOldEvolve(v) { return (v.kind || "old") === "old"; }
-  function nextMon(id) { return MONS[pickFrom(catches().pool, id)]; }
+  // The next catch of the selected child: from the open regions (regions.js), chosen from the record's id
+  // so every phone shows the same one.
+  function nextMon(id) {
+    var list = Regions.candidates(familiesOf(current));
+    return monEntry(list[hashOf(seedOf(id)) % list.length]);
+  }
+  // [name, type, colour, dex] like MONS, for any of the 1,025 (first type and its colour).
+  var TYPE_COLOURS = (function () { var c = {}; MONS.forEach(function (m) { c[m[1]] = m[2]; }); return c; })();
+  function monEntry(dex) {
+    var k = monIndex(dex);
+    if (k >= 0) return MONS[k];
+    var d = Regions.info(dex);
+    return d ? [d[0], d[1], TYPE_COLOURS[d[1]] || "#9c8f6b", dex] : [String(dex), "Normal", "#9c8f6b", dex];
+  }
+  // Families a child has: every Pokémon they caught, and every one in their box now (also traded ones).
+  function familiesOf(kidId, w) {
+    w = w || world();
+    var owned = {};
+    var byId = forKid(kidId, function () { return catches().byId; });
+    Object.keys(byId).forEach(function (id) { var f = Regions.familyOf(byId[id].mon[3]); if (f) owned[f] = true; });
+    boxOf(kidId, w).forEach(function (m) { var f = Regions.familyOf(m.c.dex); if (f) owned[f] = true; });
+    return owned;
+  }
+  function regionText(kidId, w) {
+    var pr = Regions.progress(familiesOf(kidId, w));
+    var r = pr.rows[pr.open - 1];
+    var need = Regions.toOpen(r);
+    var next = pr.open < Regions.NAMES.length && need > 0 ? " · catch " + need + " more to open " + Regions.NAMES[pr.open] + "!" : "";
+    return "🗺️ " + r.name + " " + r.have + " / " + r.total + next;
+  }
   function monIndex(dex) {
     for (var k = 0; k < MONS.length; k++) if (MONS[k][3] === dex) return k;
     return -1;
@@ -1527,6 +1562,7 @@
     tb.disabled = !retry && (!left || !canTrade(current));
     var stones = stonesLeft(current);
     el("boxStones").textContent = "💎 Mega Stones: " + stones + (stones ? " · Tap a Pokémon that can Mega Evolve" : " · Rank up to get one");
+    el("boxRegion").textContent = regionText(current, w);
     if (openMonId && el("monSheet").className.indexOf("show") >= 0) fillMon(openMonId);
   }
   var openMonId = null;
@@ -1886,7 +1922,7 @@
   var peakSent = {};
   function savePeaks() {
     // Needs the sheet code that starts Mega Stones (gen 3), or the first rank-up after the update gives no stone.
-    if (!API_URL || !(state.serverGen >= 4)) return;
+    if (!API_URL || !(state.serverGen >= 5)) return;
     KIDS.forEach(function (k) {
       var rank = forKid(k.id, function () { return summary().rank; });
       var saved = state.settings.peaks[k.id];
@@ -1920,7 +1956,7 @@
       return;
     }
     // Until the sheet code knows levels (gen 3), nothing is saved: an older sheet would store it wrongly.
-    if (!(state.serverGen >= 4)) {
+    if (!(state.serverGen >= 5)) {
       window.alert(state.serverGen ? "Updating... please try again in a minute." : "Loading... please check the internet and try again in a moment.");
       refresh();
       done(false, true);
@@ -2045,9 +2081,17 @@
     var partner = again ? w.mons[lastTry.partner] || null : partnerOf(who, w);
     item.partner = again ? lastTry.partner : partner ? partner.id : "";
     var exp = Growth.expOf(item);
+    var openBefore = Regions.progress(familiesOf(who, w)).open;
     var innerDone = done;
     done = function (ok, x) {
-      if (ok) noteGrowth(partner, exp);
+      if (ok) {
+        noteGrowth(partner, exp);
+        var openNow = Regions.progress(familiesOf(who)).open;
+        if (openNow > openBefore) {
+          var news = "🎉 " + Regions.NAMES[openNow - 1] + " is open! New Pokémon can appear!";
+          growthNote = growthNote ? { text: growthNote.text + "  " + news, evolve: growthNote.evolve } : { text: news, evolve: null };
+        }
+      }
       innerDone(ok, x);
     };
     button.disabled = true;
