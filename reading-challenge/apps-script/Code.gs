@@ -30,9 +30,9 @@ var MON_COL = 11;
 var PARTNER_COL = 12;
 var MAX_ID = 40;
 // Pages older than this may work out Pokémon differently, so their changes are refused.
-var MIN_CLIENT_GEN = 3;
-// Tells pages that this sheet code knows trades (2) and levels, level-up evolutions and Mega Stones (3).
-var SERVER_GEN = 3;
+var MIN_CLIENT_GEN = 4;
+// Tells pages that this sheet code knows trades (2) and levels, level-up evolutions and Mega Stones (3), the Poké Ball meter (4).
+var SERVER_GEN = 4;
 // Evolutions from a level or a Mega Stone: "title" holds this word instead of the record that paid for it.
 var GROWTH_KINDS = ["level", "stone"];
 

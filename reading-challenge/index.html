@@ -187,6 +187,8 @@
   .grow small { display: block; margin-top: 4px; color: #555; }
   .grow .btn { margin-top: 8px; width: 100%; }
   .bar.exp > div { background: linear-gradient(90deg, var(--yellow), #ffe066); }
+  .grow .ball-top { margin-top: 10px; }
+  .bar.ballbar > div { background: linear-gradient(90deg, var(--red), #ff8a65); }
   .stones { font-size: 13px; font-weight: bold; margin: -6px 0 12px; }
   .md-exp { font-size: 13px; color: #555; margin: 6px 0; }
   .mon-card #mdPartner .btn { margin: 6px auto 0; display: block; }
@@ -387,7 +389,7 @@
 <div class="sheet" id="readSheet">
   <form class="sheet-card" id="readForm" autocomplete="off">
     <h3>📖 I read a book!</h3>
-    <div class="whos"><img class="sprite" id="whosSprite" alt=""><div><b>Who's that Pokémon?</b>Pass the quiz to catch it!</div></div>
+    <div class="whos"><img class="sprite" id="whosSprite" alt=""><div><b>Who's that Pokémon?</b>Fill your Poké Ball to catch it!</div></div>
     <div class="step"><div class="num">1</div><div class="body">
       <b>Type the book title</b>
       <input id="fTitle" required maxlength="120" placeholder="e.g. The Twits">
@@ -438,7 +440,7 @@
       <button class="btn ghost" type="button" data-close>Cancel</button>
       <button class="btn purple" type="submit">🚀 LET IT RIP!</button>
     </div>
-    <div class="rule">Every correct answer counts. The app adds them up for you. Get 50 or more in one go: catch a NEW Pokémon! Every correct answer gives your partner 2 EXP.</div>
+    <div class="rule">Every correct answer counts. The app adds them up for you. Every correct answer gives 2 EXP and fills your Poké Ball by 2. A full ball (1,500) catches a NEW Pokémon!</div>
   </form>
 </div>
 
@@ -532,8 +534,8 @@
 </div>
 
 <!-- ?v= must change with APP_VERSION so phones fetch the new files -->
-<script src="evo-data.js?v=2026-10-28-1"></script>
-<script src="growth.js?v=2026-10-28-1"></script>
+<script src="evo-data.js?v=2026-10-28-2"></script>
+<script src="growth.js?v=2026-10-28-2"></script>
 <script>
 (function () {
   "use strict";
@@ -543,9 +545,9 @@
   var REFRESH_MS = 60000;
   // Change on every release: a page left open with older code reloads itself,
   // so every phone works out the same Pokémon.
-  var APP_VERSION = "2026-10-28-1";
+  var APP_VERSION = "2026-10-28-2";
   // Sent with every change; the sheet refuses changes from older pages (MIN_CLIENT_GEN in Code.gs).
-  var CLIENT_GEN = 3;
+  var CLIENT_GEN = 4;
   var STORAGE_KEY = "htrc-2026-autumn-v3";
   var START = new Date(2026, 9, 24);   // Sat 24 Oct 2026
   var DAY_COUNT = 9;                   // to Sun 1 Nov 2026
@@ -564,8 +566,8 @@
     { id: "leo", name: "LEO", maths: true, target: 10, mathsTarget: 2500, ks: "KS2", practices: [] },
     { id: "yudai", name: "YUDAI", maths: false, target: 18, mathsTarget: 0, ks: "KS3", practices: ["latin", "mymaths"] }
   ];
-  // Extra practice: a session with at least `min` correct answers catches a Pokémon
-  // (and gives an evolution). It does not count towards the prize.
+  // Extra practice. Before PACE_FROM a session with at least `min` correct answers caught a Pokémon;
+  // now it fills the Poké Ball. It does not count towards the prize.
   // Sessions logged before PRACTICE_RULE_FROM keep `oldMin`, so nothing already caught changes.
   var PRACTICES = {
     latin: { name: "Latin", icon: "🏛️", min: 150, oldMin: 50 },
@@ -642,6 +644,10 @@
   // Eevee's other evolutions (not in its EVOLVES line).
   var EEVEE_FAMILY = [133, 134, 135, 136, 196, 197, 700];
   var NEW_MONS_FROM = 1792954754993;
+  // From this time, Pokémon are caught with the Poké Ball meter (study fills it, BALL_POINTS = one ball)
+  // instead of one per win. Records before it keep the old rules, so nothing already caught changes.
+  var PACE_FROM = 1793168487192;
+  var BALL_POINTS = 1500;
   // What each Pokémon above evolves into, stage by stage, then its Mega / Gigantamax / special forms.
   // Keyed by the dex number in MONS; [name, dex number]. Not listed = already fully evolved.
   var EVOLVES = {
@@ -871,7 +877,7 @@
     return svg;
   }
   function newSeed() { return String(Math.floor(Math.random() * 1e6)); }
-  function newId(seed) { return Date.now() + "-" + (seed || newSeed()); }
+  function newId(seed) { return Math.max(Date.now(), PACE_FROM) + "-" + (seed || newSeed()); }
 
   // ---------- progress maths ----------
   function summary(d) {
@@ -902,8 +908,8 @@
     return "⭐ Next rank: " + RANKS[s.rank + 1] + " (" + pct + "%) — " + parts.join(" and ");
   }
 
-  // Every passed book and every big enough times tables game catches the next Pokémon,
-  // in the order they were logged (ids start with the time they were made).
+  // Before PACE_FROM every passed book and every big enough times tables game caught the next Pokémon;
+  // from then on a record catches when it fills a Poké Ball. In the order they were logged (ids start with the time).
   function loggedAt(x) { return parseInt(String(x.id), 10) || 0; }
   // A times tables game needs MATHS_CATCH_MIN correct answers to catch a Pokémon.
   // Games logged before MATHS_RULE_FROM keep the old rule (1 or more), so nothing already caught changes.
@@ -926,8 +932,8 @@
     return cfg.oldMin && loggedAt(p) < PRACTICE_RULE_FROM ? cfg.oldMin : cfg.min;
   }
   function practiceCatches(p) { return !!PRACTICES[p.type] && p.correct >= practiceMin(p); }
-  // A record that wins a reward either catches a new Pokémon or (if chosen) evolves one.
-  // The evolution is saved as an "evolve" entry whose source is that record.
+  // A record that won a reward caught a Pokémon, or paid for an old-style evolution or a trade
+  // (saved as an "evolve" / "trade" entry whose source is that record).
   function usedForReward() {
     var used = {};
     data().evolves.forEach(function (v) { if (v.source) used[v.source] = true; });
@@ -936,9 +942,33 @@
   }
   function catchOrder() {
     var d = data(), used = usedForReward();
-    var list = d.entries.filter(function (x) { return x.mon || isPass(x); })
-      .concat(d.maths.filter(function (x) { return x.mon || mathsCatches(x); }), d.practice.filter(function (x) { return x.mon || practiceCatches(x); }));
+    function caught(rule) { return function (x) { return x.mon || (loggedAt(x) < PACE_FROM && rule(x)); }; }
+    var list = d.entries.filter(caught(isPass)).concat(d.maths.filter(caught(mathsCatches)), d.practice.filter(caught(practiceCatches)));
     return list.filter(function (x) { return !used[x.id]; }).sort(function (a, b) { return loggedAt(a) - loggedAt(b); });
+  }
+  // Poké Ball meter of a child: study since PACE_FROM, the same numbers as EXP. extra = a record not saved yet.
+  function ballOf(kidId, extra) {
+    var d = state.kids[kidId];
+    var list = d.entries.concat(d.maths, d.practice, extra ? [extra] : []).filter(function (x) { return loggedAt(x) >= PACE_FROM; });
+    var ids = {};
+    list.forEach(function (x) { ids[x.id] = true; });
+    var points = list.reduce(function (sum, x) { return sum + Growth.expOf(x); }, 0);
+    var used = list.filter(function (x) { return x.mon; }).length +
+      d.trades.filter(function (t) { return ids[t.source]; }).length;
+    return { points: points, meter: points % BALL_POINTS, left: Math.floor(points / BALL_POINTS) - used };
+  }
+  // A new record wins (catch or trade) when it gives points and a ball is ready with it.
+  function winsBall(item) {
+    return Growth.expOf(item) > 0 && ballOf(item.kid, item).left >= 1;
+  }
+  function ballNote(b) {
+    if (b.left > 0) return " · " + b.left + " ball" + (b.left > 1 ? "s" : "") + " waiting!";
+    if (b.left < 0) return " · " + (-b.left) + " ball" + (b.left < -1 ? "s" : "") + " to fill first (a record was deleted)";
+    return "";
+  }
+  function ballText(kidId) {
+    var b = ballOf(kidId);
+    return "🔴 Poké Ball " + b.meter.toLocaleString("en-GB") + " / " + BALL_POINTS.toLocaleString("en-GB") + ballNote(b);
   }
   function hashOf(s) {
     var h = 2166136261;
@@ -1134,7 +1164,20 @@
   function renderGrow(p, chosen) {
     var box = el("grow");
     box.innerHTML = "";
-    if (!p) return;
+    if (p) renderPartnerGrow(box, p, chosen);
+    var meter = ballOf(current);
+    var ball = make("div", "grow-top ball-top");
+    ball.appendChild(make("b", "", "🔴 Poké Ball"));
+    ball.appendChild(make("span", "", meter.meter.toLocaleString("en-GB") + " / " + BALL_POINTS.toLocaleString("en-GB")));
+    box.appendChild(ball);
+    var bbar = make("div", "bar ballbar");
+    var bfill = make("div", "");
+    bfill.style.width = (meter.left > 0 ? 100 : meter.meter / BALL_POINTS * 100) + "%";
+    bbar.appendChild(bfill);
+    box.appendChild(bbar);
+    if (meter.left) box.appendChild(make("small", "", ballNote(meter).slice(3)));
+  }
+  function renderPartnerGrow(box, p, chosen) {
     var top = make("div", "grow-top");
     top.appendChild(make("b", "", p.c.name + " Lv." + p.level));
     top.appendChild(make("span", "", p.progress ? p.progress.have + " / " + p.progress.need + " EXP" : "MAX level!"));
@@ -1212,7 +1255,7 @@
     var dex = el("dex");
     dex.innerHTML = "";
     var list = data().entries;
-    if (!list.length) dex.appendChild(make("div", "empty-dex", "No books yet. Read a book and catch your first Pokémon!"));
+    if (!list.length) dex.appendChild(make("div", "empty-dex", "No books yet. Read a book and fill your Poké Ball!"));
     var cs = catches(), w = world(), evolved = cs.bySource, traded = w.traded;
     Object.keys(w.evolved).forEach(function (id) { evolved[id] = w.evolved[id]; });
     // The Pokémon each record caught, as it is now (it may have been traded, then evolved by its new owner).
@@ -1230,8 +1273,10 @@
       top.appendChild(info);
       if (pass && nos[e.id]) {
         monLine(info, nos[e.id]);
-      } else if (pass) {
+      } else if (pass && (evolved[e.id] || traded[e.id] || loggedAt(e) < PACE_FROM)) {
         info.appendChild(make("div", "mon", paidText(e.id, evolved, traded)));
+      } else if (pass) {
+        info.appendChild(make("div", "mon", "📖 +" + Growth.EXP.book + " for your Poké Ball"));
       } else {
         info.appendChild(make("div", "mon", "It broke free!"));
       }
@@ -1471,7 +1516,7 @@
     var w = world();
     var list = boxOf(current, w);
     var pid = chosenPartnerId(current, w);
-    if (!list.length) box.appendChild(make("div", "empty-dex", "No Pokémon yet. Win a mission to catch your first one!"));
+    if (!list.length) box.appendChild(make("div", "empty-dex", "No Pokémon yet. Fill your Poké Ball to catch your first one!"));
     list.forEach(function (m) {
       box.appendChild(monTile(m, pid, function () { openMon(m.id); }));
     });
@@ -1841,7 +1886,7 @@
   var peakSent = {};
   function savePeaks() {
     // Needs the sheet code that starts Mega Stones (gen 3), or the first rank-up after the update gives no stone.
-    if (!API_URL || !(state.serverGen >= 3)) return;
+    if (!API_URL || !(state.serverGen >= 4)) return;
     KIDS.forEach(function (k) {
       var rank = forKid(k.id, function () { return summary().rank; });
       var saved = state.settings.peaks[k.id];
@@ -1875,7 +1920,7 @@
       return;
     }
     // Until the sheet code knows levels (gen 3), nothing is saved: an older sheet would store it wrongly.
-    if (!(state.serverGen >= 3)) {
+    if (!(state.serverGen >= 4)) {
       window.alert(state.serverGen ? "Updating... please try again in a minute." : "Loading... please check the internet and try again in a moment.");
       refresh();
       done(false, true);
@@ -1941,7 +1986,8 @@
     var entry = { kid: current, type: "read", day: parseInt(el("fDate").value, 10), title: title, site: site, score: score, total: total };
     entry.id = recordId(entry, pendingSeed);
     var before = summary();
-    addWithReward(entry, "entries", isPass(entry), el("readForm").querySelector("button[type=submit]"), function (ok, evo) {
+    var wins = lastTry && lastTry.id === entry.id ? lastTry.wins : winsBall(entry);
+    addWithReward(entry, "entries", wins, el("readForm").querySelector("button[type=submit]"), function (ok, evo) {
       if (!ok) return;
       pendingSeed = newSeed();
       renderSheets();
@@ -1950,7 +1996,7 @@
       closeSheets();
       var mid = (noQuiz(entry) ? "Book done!" : entry.score + "/" + entry.total) + tierUpMessage(before, summary());
       if (evo) celebrateEvolve(evo, mid);
-      else celebrateBook(entry, before, summary());
+      else celebrateBook(entry, before, summary(), wins);
     });
   };
 
@@ -1962,17 +2008,17 @@
     // Trying again after "Not saved": use the same reward as the first try (it may have been saved).
     if (lastTry && lastTry.id === item.id && lastTry.chosen) {
       var again = lastTry;
-      saveRecord(item, listName, again.ev, button, function (ok) { done(ok, again.evo); });
+      saveRecord(item, listName, again.ev, button, function (ok) { done(ok, again.evo); }, again.evo, again.wins);
       return;
     }
     var trade = wins && canTrade(item.kid);
-    if (!trade) { saveRecord(item, listName, null, button, done); return; }
+    if (!trade) { saveRecord(item, listName, null, button, done, null, wins); return; }
     rewardKid = item.kid;
     rewardDone = function (choice) {
-      if (!choice) { saveRecord(item, listName, null, button, done); return; }
+      if (!choice) { saveRecord(item, listName, null, button, done, null, wins); return; }
       var tx = tradeRow(item.kid, item.day, item.id, choice);
       var info = tradeInfo(choice, item.kid);
-      saveRecord(item, listName, tx, button, function (ok) { done(ok, info); }, info);
+      saveRecord(item, listName, tx, button, function (ok) { done(ok, info); }, info, wins);
     };
     showReward();
   }
@@ -1987,10 +2033,10 @@
       evolve: now.ready.length && now.owner === partner.owner ? now.id : null
     };
   }
-  function saveRecord(item, listName, ev, button, done, evo) {
+  // wins: decided once when the record was typed (the meter may move while the reward screen is open).
+  function saveRecord(item, listName, ev, button, done, evo, wins) {
     var who = item.kid;
     // A record that catches saves its Pokémon now, so no later change can turn it into another one.
-    var wins = listName === "entries" ? isPass(item) : listName === "maths" ? forKid(who, function () { return mathsCatches(item); }) : practiceCatches(item);
     if (wins && !ev) item.mon = forKid(who, function () { return nextMon(item.id)[3]; });
     // The partner now gets this record's experience (saved with the record, so it never moves).
     // A resend after "Not saved" keeps the first try's partner (the sheet may already have it).
@@ -2013,7 +2059,7 @@
       else if (ev) state.kids[who].evolves = state.kids[who].evolves.concat([ev]);
     }, function (ok, refused) {
       button.disabled = false;
-      lastTry = ok || refused ? null : { key: tryKey(item), id: item.id, chosen: true, ev: ev, evo: evo || null, partner: item.partner };
+      lastTry = ok || refused ? null : { key: tryKey(item), id: item.id, chosen: true, ev: ev, evo: evo || null, partner: item.partner, wins: !!wins };
       done(ok, null);
     });
   }
@@ -2050,12 +2096,14 @@
     el("rewardSheet").className = "sheet";
   };
 
-  function celebrateBook(entry, before, after) {
+  function celebrateBook(entry, before, after, wins) {
     if (!isPass(entry)) {
-      show(make("div", "ball huge empty"), "Oh no! It broke free!", "You got " + entry.score + "/" + entry.total + ". Read it again and try once more!");
+      show(make("div", "ball huge empty"), "Oh no! Not passed this time.", "You got " + entry.score + "/" + entry.total + ". Read it again and try once more!");
       return;
     }
-    catchPokemon(entry, ballClass(entry), "", (noQuiz(entry) ? "Book done!" : entry.score + "/" + entry.total) + tierUpMessage(before, after));
+    var mid = (noQuiz(entry) ? "Book done!" : entry.score + "/" + entry.total) + tierUpMessage(before, after);
+    if (wins) catchPokemon(entry, ballClass(entry), "", mid);
+    else show(make("div", "ball huge " + ballClass(entry)), "Book passed! 📖", mid + "  ·  " + ballText(entry.kid));
   }
 
   // The old Pokémon glows white, then the evolved one pops out.
@@ -2154,7 +2202,7 @@
     var item = { kid: current, type: "maths", day: parseInt(el("mDate").value, 10), site: "Times Tables Rock Stars", correct: correct };
     item.id = recordId(item);
     var before = summary();
-    var wins = mathsCatches(item);
+    var wins = lastTry && lastTry.id === item.id ? lastTry.wins : winsBall(item);
     addWithReward(item, "maths", wins, el("mathsForm").querySelector("button[type=submit]"), function (ok, evo) {
       if (!ok) return;
       el("mCorrect").value = "";
@@ -2163,7 +2211,7 @@
       var mid = "Total: " + after.correct + " correct answers" + tierUpMessage(before, after);
       if (evo) celebrateEvolve(evo, "+" + correct + "!  " + mid);
       else if (wins) catchPokemon(item, "", "+" + correct + "! ", mid);
-      else show(beySvg("blade"), "LET IT RIP! +" + correct, mid + "  ·  Get " + mathsMin(item) + " or more in one go to catch a Pokémon!");
+      else show(beySvg("blade"), "LET IT RIP! +" + correct, mid + "  ·  " + ballText(item.kid));
     });
   };
 
@@ -2174,7 +2222,7 @@
       var cfg = PRACTICES[type];
       practiceType = type;
       el("pTitle").textContent = cfg.icon + " " + cfg.name;
-      el("pRule").textContent = "Get " + cfg.min + " or more in one go: catch a NEW Pokémon! Every correct answer gives your partner EXP.";
+      el("pRule").textContent = "Every correct answer gives EXP and fills your Poké Ball. A full ball (" + BALL_POINTS.toLocaleString("en-GB") + ") catches a NEW Pokémon!";
       openSheet("practiceSheet");
     };
   });
@@ -2186,7 +2234,7 @@
     if (isNaN(correct) || correct < 0 || correct > 2000) { window.alert("Please type how many you got right (0 to 2000)."); return; }
     var item = { kid: current, type: practiceType, day: parseInt(el("pDate").value, 10), site: cfg.name, correct: correct };
     item.id = recordId(item);
-    var wins = practiceCatches(item);
+    var wins = lastTry && lastTry.id === item.id ? lastTry.wins : winsBall(item);
     addWithReward(item, "practice", wins, el("practiceForm").querySelector("button[type=submit]"), function (ok, evo) {
       if (!ok) return;
       el("pCorrect").value = "";
@@ -2194,7 +2242,7 @@
       var mid = cfg.name + ": " + correct + " correct";
       if (evo) celebrateEvolve(evo, "+" + correct + "!  " + mid);
       else if (wins) catchPokemon(item, "", "+" + correct + "! ", mid);
-      else show(make("div", "ball huge empty"), cfg.icon + " +" + correct, mid + "  ·  Get " + practiceMin(item) + " or more in one go to catch a Pokémon!");
+      else show(make("div", "ball huge empty"), cfg.icon + " +" + correct, mid + "  ·  " + ballText(item.kid));
     });
   };
 
@@ -2204,7 +2252,7 @@
     var quiz = el("fSite").value !== NO_QUIZ;
     el("quizPart").className = quiz ? "" : "hidden";
     el("fScore").required = quiz;
-    el("readRule").textContent = (quiz ? "80% or more wins (8 out of 10): catch a NEW Pokémon!" : "Finished the whole book? Catch a NEW Pokémon!") + " Your partner gets " + Growth.EXP.book + " EXP.";
+    el("readRule").textContent = (quiz ? "Pass with 80% or more (8 out of 10): " : "Finished the whole book? ") + Growth.EXP.book + " EXP and +" + Growth.EXP.book + " for your Poké Ball (" + BALL_POINTS.toLocaleString("en-GB") + " = a NEW Pokémon).";
   }
   el("fSite").onchange = updateQuizPart;
   updateQuizPart();
