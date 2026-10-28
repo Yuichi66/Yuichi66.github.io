@@ -272,7 +272,6 @@
   .pd-table th, .pd-table td { text-align: left; padding: 4px; border-bottom: 1px solid #e3e2dc; vertical-align: top; }
   .pd-table td { overflow-wrap: anywhere; }
   .pd-num { text-align: right; white-space: nowrap; }
-  .pin-row input { width: 140px; text-align: center; font-size: 26px; letter-spacing: 6px; }
   .step { display: flex; gap: 10px; align-items: flex-start; margin: 14px 0; }
   .step .num { flex-shrink: 0; width: 32px; height: 32px; border-radius: 50%; background: var(--yellow); border: 3px solid #000; font-weight: bold; display: flex; align-items: center; justify-content: center; }
   .step .body { flex: 1; min-width: 0; }
@@ -461,20 +460,7 @@
   </form>
 </div>
 
-<!-- Parent: number, then the dashboard -->
-<div class="sheet" id="pinSheet">
-  <form class="sheet-card" id="pinForm" autocomplete="off">
-    <h3>👪 Parent</h3>
-    <div class="step"><div class="num">🔒</div><div class="body">
-      <b>Enter the 4-digit number</b>
-      <div class="pin-row"><input id="pinInput" type="password" inputmode="numeric" pattern="[0-9]*" maxlength="4" autocomplete="one-time-code" required></div>
-    </div></div>
-    <div class="sheet-actions">
-      <button class="btn ghost" type="button" data-close>Cancel</button>
-      <button class="btn purple" type="submit">Open</button>
-    </div>
-  </form>
-</div>
+<!-- Parent dashboard -->
 
 <div class="sheet" id="parentSheet">
   <div class="sheet-card wide">
@@ -600,11 +586,11 @@
 </div>
 
 <!-- ?v= must change with APP_VERSION so phones fetch the new files -->
-<script src="evo-data.js?v=2026-10-28-7"></script>
-<script src="dex-data.js?v=2026-10-28-7"></script>
-<script src="growth.js?v=2026-10-28-7"></script>
-<script src="regions.js?v=2026-10-28-7"></script>
-<script src="parent.js?v=2026-10-28-7"></script>
+<script src="evo-data.js?v=2026-10-28-8"></script>
+<script src="dex-data.js?v=2026-10-28-8"></script>
+<script src="growth.js?v=2026-10-28-8"></script>
+<script src="regions.js?v=2026-10-28-8"></script>
+<script src="parent.js?v=2026-10-28-8"></script>
 <script>
 (function () {
   "use strict";
@@ -614,7 +600,7 @@
   var REFRESH_MS = 60000;
   // Change on every release: a page left open with older code reloads itself,
   // so every phone works out the same Pokémon.
-  var APP_VERSION = "2026-10-28-7";
+  var APP_VERSION = "2026-10-28-8";
   // Sent with every change; the sheet refuses changes from older pages (MIN_CLIENT_GEN in Code.gs).
   var CLIENT_GEN = 7;
   var STORAGE_KEY = "htrc-2026-autumn-v3";
@@ -2144,7 +2130,7 @@
 
   // ---------- sheets & overlay ----------
   function openSheet(id) { el(id).className = "sheet show"; window.scrollTo(0, 0); }
-  function closeSheets() { ["readSheet", "mathsSheet", "practiceSheet", "rewardSheet", "monSheet", "tradeSheet", "evoSheet", "pinSheet", "parentSheet"].forEach(function (id) { el(id).className = "sheet"; }); }
+  function closeSheets() { ["readSheet", "mathsSheet", "practiceSheet", "rewardSheet", "monSheet", "tradeSheet", "evoSheet", "parentSheet"].forEach(function (id) { el(id).className = "sheet"; }); }
   Array.prototype.forEach.call(document.querySelectorAll("[data-close]"), function (b) { b.onclick = closeSheets; });
   el("openRead").onclick = function () { openSheet("readSheet"); };
   el("openMaths").onclick = function () { openSheet("mathsSheet"); };
@@ -2174,9 +2160,7 @@
     return msg;
   }
 
-  // ---------- parent dashboard (read only; parent.js draws it) ----------
-  // Only stops children opening it by chance: anyone who reads the page code can see it.
-  var PARENT_PIN = "4719";
+  // ---------- parent dashboard (read only; parent.js draws it; anyone may open it) ----------
   function parentRecords(kidId) {
     var d = state.kids[kidId], out = [];
     function add(x, subject, amount, tried, text) {
@@ -2201,13 +2185,6 @@
     });
   }
   el("openParent").onclick = function () {
-    el("pinInput").value = "";
-    openSheet("pinSheet");
-    el("pinInput").focus();
-  };
-  el("pinForm").onsubmit = function (ev) {
-    ev.preventDefault();
-    if (el("pinInput").value !== PARENT_PIN) { window.alert("That number is not right."); el("pinInput").value = ""; return; }
     if (typeof Parent === "undefined") { window.alert("The parent page could not load. Please reload and try again."); return; }
     closeSheets();
     var now = new Date();
