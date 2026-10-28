@@ -24,10 +24,24 @@ var Regions = (function () {
     return out;
   })();
 
-  // Family of any form in a box (a Mega or regional form counts as its species).
-  function familyOf(form) {
+  // Species of any form in a box (a Mega or regional form counts as its species).
+  function speciesOf(form) {
     var species = EVO[form] ? EVO[form][1] : form;
-    return DEX[species] ? DEX[species][2] : null;
+    return DEX[species] ? species : null;
+  }
+  function familyOf(form) {
+    var species = speciesOf(form);
+    return species ? DEX[species][2] : null;
+  }
+  // owned: species -> true. Returns [{ name, have, total }] for every region, counting every species (Kanto 151).
+  function speciesProgress(owned) {
+    var rows = NAMES.map(function (n) { return { name: n, have: 0, total: 0 }; });
+    Object.keys(DEX).forEach(function (d) {
+      var r = rows[DEX[d][3]];
+      r.total++;
+      if (owned[d]) r.have++;
+    });
+    return rows;
   }
   // owned: family -> true. Returns [{ name, have, total }] for every region, and how many are open.
   function progress(owned) {
@@ -74,6 +88,6 @@ var Regions = (function () {
   // [name, type, dex] of a species, for Pokémon that are not in the first 100.
   function info(dex) { var d = DEX[dex]; return d ? [d[0], d[1], dex] : null; }
 
-  return { NAMES: NAMES, familyOf: familyOf, progress: progress, toOpen: toOpen, candidates: candidates, legends: legends, rate: rate, info: info };
+  return { NAMES: NAMES, speciesOf: speciesOf, familyOf: familyOf, progress: progress, speciesProgress: speciesProgress, toOpen: toOpen, candidates: candidates, legends: legends, rate: rate, info: info };
 })();
 if (typeof module !== "undefined") module.exports = Regions;

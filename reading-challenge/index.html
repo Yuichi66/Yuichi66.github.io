@@ -535,10 +535,10 @@
 </div>
 
 <!-- ?v= must change with APP_VERSION so phones fetch the new files -->
-<script src="evo-data.js?v=2026-10-28-4"></script>
-<script src="dex-data.js?v=2026-10-28-4"></script>
-<script src="growth.js?v=2026-10-28-4"></script>
-<script src="regions.js?v=2026-10-28-4"></script>
+<script src="evo-data.js?v=2026-10-28-5"></script>
+<script src="dex-data.js?v=2026-10-28-5"></script>
+<script src="growth.js?v=2026-10-28-5"></script>
+<script src="regions.js?v=2026-10-28-5"></script>
 <script>
 (function () {
   "use strict";
@@ -548,7 +548,7 @@
   var REFRESH_MS = 60000;
   // Change on every release: a page left open with older code reloads itself,
   // so every phone works out the same Pokémon.
-  var APP_VERSION = "2026-10-28-4";
+  var APP_VERSION = "2026-10-28-5";
   // Sent with every change; the sheet refuses changes from older pages (MIN_CLIENT_GEN in Code.gs).
   var CLIENT_GEN = 6;
   var STORAGE_KEY = "htrc-2026-autumn-v3";
@@ -1104,19 +1104,23 @@
     var d = Regions.info(dex);
     return d ? [d[0], d[1], TYPE_COLOURS[d[1]] || "#9c8f6b", dex] : [String(dex), "Normal", "#9c8f6b", dex];
   }
-  // Families a child has: every Pokémon they caught, and every one in their box now (also traded ones).
-  function familiesOf(kidId, w) {
+  // What a child has: every Pokémon they caught, and every one in their box now (also traded ones).
+  // keyOf: Regions.familyOf (families) or Regions.speciesOf (species).
+  function ownedBy(kidId, w, keyOf) {
     w = w || world();
     var owned = {};
     var byId = forKid(kidId, function () { return catches().byId; });
-    Object.keys(byId).forEach(function (id) { var f = Regions.familyOf(byId[id].mon[3]); if (f) owned[f] = true; });
-    boxOf(kidId, w).forEach(function (m) { var f = Regions.familyOf(m.c.dex); if (f) owned[f] = true; });
+    Object.keys(byId).forEach(function (id) { var x = keyOf(byId[id].mon[3]); if (x) owned[x] = true; });
+    boxOf(kidId, w).forEach(function (m) { var x = keyOf(m.c.dex); if (x) owned[x] = true; });
     return owned;
   }
+  function familiesOf(kidId, w) { return ownedBy(kidId, w, Regions.familyOf); }
+  // "Kanto 12 / 151" counts species; the next region still opens at half the families (catch N more).
   function regionText(kidId, w) {
+    w = w || world();
     var pr = Regions.progress(familiesOf(kidId, w));
-    var r = pr.rows[pr.open - 1];
-    var need = Regions.toOpen(r);
+    var need = Regions.toOpen(pr.rows[pr.open - 1]);
+    var r = Regions.speciesProgress(ownedBy(kidId, w, Regions.speciesOf))[pr.open - 1];
     var next = pr.open < Regions.NAMES.length && need > 0 ? " · catch " + need + " more to open " + Regions.NAMES[pr.open] + "!" : "";
     return "🗺️ " + r.name + " " + r.have + " / " + r.total + next;
   }
