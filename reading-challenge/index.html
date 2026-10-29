@@ -281,6 +281,9 @@
   .go-link.alt { background: #fff; }
   .score-row { display: flex; align-items: center; gap: 6px; }
   .score-row input { width: 80px; text-align: center; font-size: 22px; }
+  .top-back { flex-shrink: 0; display: block; width: 38px; height: 38px; margin: 0 0 6px; border: 3px solid #000; border-radius: 50%; background: #fff; font-size: 20px; font-weight: bold; line-height: 1; cursor: pointer; padding: 0; font-family: inherit; }
+  .sheet-head { display: flex; align-items: center; gap: 10px; margin-bottom: 4px; }
+  .sheet-head .top-back, .sheet-head h3 { margin: 0; }
   .sheet-actions { display: flex; gap: 10px; justify-content: space-between; flex-wrap: wrap; margin-top: 16px; }
   .whos { display: flex; align-items: center; gap: 10px; background: linear-gradient(135deg, #2a75bb, #1b4f8a); color: #fff; border: 3px solid #000; border-radius: 14px; padding: 4px 12px; }
   .whos .sprite { width: 72px; height: 72px; filter: brightness(0); }
@@ -586,11 +589,11 @@
 </div>
 
 <!-- ?v= must change with APP_VERSION so phones fetch the new files -->
-<script src="evo-data.js?v=2026-10-28-8"></script>
-<script src="dex-data.js?v=2026-10-28-8"></script>
-<script src="growth.js?v=2026-10-28-8"></script>
-<script src="regions.js?v=2026-10-28-8"></script>
-<script src="parent.js?v=2026-10-28-8"></script>
+<script src="evo-data.js?v=2026-10-28-9"></script>
+<script src="dex-data.js?v=2026-10-28-9"></script>
+<script src="growth.js?v=2026-10-28-9"></script>
+<script src="regions.js?v=2026-10-28-9"></script>
+<script src="parent.js?v=2026-10-28-9"></script>
 <script>
 (function () {
   "use strict";
@@ -600,7 +603,7 @@
   var REFRESH_MS = 60000;
   // Change on every release: a page left open with older code reloads itself,
   // so every phone works out the same Pokémon.
-  var APP_VERSION = "2026-10-28-8";
+  var APP_VERSION = "2026-10-28-9";
   // Sent with every change; the sheet refuses changes from older pages (MIN_CLIENT_GEN in Code.gs).
   var CLIENT_GEN = 7;
   var STORAGE_KEY = "htrc-2026-autumn-v3";
@@ -2132,6 +2135,25 @@
   function openSheet(id) { el(id).className = "sheet show"; window.scrollTo(0, 0); }
   function closeSheets() { ["readSheet", "mathsSheet", "practiceSheet", "rewardSheet", "monSheet", "tradeSheet", "evoSheet", "parentSheet"].forEach(function (id) { el(id).className = "sheet"; }); }
   Array.prototype.forEach.call(document.querySelectorAll("[data-close]"), function (b) { b.onclick = closeSheets; });
+  // A small ← at the top of every sheet does what its Cancel / Close button at the bottom does.
+  var SHEET_EXITS = { rewardSheet: "rwCancel", evoSheet: "evLater", tradeSheet: "trCancel" };
+  Array.prototype.forEach.call(document.querySelectorAll(".sheet"), function (sheet) {
+    var exit = SHEET_EXITS[sheet.id] ? el(SHEET_EXITS[sheet.id]) : sheet.querySelector("[data-close]");
+    var card = sheet.querySelector(".sheet-card");
+    if (!exit || !card) return;
+    var back = make("button", "top-back", "←");
+    back.type = "button";
+    back.setAttribute("aria-label", "Back");
+    back.onclick = function () { exit.click(); };
+    // Next to the title when the sheet starts with one, otherwise on its own line above the rest.
+    var title = card.firstElementChild;
+    if (title && title.tagName === "H3") {
+      var head = make("div", "sheet-head");
+      card.insertBefore(head, title);
+      head.appendChild(back);
+      head.appendChild(title);
+    } else card.insertBefore(back, card.firstChild);
+  });
   el("openRead").onclick = function () { openSheet("readSheet"); };
   el("openMaths").onclick = function () { openSheet("mathsSheet"); };
 
