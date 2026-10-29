@@ -75,12 +75,13 @@ var Regions = (function () {
     var fresh = pickable(true);
     return fresh.length ? fresh : pickable(false);
   }
-  // Legendary and mythical Pokémon of the open regions that start their family, and whose family the child does not have.
-  function legends(owned) {
+  // Legendary and mythical Pokémon of the open regions (every region when `everywhere`) that start their family,
+  // and whose family the child does not have.
+  function legends(owned, everywhere) {
     var open = progress(owned).open;
     return Object.keys(DEX).map(Number).filter(function (d) {
       var x = DEX[d];
-      return x[5] && x[4] === 0 && x[3] < open && !owned[x[2]];
+      return x[5] && x[4] === 0 && (everywhere || x[3] < open) && !owned[x[2]];
     }).sort(function (a, b) { return a - b; });
   }
   // How common a species is (PokeAPI catch rate: 3 rare ... 255 common).

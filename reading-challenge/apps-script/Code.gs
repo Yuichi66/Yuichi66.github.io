@@ -36,9 +36,17 @@ var PARTNER_COL = 12;
 var SHINY_COL = 13;
 var MAX_ID = 40;
 // Pages older than this may work out Pokémon differently, so their changes are refused.
-var MIN_CLIENT_GEN = 7;
-// Tells pages that this sheet code knows trades (2) and levels, level-up evolutions and Mega Stones (3), the Poké Ball meter (4), all 1,025 Pokémon and regions (5), shiny Pokémon (6).
-var SERVER_GEN = 7;
+var MIN_CLIENT_GEN = 8;
+// Tells pages that this sheet code knows trades (2) and levels, level-up evolutions and Mega Stones (3), the Poké Ball meter (4), all 1,025 Pokémon and regions (5), shiny Pokémon (6), French (7), prize Pokémon (8).
+var SERVER_GEN = 8;
+// Prize Pokémon (type "prize"), one per ball per child once the ball is reached: "title" = ball (1-3),
+// "mon" = the legendary chosen (Great and Ultra Ball), "score" = the prize record made shiny (Master Ball).
+// The same as PRIZE_MONS in index.html.
+var PRIZE_PCTS = [100, 150, 200];
+var PRIZE_MONS = { 1: [144, 145, 146], 2: [150, 151] };
+var SHINY_PRIZE_TIER = 3;
+var PASS_RATE = 0.8;
+var NO_QUIZ = "No quiz";
 // Evolutions from a level or a Mega Stone: "title" holds this word instead of the record that paid for it.
 var GROWTH_KINDS = ["level", "stone"];
 
@@ -60,6 +68,7 @@ function doPost(e) {
     else if (body.action === "delete") deleteEntry_(String(body.id || ""));
     else if (body.action === "settings") saveSettings_(String(body.kid || ""), body.settings);
     else if (body.action === "partner") savePartner_(String(body.kid || ""), String(body.partnerId || ""));
+    else if (body.action === "prize") addPrize_(body.prize);
     else throw new Error("Unknown action");
     return json_(snapshot_());
   } catch (err) {
@@ -90,6 +99,10 @@ function snapshot_() {
         base.kind = "old";
         base.source = kind;
       }
+    }
+    else if (base.type === "prize") {
+      base.tier = Number(r[4]) || 0;
+      base.target = String(r[6] || "");
     }
     else if (base.type === "trade") {
       base.source = String(r[4]);
@@ -370,6 +383,51 @@ function savePeak_(kid, rank) {
   // Mega Stones count from the peak saved before the first rank this sheet code saves.
   if (s.stoneBase === "") setSetting_(kid + ".stoneBase", s.peak === "" ? rank : s.peak);
   if (s.peak === "" || rank > s.peak) setSetting_(kid + ".peak", rank);
+}
+
+// A prize Pokémon. Same id twice = one row; each ball once per child, and only once it is reached.
+function addPrize_(p) {
+  if (!p || p.type !== "prize") throw new Error("Bad prize");
+  var id = String(p.id || "").slice(0, MAX_ID);
+  if (!id) throw new Error("Missing id");
+  if (rowOf_(id) > 0) return;
+  var kid = String(p.kid || ""), tier = Number(p.tier), day = Number(p.day);
+  if (!KIDS.hasOwnProperty(kid)) throw new Error("Unknown kid");
+  if (!isInt_(day) || day < 0 || day >= DAY_COUNT) throw new Error("Bad day");
+  if (!isInt_(tier) || tier < 1 || tier > PRIZE_PCTS.length) throw new Error("Bad prize");
+  var rows = entriesSheet_().getDataRange().getValues().slice(1);
+  function isPrize(r) { return r[2] === "prize" && String(r[1]) === kid; }
+  if (rows.some(function (r) { return isPrize(r) && Number(r[4]) === tier; })) throw new Error("Not possible: that prize was already chosen.");
+  if (prizeTier_(kid, rows) < tier) throw new Error("Not possible: that ball is not reached yet.");
+  var mon = "", target = "";
+  if (tier === SHINY_PRIZE_TIER) {
+    // The Master Ball makes one of the child's own prize Pokémon shiny, while it is in their box.
+    target = String(p.target || "").slice(0, MAX_ID);
+    var won = rows.some(function (r) { return isPrize(r) && String(r[0]) === target && r[MON_COL - 1] !== ""; });
+    if (!won || owners_()[target] !== kid) throw new Error(NOT_POSSIBLE);
+  } else {
+    mon = Number(p.mon);
+    if (PRIZE_MONS[tier].indexOf(mon) < 0) throw new Error("Bad prize");
+  }
+  entriesSheet_().appendRow([id, kid, "prize", day, tier, "Prize", target, "", "", new Date(), mon, "", ""]);
+}
+
+// The highest ball a child has reached (0 = none), worked out like the page: books passed, and for
+// children with times tables the lower of the two goals.
+function prizeTier_(kid, rows) {
+  var s = readSettings_()[kid];
+  var mine = rows.filter(function (r) { return String(r[1]) === kid; });
+  var books = mine.filter(function (r) {
+    return r[2] === "read" && (r[5] === NO_QUIZ || (Number(r[7]) > 0 && Number(r[6]) / Number(r[7]) >= PASS_RATE));
+  }).length;
+  var pct = Math.floor(books / s.target * 100);
+  if (KIDS[kid].maths) {
+    var correct = mine.filter(function (r) { return r[2] === "maths"; }).reduce(function (sum, r) { return sum + (Number(r[8]) || 0); }, 0);
+    pct = Math.min(pct, Math.floor(correct / s.mathsTarget * 100));
+  }
+  var tier = 0;
+  PRIZE_PCTS.forEach(function (need, i) { if (pct >= need) tier = i + 1; });
+  return tier;
 }
 
 // Partner Pokémon shown next to the trainer name, which gets the experience (id of the record that caught it).

@@ -126,6 +126,19 @@
   .tier b { display: block; font-size: 14px; }
   .tier .reward { font-size: 20px; font-weight: bold; margin-top: 2px; }
   .tier small { display: block; font-size: 12px; color: #555; margin-top: 2px; }
+  .tier-mons { display: flex; justify-content: center; flex-wrap: wrap; min-height: 40px; margin-top: 6px; }
+  .tier-mons .sprite { width: 36px; height: 36px; }
+  .tier-shiny { font-size: 28px; line-height: 40px; }
+  .tier-pick { font-size: 12px; font-weight: bold; color: #7b3fe4; margin-top: 2px; }
+  .tier-pick.got { color: #1d7a3a; }
+  .tier .btn.tier-btn { margin-top: 6px; padding: 6px 8px; font-size: 13px; animation: tierGlow 1.2s ease-in-out infinite alternate; }
+  @keyframes tierGlow { from { transform: scale(1); } to { transform: scale(1.08); } }
+  @media (prefers-reduced-motion: reduce) { .tier .btn.tier-btn { animation: none; } }
+  .pz-note { font-size: 13px; color: #555; margin-bottom: 10px; }
+  .pz-list { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 10px; }
+  .pz-opt { border: 3px solid #000; border-radius: 14px; background: #fff; padding: 8px; cursor: pointer; font-family: inherit; font-size: 15px; }
+  .pz-opt:hover, .pz-opt:focus-visible { background: #fff6c8; }
+  .pz-art { width: 100%; max-width: 120px; height: auto; display: block; margin: 0 auto 4px; }
   .next { margin-top: 12px; font-weight: bold; text-align: center; font-size: 16px; }
   .rule { font-size: 12px; color: #555; text-align: center; margin-top: 4px; }
 
@@ -579,6 +592,16 @@
   </div>
 </div>
 
+<!-- Prize Pokémon: choose one legendary (Great / Ultra Ball) or make one shiny (Master Ball) -->
+<div class="sheet" id="prizeSheet">
+  <div class="sheet-card">
+    <h3 id="pzTitle"></h3>
+    <div class="pz-note" id="pzNote"></div>
+    <div class="pz-list" id="pzList"></div>
+    <div class="sheet-actions"><span></span><button class="btn ghost small" type="button" data-close>Not now</button></div>
+  </div>
+</div>
+
 <div class="overlay" id="overlay">
   <div class="overlay-inner">
     <div id="ovArt"></div>
@@ -589,11 +612,11 @@
 </div>
 
 <!-- ?v= must change with APP_VERSION so phones fetch the new files -->
-<script src="evo-data.js?v=2026-10-28-9"></script>
-<script src="dex-data.js?v=2026-10-28-9"></script>
-<script src="growth.js?v=2026-10-28-9"></script>
-<script src="regions.js?v=2026-10-28-9"></script>
-<script src="parent.js?v=2026-10-28-9"></script>
+<script src="evo-data.js?v=2026-10-29-1"></script>
+<script src="dex-data.js?v=2026-10-29-1"></script>
+<script src="growth.js?v=2026-10-29-1"></script>
+<script src="regions.js?v=2026-10-29-1"></script>
+<script src="parent.js?v=2026-10-29-1"></script>
 <script>
 (function () {
   "use strict";
@@ -603,9 +626,9 @@
   var REFRESH_MS = 60000;
   // Change on every release: a page left open with older code reloads itself,
   // so every phone works out the same Pokémon.
-  var APP_VERSION = "2026-10-28-9";
+  var APP_VERSION = "2026-10-29-1";
   // Sent with every change; the sheet refuses changes from older pages (MIN_CLIENT_GEN in Code.gs).
-  var CLIENT_GEN = 7;
+  var CLIENT_GEN = 8;
   var STORAGE_KEY = "htrc-2026-autumn-v3";
   var START = new Date(2026, 9, 24);   // Sat 24 Oct 2026
   var DAY_COUNT = 9;                   // to Sun 1 Nov 2026
@@ -638,10 +661,16 @@
   var PRACTICE_RULE_FROM = 1792947578805;
   // Prize tiers: share of the goal needed, ball, reward.
   var TIERS = [
-    { pct: 100, ball: "great", name: "Great Ball", reward: "£2" },
-    { pct: 150, ball: "ultra", name: "Ultra Ball", reward: "£4" },
-    { pct: 200, ball: "master", name: "Master Ball", reward: "£6" }
+    { pct: 100, ball: "great", name: "Great Ball", reward: "£2", pick: "Pick 1 legendary!" },
+    { pct: 150, ball: "ultra", name: "Ultra Ball", reward: "£4", pick: "Pick 1 legendary!" },
+    { pct: 200, ball: "master", name: "Master Ball", reward: "£6", pick: "Make it SHINY!" }
   ];
+  // Each ball also gives a Pokémon, chosen once, as soon as it is reached (the money is still given on PRIZE_DAY_INDEX):
+  // the Great and Ultra Balls one of their legendary Pokémon, the Master Ball makes one prize Pokémon shiny.
+  // The same as PRIZE_MONS in Code.gs. These are never caught the normal way.
+  var PRIZE_MONS = { 1: [144, 145, 146], 2: [150, 151] };
+  var SHINY_PRIZE_TIER = 3;
+  function isPrizeMon(dex) { return PRIZE_MONS[1].indexOf(dex) >= 0 || PRIZE_MONS[2].indexOf(dex) >= 0; }
 
   // [name, type, colour, national dex number]
   var MONS = [
@@ -835,7 +864,7 @@
       s.settings.mathsTargets[k.id] = k.mathsTarget;
       s.settings.practiceGoals[k.id] = goalsFrom(k.practiceGoals, k);
       s.settings.partnerIds[k.id] = "";
-      s.kids[k.id] = { entries: [], maths: [], practice: [], evolves: [], trades: [] };
+      s.kids[k.id] = { entries: [], maths: [], practice: [], evolves: [], trades: [], prizes: [] };
     });
     return s;
   }
@@ -850,6 +879,7 @@
           if (!base.kids[k.id].practice) base.kids[k.id].practice = [];
           if (!base.kids[k.id].evolves) base.kids[k.id].evolves = [];
           if (!base.kids[k.id].trades) base.kids[k.id].trades = [];
+          if (!base.kids[k.id].prizes) base.kids[k.id].prizes = [];
           if (parsed.settings.targets[k.id]) base.settings.targets[k.id] = parsed.settings.targets[k.id];
           if (parsed.settings.mathsTargets[k.id]) base.settings.mathsTargets[k.id] = parsed.settings.mathsTargets[k.id];
           if (parsed.settings.partnerIds && parsed.settings.partnerIds[k.id]) base.settings.partnerIds[k.id] = parsed.settings.partnerIds[k.id];
@@ -1028,8 +1058,16 @@
   function catchOrder() {
     var d = data(), used = usedForReward();
     function caught(rule) { return function (x) { return x.mon || (loggedAt(x) < PACE_FROM && rule(x)); }; }
-    var list = d.entries.filter(caught(isPass)).concat(d.maths.filter(caught(mathsCatches)), d.practice.filter(caught(practiceCatches)));
+    var list = d.entries.filter(caught(isPass)).concat(d.maths.filter(caught(mathsCatches)), d.practice.filter(caught(practiceCatches)), prizeMons(d));
     return list.filter(function (x) { return !used[x.id]; }).sort(function (a, b) { return loggedAt(a) - loggedAt(b); });
+  }
+  // Prize Pokémon of the Great and Ultra Balls, shiny when the Master Ball prize was used on them.
+  function prizeMons(d) {
+    var prizes = d.prizes || [], shinyIds = {};
+    prizes.forEach(function (p) { if (p.tier === SHINY_PRIZE_TIER) shinyIds[p.target] = true; });
+    return prizes.filter(function (p) { return p.mon; }).map(function (p) {
+      return { id: p.id, kid: p.kid, type: "prize", day: p.day, tier: p.tier, mon: p.mon, shiny: shinyIds[p.id] ? 1 : 0 };
+    });
   }
   // Poké Ball meter of a child: study since PACE_FROM, the same numbers as EXP. extra = a record not saved yet.
   function ballOf(kidId, extra) {
@@ -1109,14 +1147,14 @@
       if (loggedAt(x) >= NEW_MONS_FROM) addNew();
       // A saved Pokémon outside the first 100 (all 1,025 can be caught now): used as it is,
       // and kept out of the old pool and families, which only pick older records again.
-      if (x.mon && monIndex(x.mon) < 0) { byId[x.id] = { no: i, mon: monEntry(x.mon), steps: 0, shiny: !!x.shiny }; return; }
+      if (x.mon && monIndex(x.mon) < 0) { byId[x.id] = { no: i, mon: monEntry(x.mon), steps: 0, shiny: !!x.shiny, tier: x.tier || 0 }; return; }
       // The Pokémon saved with the record is used as it is, so it can never change later.
       var k = x.mon ? monIndex(x.mon) : -1;
       if (k < 0) k = loggedAt(x) >= FAMILY_RULE_FROM ? pickFrom(freshPool(owned, withNew), x.id) : pickFrom(pool, x.id);
       owned[FAMILY(MONS[k][3])] = true;
       pool = pool.filter(function (j) { return j !== k; });
       if (!pool.length) pool = allMonIndexes(withNew);
-      byId[x.id] = { no: i, mon: MONS[k], steps: 0, shiny: !!x.shiny };
+      byId[x.id] = { no: i, mon: MONS[k], steps: 0, shiny: !!x.shiny, tier: x.tier || 0 };
     });
     if (Date.now() >= NEW_MONS_FROM) addNew();
     // `pool` is kept as it was, but it no longer decides the next catch: nextMon() picks from the open regions.
@@ -1146,12 +1184,13 @@
   function isOldEvolve(v) { return (v.kind || "old") === "old"; }
   // The next catch of the selected child: from the open regions (regions.js), chosen from the record's id
   // so every phone shows the same one.
-  // Common Pokémon come more often (PokeAPI catch rate). A big times tables game (LEGEND_MIN correct in one go)
-  // that fills the ball has a 1 in LEGEND_ODDS chance of a legendary or mythical Pokémon of the open regions.
-  var LEGEND_MIN = 100, LEGEND_ODDS = 10;
-  function nextMon(id, bigGame) {
+  // Common Pokémon come more often (PokeAPI catch rate). Any catch has a 1 in LEGEND_ODDS chance of a legendary
+  // or mythical Pokémon of any region (all of Kanto's are prizes, so the open regions alone would give none),
+  // but never a prize one.
+  var LEGEND_ODDS = 100;
+  function nextMon(id) {
     var owned = familiesOf(current), seed = seedOf(id);
-    var legends = bigGame ? Regions.legends(owned) : [];
+    var legends = Regions.legends(owned, true).filter(function (d) { return !isPrizeMon(d); });
     if (legends.length && hashOf("legend-" + seed) % LEGEND_ODDS === 0) return monEntry(legends[hashOf(seed) % legends.length]);
     var list = Regions.candidates(owned);
     var total = list.reduce(function (sum, d) { return sum + Regions.rate(d); }, 0);
@@ -1162,10 +1201,9 @@
     }
     return monEntry(list[list.length - 1]);
   }
-  function isBigGame(item) { return item.type === "maths" && item.correct >= LEGEND_MIN; }
-  // Shiny: 1 in SHINY_ODDS, or 1 in SHINY_ODDS_MATHS when times tables filled the ball. Saved with the record.
-  var SHINY_ODDS = 50, SHINY_ODDS_MATHS = 20;
-  function isShiny(item) { return hashOf("shiny-" + seedOf(item.id)) % (item.type === "maths" ? SHINY_ODDS_MATHS : SHINY_ODDS) === 0; }
+  // Shiny: 1 in SHINY_ODDS, whatever filled the ball. Saved with the record.
+  var SHINY_ODDS = 100;
+  function isShiny(item) { return hashOf("shiny-" + seedOf(item.id)) % SHINY_ODDS === 0; }
   // [name, type, colour, dex] like MONS, for any of the 1,025 (first type and its colour).
   var TYPE_COLOURS = (function () { var c = {}; MONS.forEach(function (m) { c[m[1]] = m[2]; }); return c; })();
   function monEntry(dex) {
@@ -1373,7 +1411,8 @@
       var moreCorrect = need(mathsTarget(), next.pct) - s.correct;
       if (moreCorrect > 0) parts.push(moreCorrect + " more correct answers");
     }
-    return "Next: " + next.name + " (" + next.reward + ") — " + parts.join(" and ");
+    var mon = s.tier + 1 === SHINY_PRIZE_TIER ? "a ✨SHINY legendary!" : "a 🌟legendary Pokémon!";
+    return "Next: " + next.name + " (" + next.reward + ") + " + mon + " — " + parts.join(" and ");
   }
   function renderProgress(s) {
     var stage = Math.min(2, s.tier === 0 ? (s.pct >= 50 ? 1 : 0) : 2);
@@ -1407,11 +1446,89 @@
       var req = need(target(), t.pct) + " books";
       if (kid().maths) req += " + " + need(mathsTarget(), t.pct) + " correct";
       box.appendChild(make("small", "", req));
+      addPrizeMons(box, i + 1, s.tier > i, w);
       ladder.appendChild(box);
     });
 
     el("nextMsg").textContent = prizeNextMessage(s);
-    el("ruleMsg").textContent = (kid().maths ? "Both goals count. " : "") + "You get ONE prize: the highest ball you reach. Prizes are given on Sun 1 Nov.";
+    el("ruleMsg").textContent = (kid().maths ? "Both goals count. " : "") + "You get ONE money prize: the highest ball you reach (given on Sun 1 Nov). " +
+      "Each ball's Pokémon is yours as soon as you reach it!";
+  }
+  // ---------- prize Pokémon ----------
+  function prizeOf(kidId, tier) { return (state.kids[kidId].prizes || []).filter(function (p) { return p.tier === tier; })[0] || null; }
+  // What a ball's prize can be now: its legendary Pokémon the child has never had, or, for the Master Ball,
+  // the child's prize Pokémon in their box that are not shiny yet (record ids).
+  function prizeChoices(kidId, tier, w) {
+    w = w || world();
+    if (tier === SHINY_PRIZE_TIER) {
+      return boxOf(kidId, w).filter(function (m) { return isOwnPrize(kidId, m.id) && !m.c.shiny; }).map(function (m) { return m.id; });
+    }
+    var owned = ownedBy(kidId, w, Regions.speciesOf);
+    return PRIZE_MONS[tier].filter(function (d) { return !owned[d]; });
+  }
+  // A Pokémon the child won as a Great or Ultra Ball prize (a traded one from a brother is not their own prize).
+  function isOwnPrize(kidId, id) { return (state.kids[kidId].prizes || []).some(function (p) { return p.id === id && p.mon; }); }
+  // The prize Pokémon of one ball in the ladder: what it gives, or what was chosen, and a button once it is reached.
+  function addPrizeMons(box, tier, reached, w) {
+    var got = prizeOf(current, tier);
+    var row = make("div", "tier-mons");
+    if (got) {
+      var m = w.mons[tier === SHINY_PRIZE_TIER ? got.target : got.id];
+      if (m) row.appendChild(sprite(m.c.dex, "", m.c.name, m.c.shiny));
+      box.appendChild(row);
+      box.appendChild(make("div", "tier-pick got", "✓ " + (m ? (m.c.shiny ? "✨" : "") + m.c.name : "Got it!")));
+      return;
+    }
+    var choices = prizeChoices(current, tier, w);
+    if (tier === SHINY_PRIZE_TIER) row.appendChild(make("span", "tier-shiny", "✨"));
+    else (choices.length ? choices : PRIZE_MONS[tier]).forEach(function (d) { row.appendChild(sprite(d, "", monEntry(d)[0])); });
+    box.appendChild(row);
+    box.appendChild(make("div", "tier-pick", TIERS[tier - 1].pick));
+    if (!reached) return;
+    if (!choices.length) {
+      var wonOne = (state.kids[current].prizes || []).some(function (p) { return p.mon; });
+      box.appendChild(make("small", "", tier !== SHINY_PRIZE_TIER ? "You have them all!" : wonOne ? "Your prize Pokémon is not in your box" : "Get a legendary prize first!"));
+      return;
+    }
+    var b = make("button", "btn small tier-btn", tier === SHINY_PRIZE_TIER ? "✨ Choose!" : "🌟 Choose!");
+    b.type = "button";
+    b.onclick = function () { openPrize(tier); };
+    box.appendChild(b);
+  }
+  function openPrize(tier) {
+    var w = world(), list = el("pzList");
+    el("pzTitle").textContent = tier === SHINY_PRIZE_TIER ? "✨ Which one becomes SHINY?" : "🌟 Choose your legendary!";
+    el("pzNote").textContent = TIERS[tier - 1].name + " prize · you can choose only once";
+    list.innerHTML = "";
+    prizeChoices(current, tier, w).forEach(function (c) {
+      var m = tier === SHINY_PRIZE_TIER ? w.mons[c] : null;
+      var dex = m ? m.c.dex : c, name = m ? m.c.name : monEntry(c)[0];
+      var b = make("button", "pz-opt");
+      b.type = "button";
+      b.appendChild(artwork(dex, name, "pz-art", !!m));
+      b.appendChild(make("b", "", (m ? "✨" : "") + name));
+      b.onclick = function () { claimPrize(tier, c, dex, name); };
+      list.appendChild(b);
+    });
+    openSheet("prizeSheet");
+  }
+  // The last prize that was "Not saved": sent again with the same id when the same one is chosen
+  // (the sheet may have saved it and only the reply was lost).
+  var claiming = false, prizeTry = null;
+  function claimPrize(tier, choice, dex, name) {
+    if (claiming) return;
+    claiming = true;
+    var shiny = tier === SHINY_PRIZE_TIER, who = current;
+    var again = prizeTry && prizeTry.kid === who && prizeTry.tier === tier && (shiny ? prizeTry.target : prizeTry.mon) === choice;
+    var p = again ? prizeTry : { id: newId(), kid: who, type: "prize", day: clampDay(todayIndex()), tier: tier, mon: shiny ? 0 : choice, target: shiny ? choice : "" };
+    commit({ action: "prize", prize: p }, function () { state.kids[who].prizes.push(p); }, function (ok, refused) {
+      claiming = false;
+      prizeTry = ok || refused ? null : p;
+      if (!ok) return;
+      closeSheets();
+      show(artwork(dex, name, undefined, shiny), shiny ? "✨ WOW! " + name + " is now SHINY!" : "🌟 You got the legendary " + name + "!",
+        TIERS[tier - 1].name + " prize · look in your 🎒 Pokémon box!");
+    });
   }
 
   function renderCollection() {
@@ -1757,8 +1874,9 @@
     }
     var how = el("mdHow");
     how.innerHTML = "";
-    var rec = recordOf(id);
-    var line = make("div", "md-line", (m.from !== current ? "Caught by " + kidName(m.from) + ": " : "") + (rec ? recordText(rec) : "Caught!"));
+    var rec = recordOf(id), prize = m.c.tier ? TIERS[m.c.tier - 1] : null;
+    var how1 = prize ? "🏆 " + prize.name + " prize" + (m.c.shiny ? " · ✨ made shiny with the Master Ball" : "") : rec ? recordText(rec) : "Caught!";
+    var line = make("div", "md-line", (m.from !== current ? (prize ? "Won by " : "Caught by ") + kidName(m.from) + ": " : "") + how1);
     if (rec) line.appendChild(make("small", "", whenText(rec)));
     how.appendChild(line);
     m.moves.forEach(function (mv) {
@@ -1997,6 +2115,7 @@
       else if (PRACTICES[e.type]) next.kids[e.kid].practice.push(e);
       else if (e.type === "evolve") next.kids[e.kid].evolves.push({ id: e.id, kid: e.kid, type: e.type, day: e.day, target: e.site, source: e.source || "",
         kind: e.kind || "old", to: e.to || 0, from: e.from || 0, stone: e.stone || 0, seq: seq });
+      else if (e.type === "prize") next.kids[e.kid].prizes.push({ id: e.id, kid: e.kid, type: e.type, day: e.day, tier: e.tier, mon: e.mon || 0, target: e.target || "", seq: seq });
       else if (e.type === "trade") next.kids[e.kid].trades.push({ id: e.id, kid: e.kid, type: e.type, day: e.day, source: e.source || "", give: e.site, get: e.get || "", with: e.with || "", ticket: e.ticket || 0, seq: seq });
       else next.kids[e.kid].entries.push(e);
     });
@@ -2133,7 +2252,7 @@
 
   // ---------- sheets & overlay ----------
   function openSheet(id) { el(id).className = "sheet show"; window.scrollTo(0, 0); }
-  function closeSheets() { ["readSheet", "mathsSheet", "practiceSheet", "rewardSheet", "monSheet", "tradeSheet", "evoSheet", "parentSheet"].forEach(function (id) { el(id).className = "sheet"; }); }
+  function closeSheets() { ["readSheet", "mathsSheet", "practiceSheet", "rewardSheet", "monSheet", "tradeSheet", "evoSheet", "parentSheet", "prizeSheet"].forEach(function (id) { el(id).className = "sheet"; }); }
   Array.prototype.forEach.call(document.querySelectorAll("[data-close]"), function (b) { b.onclick = closeSheets; });
   // A small ← at the top of every sheet does what its Cancel / Close button at the bottom does.
   var SHEET_EXITS = { rewardSheet: "rwCancel", evoSheet: "evLater", tradeSheet: "trCancel" };
@@ -2177,7 +2296,8 @@
     if (id) openEvolve(id, "level");
   };
   function tierUpMessage(before, after) {
-    var msg = after.tier > before.tier ? "  🏆 " + TIERS[after.tier - 1].name + " unlocked! (" + TIERS[after.tier - 1].reward + ")" : "";
+    var msg = after.tier > before.tier ? "  🏆 " + TIERS[after.tier - 1].name + " unlocked! (" + TIERS[after.tier - 1].reward + ")" +
+      (!prizeOf(current, after.tier) && prizeChoices(current, after.tier).length ? " Choose your prize Pokémon in My progress!" : "") : "";
     if (after.rank > before.rank) msg += "  ⭐ RANK UP! You are now a " + RANKS[after.rank] + "!";
     return msg;
   }
@@ -2283,7 +2403,7 @@
     var who = item.kid;
     // A record that catches saves its Pokémon now, so no later change can turn it into another one.
     if (wins && !ev) {
-      item.mon = forKid(who, function () { return nextMon(item.id, isBigGame(item))[3]; });
+      item.mon = forKid(who, function () { return nextMon(item.id)[3]; });
       item.shiny = isShiny(item) ? 1 : 0;
     }
     // The partner now gets this record's experience (saved with the record, so it never moves).
