@@ -626,7 +626,7 @@
   var REFRESH_MS = 60000;
   // Change on every release: a page left open with older code reloads itself,
   // so every phone works out the same Pokémon.
-  var APP_VERSION = "2026-10-29-1";
+  var APP_VERSION = "2026-11-01-1";
   // Sent with every change; the sheet refuses changes from older pages (MIN_CLIENT_GEN in Code.gs).
   var CLIENT_GEN = 8;
   var STORAGE_KEY = "htrc-2026-autumn-v3";
@@ -2251,7 +2251,13 @@
   }
 
   // ---------- sheets & overlay ----------
-  function openSheet(id) { el(id).className = "sheet show"; window.scrollTo(0, 0); }
+  // A page left open for days still starts every form on today.
+  function openSheet(id) {
+    var day = el(id).querySelector(".day-select");
+    if (day) day.value = String(clampDay(todayIndex()));
+    el(id).className = "sheet show";
+    window.scrollTo(0, 0);
+  }
   function closeSheets() { ["readSheet", "mathsSheet", "practiceSheet", "rewardSheet", "monSheet", "tradeSheet", "evoSheet", "parentSheet", "prizeSheet"].forEach(function (id) { el(id).className = "sheet"; }); }
   Array.prototype.forEach.call(document.querySelectorAll("[data-close]"), function (b) { b.onclick = closeSheets; });
   // A small ← at the top of every sheet does what its Cancel / Close button at the bottom does.
