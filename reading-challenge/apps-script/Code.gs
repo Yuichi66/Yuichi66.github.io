@@ -16,7 +16,7 @@ var PRACTICE_SITES = { latin: "Latin", mymaths: "MyMaths", french: "French" };
 // Practice goals (correct answers), saved as "<kid>.<type>Goal". Only shown as progress, not used for prizes.
 var MIN_PRACTICE_GOAL = 10;
 var MAX_PRACTICE_GOAL = 100000;
-var DAY_COUNT = 9;
+var DAY_COUNT = 16;
 var MAX_TITLE = 120;
 var MAX_SCORE = 50;
 var MAX_CORRECT = 2000;

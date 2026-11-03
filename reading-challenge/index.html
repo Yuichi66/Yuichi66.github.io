@@ -153,8 +153,8 @@
   details.collection > summary::before { content: "▶ "; }
   details.collection[open] > summary::before { content: "▼ "; }
   .sub-h { font-weight: bold; margin: 16px 0 8px; }
-  .days { display: grid; grid-template-columns: repeat(9, minmax(0, 1fr)); gap: 4px; }
-  @media (max-width: 600px) { .days { grid-template-columns: repeat(5, minmax(0, 1fr)); } }
+  .days { display: grid; grid-template-columns: repeat(8, minmax(0, 1fr)); gap: 4px; }
+  @media (max-width: 600px) { .days { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
   .day { text-align: center; border: 2px solid #000; border-radius: 10px; padding: 4px 2px; background: #fff; font-size: 11px; }
   .day.today { box-shadow: 0 0 0 3px var(--yellow); }
   .day .ball { width: 28px; height: 28px; margin: 4px auto 2px; border-width: 2px; }
@@ -626,13 +626,13 @@
   var REFRESH_MS = 60000;
   // Change on every release: a page left open with older code reloads itself,
   // so every phone works out the same Pokémon.
-  var APP_VERSION = "2026-11-01-1";
+  var APP_VERSION = "2026-11-03-1";
   // Sent with every change; the sheet refuses changes from older pages (MIN_CLIENT_GEN in Code.gs).
   var CLIENT_GEN = 8;
   var STORAGE_KEY = "htrc-2026-autumn-v3";
   var START = new Date(2026, 9, 24);   // Sat 24 Oct 2026
-  var DAY_COUNT = 9;                   // to Sun 1 Nov 2026
-  var PRIZE_DAY_INDEX = 8;             // prizes are opened on Sun 1 Nov
+  var DAY_COUNT = 16;                  // to Sun 8 Nov 2026 (extended by a week)
+  var PRIZE_DAY_INDEX = 15;            // prizes are opened on Sun 8 Nov
   var PASS_RATE = 0.8;
   var BURST_RATE = 0.9;
   var CATCH_WOBBLE_MS = 1500;
@@ -1451,7 +1451,7 @@
     });
 
     el("nextMsg").textContent = prizeNextMessage(s);
-    el("ruleMsg").textContent = (kid().maths ? "Both goals count. " : "") + "You get ONE money prize: the highest ball you reach (given on Sun 1 Nov). " +
+    el("ruleMsg").textContent = (kid().maths ? "Both goals count. " : "") + "You get ONE money prize: the highest ball you reach (given on Sun 8 Nov). " +
       "Each ball's Pokémon is yours as soon as you reach it!";
   }
   // ---------- prize Pokémon ----------
