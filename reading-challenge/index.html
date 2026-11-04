@@ -167,6 +167,13 @@
   .entry .mon { font-weight: bold; }
   .entry .type { display: inline-block; font-size: 11px; color: #fff; padding: 1px 7px; border-radius: 8px; }
   .entry .title { margin-top: 4px; font-size: 14px; }
+  .badge-card { background: linear-gradient(135deg, #fff6c2, #ffd84d); text-align: center; }
+  .badge-medal { font-size: 44px; animation: tierGlow 1s ease-in-out infinite alternate; }
+  .overlay-inner > * { position: relative; z-index: 1; }
+  .overlay-inner > #ovArt { z-index: 0; }
+  .overlay .confetti { position: fixed; inset: 0; pointer-events: none; overflow: hidden; }
+  .overlay .confetti span { position: absolute; top: -10%; font-size: 30px; animation: confetti 3s linear infinite; }
+  @keyframes confetti { to { transform: translateY(120vh) rotate(360deg); } }
   .partner-btn { display: block; margin-top: 4px; font-family: inherit; font-size: 12px; font-weight: bold; cursor: pointer; border: 2px solid #000; border-radius: 10px; padding: 2px 8px; background: #fff; }
   .partner-btn.on { background: var(--yellow); cursor: default; }
   .reward-pick { display: grid; gap: 12px; margin-top: 14px; }
@@ -404,6 +411,10 @@
   <section class="panel">
     <details class="collection">
       <summary>📜 Records</summary>
+      <div id="giftWrap" class="hidden">
+        <div class="sub-h">🏅 Prize badges</div>
+        <div class="dex" id="giftLog"></div>
+      </div>
       <div class="sub-h">Book-dex</div>
       <div class="dex" id="dex"></div>
       <div class="sub-h">Gym badges (a book passed each day)</div>
@@ -626,7 +637,7 @@
   var REFRESH_MS = 60000;
   // Change on every release: a page left open with older code reloads itself,
   // so every phone works out the same Pokémon.
-  var APP_VERSION = "2026-11-03-1";
+  var APP_VERSION = "2026-11-04-1";
   // Sent with every change; the sheet refuses changes from older pages (MIN_CLIENT_GEN in Code.gs).
   var CLIENT_GEN = 8;
   var STORAGE_KEY = "htrc-2026-autumn-v3";
@@ -864,7 +875,7 @@
       s.settings.mathsTargets[k.id] = k.mathsTarget;
       s.settings.practiceGoals[k.id] = goalsFrom(k.practiceGoals, k);
       s.settings.partnerIds[k.id] = "";
-      s.kids[k.id] = { entries: [], maths: [], practice: [], evolves: [], trades: [], prizes: [] };
+      s.kids[k.id] = { entries: [], maths: [], practice: [], evolves: [], trades: [], prizes: [], gifts: [] };
     });
     return s;
   }
@@ -880,6 +891,7 @@
           if (!base.kids[k.id].evolves) base.kids[k.id].evolves = [];
           if (!base.kids[k.id].trades) base.kids[k.id].trades = [];
           if (!base.kids[k.id].prizes) base.kids[k.id].prizes = [];
+          if (!base.kids[k.id].gifts) base.kids[k.id].gifts = [];
           if (parsed.settings.targets[k.id]) base.settings.targets[k.id] = parsed.settings.targets[k.id];
           if (parsed.settings.mathsTargets[k.id]) base.settings.mathsTargets[k.id] = parsed.settings.mathsTargets[k.id];
           if (parsed.settings.partnerIds && parsed.settings.partnerIds[k.id]) base.settings.partnerIds[k.id] = parsed.settings.partnerIds[k.id];
@@ -1058,7 +1070,7 @@
   function catchOrder() {
     var d = data(), used = usedForReward();
     function caught(rule) { return function (x) { return x.mon || (loggedAt(x) < PACE_FROM && rule(x)); }; }
-    var list = d.entries.filter(caught(isPass)).concat(d.maths.filter(caught(mathsCatches)), d.practice.filter(caught(practiceCatches)), prizeMons(d));
+    var list = d.entries.filter(caught(isPass)).concat(d.maths.filter(caught(mathsCatches)), d.practice.filter(caught(practiceCatches)), prizeMons(d), giftMons(d));
     return list.filter(function (x) { return !used[x.id]; }).sort(function (a, b) { return loggedAt(a) - loggedAt(b); });
   }
   // Prize Pokémon of the Great and Ultra Balls, shiny when the Master Ball prize was used on them.
@@ -1068,6 +1080,19 @@
     return prizes.filter(function (p) { return p.mon; }).map(function (p) {
       return { id: p.id, kid: p.kid, type: "prize", day: p.day, tier: p.tier, mon: p.mon, shiny: shinyIds[p.id] ? 1 : 0 };
     });
+  }
+  // Prizes given by a grown-up (a "gift" row added to the sheet by hand): the Pokémon in "mon" joins the box.
+  function giftMons(d) {
+    return (d.gifts || []).filter(function (g) { return g.mon; }).map(function (g) {
+      return { id: g.id, kid: g.kid, type: "gift", day: g.day, mon: g.mon, shiny: 0 };
+    });
+  }
+  function giftOf(id) {
+    for (var i = 0; i < KIDS.length; i++) {
+      var g = (state.kids[KIDS[i].id].gifts || []).filter(function (x) { return x.id === id; })[0];
+      if (g) return g;
+    }
+    return null;
   }
   // Poké Ball meter of a child: study since PACE_FROM, the same numbers as EXP. extra = a record not saved yet.
   function ballOf(kidId, extra) {
@@ -1531,7 +1556,24 @@
     });
   }
 
+  // Prize badges: prizes given by a grown-up, each with the Pokémon that came with it.
+  function renderGifts() {
+    var gifts = data().gifts || [], log = el("giftLog"), byId = catches().byId;
+    el("giftWrap").className = gifts.length ? "" : "hidden";
+    log.innerHTML = "";
+    gifts.forEach(function (g) {
+      var c = byId[g.id];
+      var card = make("div", "entry badge-card");
+      card.appendChild(make("div", "badge-medal", "🏅"));
+      card.appendChild(make("div", "title", g.title));
+      card.appendChild(make("div", "mon", "🎁 Prize: " + (c ? c.name : "a Pokémon")));
+      card.appendChild(make("div", "meta", fmt(dayDate(g.day))));
+      log.appendChild(card);
+    });
+  }
+
   function renderCollection() {
+    renderGifts();
     var dex = el("dex");
     dex.innerHTML = "";
     var list = data().entries;
@@ -1874,9 +1916,10 @@
     }
     var how = el("mdHow");
     how.innerHTML = "";
-    var rec = recordOf(id), prize = m.c.tier ? TIERS[m.c.tier - 1] : null;
-    var how1 = prize ? "🏆 " + prize.name + " prize" + (m.c.shiny ? " · ✨ made shiny with the Master Ball" : "") : rec ? recordText(rec) : "Caught!";
-    var line = make("div", "md-line", (m.from !== current ? (prize ? "Won by " : "Caught by ") + kidName(m.from) + ": " : "") + how1);
+    var rec = recordOf(id), prize = m.c.tier ? TIERS[m.c.tier - 1] : null, gift = giftOf(id);
+    var how1 = prize ? "🏆 " + prize.name + " prize" + (m.c.shiny ? " · ✨ made shiny with the Master Ball" : "") : gift ? "🏅 Prize: " + gift.title : rec ? recordText(rec) : "Caught!";
+    var line = make("div", "md-line", (m.from !== current ? (prize || gift ? "Won by " : "Caught by ") + kidName(m.from) + ": " : "") + how1);
+    if (gift) line.appendChild(make("small", "", fmt(dayDate(gift.day))));
     if (rec) line.appendChild(make("small", "", whenText(rec)));
     how.appendChild(line);
     m.moves.forEach(function (mv) {
@@ -2086,6 +2129,7 @@
     renderCollection();
     renderSheets();
     renderSettings();
+    celebrateGift();
   }
 
   // ---------- shared storage (Google Sheet via Apps Script) ----------
@@ -2117,6 +2161,7 @@
         kind: e.kind || "old", to: e.to || 0, from: e.from || 0, stone: e.stone || 0, seq: seq });
       else if (e.type === "prize") next.kids[e.kid].prizes.push({ id: e.id, kid: e.kid, type: e.type, day: e.day, tier: e.tier, mon: e.mon || 0, target: e.target || "", seq: seq });
       else if (e.type === "trade") next.kids[e.kid].trades.push({ id: e.id, kid: e.kid, type: e.type, day: e.day, source: e.source || "", give: e.site, get: e.get || "", with: e.with || "", ticket: e.ticket || 0, seq: seq });
+      else if (e.type === "gift") next.kids[e.kid].gifts.push({ id: e.id, kid: e.kid, type: e.type, day: e.day, title: e.title || "", mon: e.mon || 0, seq: seq });
       else next.kids[e.kid].entries.push(e);
     });
     if (ticketTry && next.kids[ticketTry.tx.kid].trades.some(function (t) { return t.id === ticketTry.tx.id; })) ticketTry = null;
@@ -2283,6 +2328,7 @@
   el("openMaths").onclick = function () { openSheet("mathsSheet"); };
 
   function show(artNode, big, mid) {
+    showingGift = null;
     var art = el("ovArt");
     art.innerHTML = "";
     if (artNode) art.appendChild(artNode);
@@ -2296,6 +2342,7 @@
     el("overlay").className = "overlay show";
   }
   el("ovClose").onclick = function () {
+    giftClosed();
     el("overlay").className = "overlay";
     var id = evolveAfterOk;
     evolveAfterOk = null;
@@ -2486,6 +2533,39 @@
     var mid = (noQuiz(entry) ? "Book done!" : entry.score + "/" + entry.total) + tierUpMessage(before, after);
     if (wins) catchPokemon(entry, ballClass(entry), "", mid);
     else show(make("div", "ball huge " + ballClass(entry)), "Book passed! 📖", mid + "  ·  " + ballText(entry.kid));
+  }
+
+  // A prize given by a grown-up: a big "Congratulations" the first time its child's page is shown on this phone.
+  var GIFT_SEEN_KEY = "htrc-gifts-seen", showingGift = null;
+  var giftsSeen = (function () {
+    try { return JSON.parse(window.localStorage.getItem(GIFT_SEEN_KEY) || "{}") || {}; }
+    catch (e) { return {}; }
+  })();
+  function celebrateGift() {
+    if (growthNote || document.querySelector(".sheet.show, .overlay.show")) return;
+    var g = (data().gifts || []).filter(function (x) { return !giftsSeen[x.id]; })[0];
+    if (!g) return;
+    var c = catches().byId[g.id];
+    var name = c ? c.name : "a Pokémon";
+    show(artwork(c ? c.dex : g.mon, name), "🎉 CONGRATULATIONS, " + kidName(current) + "! 🎉",
+      "🏅 " + g.title + "! You got " + name + "! Look in your 🎒 Pokémon box.");
+    var party = make("div", "confetti");
+    for (var i = 0; i < 24; i++) {
+      var bit = make("span", "", ["🎉", "✨", "🌟", "🏅", "🎊"][i % 5]);
+      bit.style.left = (i * 4.1) + "%";
+      bit.style.animationDelay = (i % 6) * 0.4 + "s";
+      party.appendChild(bit);
+    }
+    el("ovArt").appendChild(party);
+    showingGift = g.id;
+  }
+  // Seen only once OK is pressed on it (another message can replace it before that).
+  function giftClosed() {
+    if (!showingGift) return;
+    giftsSeen[showingGift] = true;
+    showingGift = null;
+    try { window.localStorage.setItem(GIFT_SEEN_KEY, JSON.stringify(giftsSeen)); }
+    catch (e) { /* storage unavailable: shown once while the page is open */ }
   }
 
   // The old Pokémon glows white, then the evolved one pops out.
