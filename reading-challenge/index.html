@@ -2612,7 +2612,8 @@
       var cfg = PRACTICES[type];
       practiceType = type;
       el("pTitle").textContent = cfg.icon + " " + cfg.name;
-      el("pRule").textContent = "Every correct answer gives EXP and fills your Poké Ball. A full ball (" + BALL_POINTS.toLocaleString("en-GB") + ") catches a NEW Pokémon!";
+      var rate = type === "mymaths" ? "Every correct answer fills your Poké Ball by 1 and gives 1 EXP." : "You get 1 EXP and fill your Poké Ball by 1 for every 2 correct answers.";
+      el("pRule").textContent = rate + " A full ball (" + BALL_POINTS.toLocaleString("en-GB") + ") catches a NEW Pokémon!";
       openSheet("practiceSheet");
     };
   });
