@@ -41,12 +41,9 @@ var MIN_CLIENT_GEN = 9;
 // Tells pages that this sheet code knows trades (2) and levels, level-up evolutions and Mega Stones (3), the Poké Ball meter (4), all 1,025 Pokémon and regions (5), shiny Pokémon (6), French (7), prize Pokémon (8), no end date, holiday events and the parent PIN (9).
 var SERVER_GEN = 9;
 var EVENT_BOOKS = 5;
-// Prize Pokémon (type "prize"), one per ball per child once the ball is reached: "title" = ball (1-3),
-// "mon" = the legendary chosen (Great and Ultra Ball), "score" = the prize record made shiny (Master Ball).
-// The same as PRIZE_MONS in index.html.
-var PRIZE_PCTS = [100, 150, 200];
+// The legendary Pokémon of the old ball prizes (type "prize" rows still in the sheet). They are never caught the
+// normal way and are not offered as event Pokémon. The same as PRIZE_MONS in index.html.
 var PRIZE_MONS = { 1: [144, 145, 146], 2: [150, 151] };
-var SHINY_PRIZE_TIER = 3;
 var PASS_RATE = 0.8;
 var NO_QUIZ = "No quiz";
 // Evolutions from a level or a Mega Stone: "title" holds this word instead of the record that paid for it.
@@ -70,7 +67,6 @@ function doPost(e) {
     else if (body.action === "delete") deleteEntry_(String(body.id || ""));
     else if (body.action === "settings") saveSettings_(String(body.kid || ""), body.settings);
     else if (body.action === "partner") savePartner_(String(body.kid || ""), String(body.partnerId || ""));
-    else if (body.action === "prize") addPrize_(body.prize);
     else if (body.action === "parentCheck") checkPin_(body.pin);
     else if (body.action === "event") saveEvent_(body.pin, String(body.start || ""), String(body.end || ""));
     else if (body.action === "eventmon") addEventMon_(body.entry);
@@ -393,51 +389,6 @@ function savePeak_(kid, rank) {
   if (s.peak === "" || rank > s.peak) setSetting_(kid + ".peak", rank);
 }
 
-// A prize Pokémon. Same id twice = one row; each ball once per child, and only once it is reached.
-function addPrize_(p) {
-  if (!p || p.type !== "prize") throw new Error("Bad prize");
-  var id = String(p.id || "").slice(0, MAX_ID);
-  if (!id) throw new Error("Missing id");
-  if (rowOf_(id) > 0) return;
-  var kid = String(p.kid || ""), tier = Number(p.tier), day = Number(p.day);
-  if (!KIDS.hasOwnProperty(kid)) throw new Error("Unknown kid");
-  if (!isInt_(day) || day < 0 || day > MAX_DAY) throw new Error("Bad day");
-  if (!isInt_(tier) || tier < 1 || tier > PRIZE_PCTS.length) throw new Error("Bad prize");
-  var rows = entriesSheet_().getDataRange().getValues().slice(1);
-  function isPrize(r) { return r[2] === "prize" && String(r[1]) === kid; }
-  if (rows.some(function (r) { return isPrize(r) && Number(r[4]) === tier; })) throw new Error("Not possible: that prize was already chosen.");
-  if (prizeTier_(kid, rows) < tier) throw new Error("Not possible: that ball is not reached yet.");
-  var mon = "", target = "";
-  if (tier === SHINY_PRIZE_TIER) {
-    // The Master Ball makes one of the child's own prize Pokémon shiny, while it is in their box.
-    target = String(p.target || "").slice(0, MAX_ID);
-    var won = rows.some(function (r) { return isPrize(r) && String(r[0]) === target && r[MON_COL - 1] !== ""; });
-    if (!won || owners_()[target] !== kid) throw new Error(NOT_POSSIBLE);
-  } else {
-    mon = Number(p.mon);
-    if (PRIZE_MONS[tier].indexOf(mon) < 0) throw new Error("Bad prize");
-  }
-  entriesSheet_().appendRow([id, kid, "prize", day, tier, "Prize", target, "", "", new Date(), mon, "", ""]);
-}
-
-// The highest ball a child has reached (0 = none), worked out like the page: books passed, and for
-// children with times tables the lower of the two goals.
-function prizeTier_(kid, rows) {
-  var s = readSettings_()[kid];
-  var mine = rows.filter(function (r) { return String(r[1]) === kid; });
-  var books = mine.filter(function (r) {
-    return r[2] === "read" && (r[5] === NO_QUIZ || (Number(r[7]) > 0 && Number(r[6]) / Number(r[7]) >= PASS_RATE));
-  }).length;
-  var pct = Math.floor(books / s.target * 100);
-  if (KIDS[kid].maths) {
-    var correct = mine.filter(function (r) { return r[2] === "maths"; }).reduce(function (sum, r) { return sum + (Number(r[8]) || 0); }, 0);
-    pct = Math.min(pct, Math.floor(correct / s.mathsTarget * 100));
-  }
-  var tier = 0;
-  PRIZE_PCTS.forEach(function (need, i) { if (pct >= need) tier = i + 1; });
-  return tier;
-}
-
 // Partner Pokémon shown next to the trainer name, which gets the experience (id of the record that caught it).
 function savePartner_(kid, partnerId) {
   if (!KIDS.hasOwnProperty(kid)) throw new Error("Unknown kid");
@@ -446,9 +397,20 @@ function savePartner_(kid, partnerId) {
 }
 
 // The parent PIN lives in Script Properties (PARENT_PIN), never in the page.
+// After MAX_PIN_TRIES wrong tries in a row, every PIN is refused for PIN_LOCK_SECONDS. A right PIN starts the count again.
+var MAX_PIN_TRIES = 5;
+var PIN_LOCK_SECONDS = 15 * 60;
+var PIN_FAILS_KEY = "pinFails";
 function checkPin_(pin) {
+  var cache = CacheService.getScriptCache();
+  var fails = Number(cache.get(PIN_FAILS_KEY)) || 0;
+  if (fails >= MAX_PIN_TRIES) throw new Error("Too many tries. Wait 15 minutes.");
   var want = PropertiesService.getScriptProperties().getProperty("PARENT_PIN");
-  if (!want || String(pin || "") !== String(want)) throw new Error("Wrong PIN");
+  if (!want || String(pin || "") !== String(want)) {
+    cache.put(PIN_FAILS_KEY, String(fails + 1), PIN_LOCK_SECONDS);
+    throw new Error("Wrong PIN");
+  }
+  cache.remove(PIN_FAILS_KEY);
 }
 
 // Holiday event dates (YYYY-MM-DD, both included). Two empty dates end the event.
@@ -470,10 +432,9 @@ function saveEvent_(pin, start, end) {
     return;
   }
   if (started) {
-    // Ending: close at yesterday (at least the first day). Replacing: the old window stops after today.
-    var closeAt;
-    if (!start) closeAt = yesterday < cur.start ? cur.start : (cur.end < yesterday ? cur.end : yesterday);
-    else closeAt = cur.end < today ? cur.end : today;
+    // Ending or replacing: the old window stops after today (today is still part of it, so records
+    // logged today keep their 2x), or at its own last day if that has gone already.
+    var closeAt = cur.end < today ? cur.end : today;
     past.push({ start: cur.start, end: closeAt });
     setSetting_("event.past", JSON.stringify(past));
   }
@@ -494,8 +455,10 @@ function readEventPast_() {
     .filter(function (w) { return ok.test(w.start) && ok.test(w.end); });
 }
 
+// The family's day is the UK day, whatever time zone the script project is set to.
+var DAY_ZONE = "Europe/London";
 function dayKey_(ms) {
-  return Utilities.formatDate(new Date(ms), Session.getScriptTimeZone(), "yyyy-MM-dd");
+  return Utilities.formatDate(new Date(ms), DAY_ZONE, "yyyy-MM-dd");
 }
 
 // The event Pokémon: once per child per event, after EVENT_BOOKS books passed during it.
@@ -515,9 +478,9 @@ function addEventMon_(x) {
   if (rows.some(function (r) { return r[2] === "event" && String(r[1]) === kid && cellDay_(r[4], "event") === ev.start; })) throw new Error("Not possible: the event Pokémon was already chosen.");
   var books = rows.filter(function (r) {
     if (r[2] !== "read" || String(r[1]) !== kid) return false;
-    var at = Number(String(r[0]).split("-")[0]);
-    if (!(at > 1e12)) return false;
-    var k = dayKey_(at);
+    // The time the sheet wrote the row (the "createdAt" column), not the id the page chose.
+    if (!(r[9] instanceof Date)) return false;
+    var k = dayKey_(r[9].getTime());
     var passed = r[5] === NO_QUIZ || (Number(r[7]) > 0 && Number(r[6]) / Number(r[7]) >= PASS_RATE);
     return passed && k >= ev.start && k <= ev.end;
   }).length;
