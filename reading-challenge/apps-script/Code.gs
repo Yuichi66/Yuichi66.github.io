@@ -16,7 +16,8 @@ var PRACTICE_SITES = { latin: "Latin", mymaths: "MyMaths", french: "French" };
 // Practice goals (correct answers), saved as "<kid>.<type>Goal". Only shown as progress, not used for prizes.
 var MIN_PRACTICE_GOAL = 10;
 var MAX_PRACTICE_GOAL = 100000;
-var DAY_COUNT = 16;
+// Day numbers count from Sat 24 Oct 2026 and have no end (about 10 years allowed).
+var MAX_DAY = 3650;
 var MAX_TITLE = 120;
 var MAX_SCORE = 50;
 var MAX_CORRECT = 2000;
@@ -36,9 +37,10 @@ var PARTNER_COL = 12;
 var SHINY_COL = 13;
 var MAX_ID = 40;
 // Pages older than this may work out Pokémon differently, so their changes are refused.
-var MIN_CLIENT_GEN = 8;
-// Tells pages that this sheet code knows trades (2) and levels, level-up evolutions and Mega Stones (3), the Poké Ball meter (4), all 1,025 Pokémon and regions (5), shiny Pokémon (6), French (7), prize Pokémon (8).
-var SERVER_GEN = 8;
+var MIN_CLIENT_GEN = 9;
+// Tells pages that this sheet code knows trades (2) and levels, level-up evolutions and Mega Stones (3), the Poké Ball meter (4), all 1,025 Pokémon and regions (5), shiny Pokémon (6), French (7), prize Pokémon (8), no end date, holiday events and the parent PIN (9).
+var SERVER_GEN = 9;
+var EVENT_BOOKS = 5;
 // Prize Pokémon (type "prize"), one per ball per child once the ball is reached: "title" = ball (1-3),
 // "mon" = the legendary chosen (Great and Ultra Ball), "score" = the prize record made shiny (Master Ball).
 // The same as PRIZE_MONS in index.html.
@@ -69,6 +71,9 @@ function doPost(e) {
     else if (body.action === "settings") saveSettings_(String(body.kid || ""), body.settings);
     else if (body.action === "partner") savePartner_(String(body.kid || ""), String(body.partnerId || ""));
     else if (body.action === "prize") addPrize_(body.prize);
+    else if (body.action === "parentCheck") checkPin_(body.pin);
+    else if (body.action === "event") saveEvent_(body.pin, String(body.start || ""), String(body.end || ""));
+    else if (body.action === "eventmon") addEventMon_(body.entry);
     else throw new Error("Unknown action");
     return json_(snapshot_());
   } catch (err) {
@@ -119,7 +124,9 @@ function snapshot_() {
     }
     return base;
   });
-  return { ok: true, gen: SERVER_GEN, entries: entries, settings: readSettings_() };
+  var settings = readSettings_();
+  settings.event = readEvent_();
+  return { ok: true, gen: SERVER_GEN, entries: entries, settings: settings };
 }
 
 // Saves a record, and the evolution or trade it paid for, all or nothing. Sending the same record twice
@@ -165,7 +172,7 @@ function addGrowthEvolve_(ev) {
   var to = Number(ev.to), from = Number(ev.from), day = Number(ev.day);
   if (!id || !KIDS.hasOwnProperty(kid) || !target) throw new Error("Bad evolution");
   if (!isInt_(to) || to <= 0 || to > MAX_FORM || !isInt_(from) || from <= 0 || from > MAX_FORM || to === from) throw new Error("Bad evolution");
-  if (!isInt_(day) || day < 0 || day >= DAY_COUNT) throw new Error("Bad day");
+  if (!isInt_(day) || day < 0 || day > MAX_DAY) throw new Error("Bad day");
   if (ev.kind === "level" && id !== "lv-" + target + "-" + from) throw new Error("Bad evolution");
   var rows = entriesSheet_().getDataRange().getValues().slice(1);
   var same = rows.filter(function (r) { return String(r[0]) === id; })[0];
@@ -275,7 +282,7 @@ function addEntry_(x) {
   var kid = String(x.kid || "");
   var day = Number(x.day);
   if (!KIDS.hasOwnProperty(kid)) throw new Error("Unknown kid");
-  if (!isInt_(day) || day < 0 || day >= DAY_COUNT) throw new Error("Bad day");
+  if (!isInt_(day) || day < 0 || day > MAX_DAY) throw new Error("Bad day");
   var id = String(x.id || Utilities.getUuid()).slice(0, 40);
 
   if (x.type === "maths") {
@@ -393,7 +400,7 @@ function addPrize_(p) {
   if (rowOf_(id) > 0) return;
   var kid = String(p.kid || ""), tier = Number(p.tier), day = Number(p.day);
   if (!KIDS.hasOwnProperty(kid)) throw new Error("Unknown kid");
-  if (!isInt_(day) || day < 0 || day >= DAY_COUNT) throw new Error("Bad day");
+  if (!isInt_(day) || day < 0 || day > MAX_DAY) throw new Error("Bad day");
   if (!isInt_(tier) || tier < 1 || tier > PRIZE_PCTS.length) throw new Error("Bad prize");
   var rows = entriesSheet_().getDataRange().getValues().slice(1);
   function isPrize(r) { return r[2] === "prize" && String(r[1]) === kid; }
@@ -435,6 +442,64 @@ function savePartner_(kid, partnerId) {
   if (!KIDS.hasOwnProperty(kid)) throw new Error("Unknown kid");
   if (!partnerId || partnerId.length > MAX_ID || owners_()[partnerId] !== kid) throw new Error(NOT_POSSIBLE);
   setSetting_(kid + ".partnerId", partnerId);
+}
+
+// The parent PIN lives in Script Properties (PARENT_PIN), never in the page.
+function checkPin_(pin) {
+  var want = PropertiesService.getScriptProperties().getProperty("PARENT_PIN");
+  if (!want || String(pin || "") !== String(want)) throw new Error("Wrong PIN");
+}
+
+// Holiday event dates (YYYY-MM-DD, both included). Two empty dates end the event.
+function saveEvent_(pin, start, end) {
+  checkPin_(pin);
+  var ok = /^\d{4}-\d{2}-\d{2}$/;
+  if (start || end) {
+    if (!ok.test(start) || !ok.test(end) || start > end) throw new Error("Bad event dates");
+  }
+  setSetting_("event.start", start);
+  setSetting_("event.end", end);
+}
+
+function dayKey_(ms) {
+  return Utilities.formatDate(new Date(ms), Session.getScriptTimeZone(), "yyyy-MM-dd");
+}
+
+// The event Pokémon: once per child per event, after EVENT_BOOKS books passed during it.
+// The page picks the species (the sheet has no Pokémon data); the sheet keeps prize legendaries out.
+function addEventMon_(x) {
+  if (!x) throw new Error("Missing entry");
+  var id = String(x.id || "").slice(0, MAX_ID), kid = String(x.kid || ""), mon = Number(x.mon), day = Number(x.day);
+  if (!id) throw new Error("Missing id");
+  if (rowOf_(id) > 0) return;
+  if (!KIDS.hasOwnProperty(kid)) throw new Error("Unknown kid");
+  if (!isInt_(day) || day < 0 || day > MAX_DAY) throw new Error("Bad day");
+  if (!isInt_(mon) || mon <= 0 || mon > MAX_FORM || PRIZE_MONS[1].concat(PRIZE_MONS[2]).indexOf(mon) >= 0) throw new Error("Bad Pokémon");
+  var ev = readEvent_();
+  var today = dayKey_(Date.now());
+  if (!ev.start || today < ev.start || today > ev.end) throw new Error("Not possible: no holiday event now.");
+  var rows = entriesSheet_().getDataRange().getValues().slice(1);
+  if (rows.some(function (r) { return r[2] === "event" && String(r[1]) === kid && String(r[4]) === ev.start; })) throw new Error("Not possible: the event Pokémon was already chosen.");
+  var books = rows.filter(function (r) {
+    if (r[2] !== "read" || String(r[1]) !== kid) return false;
+    var at = Number(String(r[0]).split("-")[0]);
+    if (!(at > 1e12)) return false;
+    var k = dayKey_(at);
+    var passed = r[5] === NO_QUIZ || (Number(r[7]) > 0 && Number(r[6]) / Number(r[7]) >= PASS_RATE);
+    return passed && k >= ev.start && k <= ev.end;
+  }).length;
+  if (books < EVENT_BOOKS) throw new Error("Not possible: " + (EVENT_BOOKS - books) + " more books first.");
+  entriesSheet_().appendRow([id, kid, "event", day, ev.start, "Event", "", "", "", new Date(), mon, "", ""]);
+}
+
+function readEvent_() {
+  var out = { start: "", end: "" };
+  settingsSheet_().getDataRange().getValues().slice(1).forEach(function (r) {
+    var v = r[1] instanceof Date ? dayKey_(r[1].getTime()) : String(r[1] || "");
+    if (r[0] === "event.start") out.start = v;
+    if (r[0] === "event.end") out.end = v;
+  });
+  return out;
 }
 
 function readSettings_() {
