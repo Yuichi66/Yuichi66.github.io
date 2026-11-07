@@ -847,13 +847,13 @@
 
   // ---------- local cache (works even when storage is blocked) ----------
   function emptyState() {
-    var s = { settings: { targets: {}, mathsTargets: {}, practiceGoals: {}, partnerIds: {}, ticketBase: {}, peaks: {}, stoneBase: {} }, kids: {}, serverGen: 0 };
+    var s = { settings: { targets: {}, mathsTargets: {}, practiceGoals: {}, partnerIds: {}, ticketBase: {}, peaks: {}, stoneBase: {}, event: { start: "", end: "" } }, kids: {}, serverGen: 0 };
     KIDS.forEach(function (k) {
       s.settings.targets[k.id] = k.target;
       s.settings.mathsTargets[k.id] = k.mathsTarget;
       s.settings.practiceGoals[k.id] = goalsFrom(k.practiceGoals, k);
       s.settings.partnerIds[k.id] = "";
-      s.kids[k.id] = { entries: [], maths: [], practice: [], evolves: [], trades: [], prizes: [], gifts: [] };
+      s.kids[k.id] = { entries: [], maths: [], practice: [], evolves: [], trades: [], prizes: [], gifts: [], events: [] };
     });
     return s;
   }
@@ -870,6 +870,7 @@
           if (!base.kids[k.id].trades) base.kids[k.id].trades = [];
           if (!base.kids[k.id].prizes) base.kids[k.id].prizes = [];
           if (!base.kids[k.id].gifts) base.kids[k.id].gifts = [];
+          if (!base.kids[k.id].events) base.kids[k.id].events = [];
           if (parsed.settings.targets[k.id]) base.settings.targets[k.id] = parsed.settings.targets[k.id];
           if (parsed.settings.mathsTargets[k.id]) base.settings.mathsTargets[k.id] = parsed.settings.mathsTargets[k.id];
           if (parsed.settings.partnerIds && parsed.settings.partnerIds[k.id]) base.settings.partnerIds[k.id] = parsed.settings.partnerIds[k.id];
@@ -1034,7 +1035,7 @@
   function catchOrder() {
     var d = data(), used = usedForReward();
     function caught(rule) { return function (x) { return x.mon || (loggedAt(x) < PACE_FROM && rule(x)); }; }
-    var list = d.entries.filter(caught(isPass)).concat(d.maths.filter(caught(mathsCatches)), d.practice.filter(caught(practiceCatches)), prizeMons(d), giftMons(d));
+    var list = d.entries.filter(caught(isPass)).concat(d.maths.filter(caught(mathsCatches)), d.practice.filter(caught(practiceCatches)), prizeMons(d), giftMons(d), eventMons(d));
     return list.filter(function (x) { return !used[x.id]; }).sort(function (a, b) { return loggedAt(a) - loggedAt(b); });
   }
   // Prize Pokémon of the Great and Ultra Balls, shiny when the Master Ball prize was used on them.
@@ -1051,6 +1052,12 @@
       return { id: g.id, kid: g.kid, type: "gift", day: g.day, mon: g.mon, shiny: 0 };
     });
   }
+  // The event Pokémon a child chose in a holiday event (an "event" row): the Pokémon in "mon" joins the box.
+  function eventMons(d) {
+    return (d.events || []).filter(function (g) { return g.mon; }).map(function (g) {
+      return { id: g.id, kid: g.kid, type: "event", day: g.day, mon: g.mon, shiny: 0 };
+    });
+  }
   function giftOf(id) {
     for (var i = 0; i < KIDS.length; i++) {
       var g = (state.kids[KIDS[i].id].gifts || []).filter(function (x) { return x.id === id; })[0];
@@ -1064,7 +1071,8 @@
     var list = d.entries.concat(d.maths, d.practice, extra ? [extra] : []).filter(function (x) { return loggedAt(x) >= PACE_FROM; });
     var ids = {};
     list.forEach(function (x) { ids[x.id] = true; });
-    var points = list.reduce(function (sum, x) { return sum + Growth.expOf(x); }, 0);
+    var ev = state.settings.event;
+    var points = list.reduce(function (sum, x) { return sum + Growth.expOf(x) * (Rules.inEvent(loggedAt(x), ev) ? 2 : 1); }, 0);
     var used = list.filter(function (x) { return x.mon; }).length +
       d.trades.filter(function (t) { return ids[t.source]; }).length;
     return { points: points, meter: points % BALL_POINTS, left: Math.floor(points / BALL_POINTS) - used };
@@ -1387,9 +1395,81 @@
     renderGrow(partner, !!chosenPartnerId(current, w));
     el("rank").textContent = "Rank " + (s.rank + 1) + " " + RANKS[s.rank];
     el("rankMsg").textContent = rankNextMessage(s);
+    renderEvent();
 
     renderPracticeGoals();
   }
+  // ---------- holiday event ----------
+  var EVENT_BOOKS = 5;
+  // Books passed during the holiday event (records logged inside its dates).
+  function eventBooks(kidId) {
+    var ev = state.settings.event;
+    return state.kids[kidId].entries.filter(function (e) { return isPass(e) && Rules.inEvent(loggedAt(e), ev); }).length;
+  }
+  function eventDone(kidId) {
+    var ev = state.settings.event;
+    return state.kids[kidId].events.some(function (x) { return x.title === ev.start; });
+  }
+  function renderEvent() {
+    var box = el("eventMsg"), ev = state.settings.event;
+    box.innerHTML = "";
+    if (!Rules.inEvent(Date.now(), ev)) return;
+    var n = eventBooks(current), done = eventDone(current);
+    box.appendChild(make("div", "", "🎉 Holiday event! Poké Ball fills 2x until " + fmt(new Date(ev.end + "T00:00")) + "."));
+    if (done) box.appendChild(make("div", "", "✅ You got your event Pokémon!"));
+    else if (n < EVENT_BOOKS) box.appendChild(make("div", "", "📖 " + (EVENT_BOOKS - n) + " more book" + (EVENT_BOOKS - n > 1 ? "s" : "") + " for a special event Pokémon!"));
+    else {
+      var b = make("button", "btn purple small", "🌟 Choose your event Pokémon!");
+      b.type = "button";
+      b.onclick = openEventChoice;
+      box.appendChild(b);
+    }
+  }
+  // Three legendary or mythical Pokémon of the child's open regions (every region if fewer than 3), never a prize one; the same three on every phone.
+  function eventChoices(kidId) {
+    var owned = familiesOf(kidId);
+    function notPrize(d) { return !isPrizeMon(d); }
+    var list = Regions.legends(owned, false).filter(notPrize);
+    // All of Kanto's legendaries are prizes, so a child with only Kanto open draws from every region.
+    if (list.length < 3) list = Regions.legends(owned, true).filter(notPrize);
+    var seed = Number(state.settings.event.start.replace(/-/g, "")) + kidId.length;
+    var out = [];
+    while (list.length && out.length < 3) out.push(list.splice(seed % list.length, 1)[0]);
+    return out;
+  }
+  function openEventChoice() {
+    var list = el("pzList");
+    el("pzTitle").textContent = "🌟 Choose your event Pokémon!";
+    el("pzNote").textContent = "Holiday event prize · you can choose only once";
+    list.innerHTML = "";
+    eventChoices(current).forEach(function (dex) {
+      var name = monEntry(dex)[0];
+      var b = make("button", "pz-opt");
+      b.type = "button";
+      b.setAttribute("data-dex", dex);
+      b.appendChild(artwork(dex, name, "pz-art"));
+      b.appendChild(make("b", "", name));
+      b.onclick = function () { claimEventMon(dex, name); };
+      list.appendChild(b);
+    });
+    openSheet("prizeSheet");
+  }
+  var eventClaiming = false;
+  function claimEventMon(dex, name) {
+    if (eventClaiming) return;
+    eventClaiming = true;
+    var who = current;
+    var entry = { id: newId(), kid: who, mon: dex, day: todayIndex() };
+    commit({ action: "eventmon", entry: entry }, function () {
+      state.kids[who].events.push({ id: entry.id, kid: who, type: "event", day: entry.day, title: state.settings.event.start, mon: dex, seq: 1e9 });
+    }, function (ok) {
+      eventClaiming = false;
+      if (!ok) return;
+      closeSheets();
+      show(artwork(dex, name), "🌟 You got " + name + "!", "Holiday event prize · look in your 🎒 Pokémon box!");
+    });
+  }
+
   // ---------- prize Pokémon ----------
   function prizeOf(kidId, tier) { return (state.kids[kidId].prizes || []).filter(function (p) { return p.tier === tier; })[0] || null; }
   // What a ball's prize can be now: its legendary Pokémon the child has never had, or, for the Master Ball,
@@ -2058,6 +2138,7 @@
       if (st.stoneBase !== undefined && st.stoneBase !== "") next.settings.stoneBase[k.id] = st.stoneBase;
       if (st.peak !== undefined && st.peak !== "") next.settings.peaks[k.id] = st.peak;
     });
+    next.settings.event = (res.settings && res.settings.event) || { start: "", end: "" };
     next.serverGen = res.gen || 0;
     // seq: place in the sheet. Trades and evolutions are replayed in this order (phone clocks can be wrong).
     res.entries.forEach(function (e, seq) {
@@ -2069,6 +2150,7 @@
         kind: e.kind || "old", to: e.to || 0, from: e.from || 0, stone: e.stone || 0, seq: seq });
       else if (e.type === "prize") next.kids[e.kid].prizes.push({ id: e.id, kid: e.kid, type: e.type, day: e.day, tier: e.tier, mon: e.mon || 0, target: e.target || "", seq: seq });
       else if (e.type === "trade") next.kids[e.kid].trades.push({ id: e.id, kid: e.kid, type: e.type, day: e.day, source: e.source || "", give: e.site, get: e.get || "", with: e.with || "", ticket: e.ticket || 0, seq: seq });
+      else if (e.type === "event") next.kids[e.kid].events.push({ id: e.id, kid: e.kid, type: "event", day: e.day, title: e.title || "", mon: e.mon || 0, seq: seq });
       else if (e.type === "gift") next.kids[e.kid].gifts.push({ id: e.id, kid: e.kid, type: e.type, day: e.day, title: e.title || "", mon: e.mon || 0, seq: seq });
       else next.kids[e.kid].entries.push(e);
     });
@@ -2280,12 +2362,34 @@
       });
     });
   }
+  var PIN_KEY = "htrc-parent-pin";
+  function parentPin() { try { return window.localStorage.getItem(PIN_KEY) || ""; } catch (e) { return ""; } }
+  // Asks once per device; kept only after the sheet says it is right.
+  function askParentPin() {
+    var pin = window.prompt("Parent PIN");
+    if (!pin) return Promise.reject(new Error("No PIN"));
+    return api({ action: "parentCheck", pin: pin }).then(function () {
+      try { window.localStorage.setItem(PIN_KEY, pin); } catch (e) { /* storage unavailable: asked again next time */ }
+      return pin;
+    });
+  }
+  // A stored PIN the sheet no longer accepts is forgotten.
+  function withPin(fn) {
+    var pin = parentPin();
+    return (pin ? Promise.resolve(pin) : askParentPin()).then(fn).catch(function (err) {
+      if (err && /Wrong PIN/.test(err.message || "")) { try { window.localStorage.removeItem(PIN_KEY); } catch (e) { /* ignore */ } }
+      throw err;
+    });
+  }
   el("openParent").onclick = function () {
     if (typeof Parent === "undefined") { window.alert("The parent page could not load. Please reload and try again."); return; }
     closeSheets();
     var now = new Date();
     var sync = sheetLoadedAt ? "☁ Shared · updated " + sheetLoadedAt.toTimeString().slice(0, 5) + " · opened " + now.toTimeString().slice(0, 5) : el("sync").textContent;
     Parent.render(el("parentRoot"), parentKids(), now, sync, !!sheetLoadedAt);
+    Parent.renderEvent(el("parentRoot"), state.settings.event, function (start, end) {
+      return withPin(function (pin) { return api({ action: "event", pin: pin, start: start, end: end }); });
+    });
     openSheet("parentSheet");
   };
 

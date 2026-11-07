@@ -211,6 +211,21 @@ var Parent = (function () {
     root.onclick = function (ev) { if (!ev.target.closest || !ev.target.closest(".pd-col")) tip(null); };
   }
 
-  return { SUBJECTS: SUBJECTS, studyDay: studyDay, dayKey: dayKey, lastDays: lastDays, byDay: byDay, kidStats: kidStats, series: series, newestFirst: newestFirst, render: render };
+  // Holiday event dates. onSave(start, end) returns a promise.
+  function renderEvent(root, ev, onSave) {
+    var box = make("div", "pd-card");
+    box.appendChild(make("h3", "", "🎉 Holiday event"));
+    var s = make("input"); s.type = "date"; s.value = ev.start || "";
+    var e = make("input"); e.type = "date"; e.value = ev.end || "";
+    var save = make("button", "btn small blue", "Save"); save.type = "button";
+    var stop = make("button", "btn small", "End event"); stop.type = "button";
+    var msg = make("span", "", "");
+    save.onclick = function () { onSave(s.value, e.value).then(function () { msg.textContent = "Saved!"; }, function (err) { msg.textContent = String(err.message || err); }); };
+    stop.onclick = function () { onSave("", "").then(function () { s.value = e.value = ""; msg.textContent = "Event ended."; }, function (err) { msg.textContent = String(err.message || err); }); };
+    [make("label", "", "Start "), s, make("label", "", " End "), e, save, stop, msg].forEach(function (n) { box.appendChild(n); });
+    root.appendChild(box);
+  }
+
+  return { SUBJECTS: SUBJECTS, studyDay: studyDay, dayKey: dayKey, lastDays: lastDays, byDay: byDay, kidStats: kidStats, series: series, newestFirst: newestFirst, render: render, renderEvent: renderEvent };
 })();
 if (typeof module !== "undefined") module.exports = Parent;
