@@ -153,8 +153,8 @@
   details.collection > summary::before { content: "▶ "; }
   details.collection[open] > summary::before { content: "▼ "; }
   .sub-h { font-weight: bold; margin: 16px 0 8px; }
-  .days { display: grid; grid-template-columns: repeat(8, minmax(0, 1fr)); gap: 4px; }
-  @media (max-width: 600px) { .days { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+  .days { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 4px; }
+  @media (max-width: 600px) { .days { grid-template-columns: repeat(7, minmax(0, 1fr)); } }
   .day { text-align: center; border: 2px solid #000; border-radius: 10px; padding: 4px 2px; background: #fff; font-size: 11px; }
   .day.today { box-shadow: 0 0 0 3px var(--yellow); }
   .day .ball { width: 28px; height: 28px; margin: 4px auto 2px; border-width: 2px; }
@@ -383,19 +383,9 @@
       <div><b id="trainerName"></b><span class="rank" id="rank"></span></div>
     </div>
     <div class="grow" id="grow"></div>
-    <div class="goal">
-      <div class="goal-label"><span>📖 Books passed</span><span id="readText"></span></div>
-      <div class="bar read" id="readBar"><div></div></div>
-    </div>
-    <div class="goal" id="mathsGoal">
-      <div class="goal-label"><span>🎸 Times tables correct</span><span id="mathsText"></span></div>
-      <div class="bar maths" id="mathsBar"><div></div></div>
-    </div>
     <div id="practiceGoals"></div>
-    <div class="ladder" id="ladder"></div>
-    <div class="next" id="nextMsg"></div>
     <div class="rank-next" id="rankMsg"></div>
-    <div class="rule" id="ruleMsg"></div>
+    <div class="rule" id="eventMsg"></div>
   </section>
 
   <!-- 3. Pokémon box -->
@@ -417,7 +407,7 @@
       </div>
       <div class="sub-h">Book-dex</div>
       <div class="dex" id="dex"></div>
-      <div class="sub-h">Gym badges (a book passed each day)</div>
+      <div class="sub-h">This week (a book passed each day)</div>
       <div class="days" id="days"></div>
       <div id="mathsLogWrap">
         <div class="sub-h">Times tables log</div>
@@ -433,16 +423,6 @@
   <details class="settings">
     <summary>⚙ Settings (for grown-ups)</summary>
     <div class="panel">
-      <div class="row">
-        <div class="field">
-          <label for="sTarget">Books goal (<span class="sKid"></span>)</label>
-          <input id="sTarget" type="number" min="1" max="60">
-        </div>
-        <div class="field" id="sMathsField">
-          <label for="sMaths">Correct answers goal</label>
-          <input id="sMaths" type="number" min="10" max="20000">
-        </div>
-      </div>
       <div class="row" id="sPracticeRow"></div>
       <button class="btn small blue" id="saveSettings" type="button">Save</button>
       <span id="saved" style="margin-left:8px"></span>
@@ -460,7 +440,6 @@
       <b>Type the book title</b>
       <input id="fTitle" required maxlength="120" placeholder="e.g. The Twits">
       <div class="row" style="margin-top:8px">
-        <div class="field"><label for="fDate">Day you finished</label><select id="fDate" class="day-select"></select></div>
       </div>
     </div></div>
     <div class="step"><div class="num">2</div><div class="body">
@@ -512,7 +491,6 @@
       <b>How many did you get right?</b>
       <div class="score-row"><input id="mCorrect" type="number" min="0" max="2000" required placeholder="35"><span>correct answers</span></div>
       <div class="row" style="margin-top:8px">
-        <div class="field"><label for="mDate">Day</label><select id="mDate" class="day-select"></select></div>
       </div>
     </div></div>
     <div class="sheet-actions">
@@ -531,7 +509,6 @@
       <b>How many did you get right?</b>
       <div class="score-row"><input id="pCorrect" type="number" min="0" max="2000" required><span>correct answers</span></div>
       <div class="row" style="margin-top:8px">
-        <div class="field"><label for="pDate">Day</label><select id="pDate" class="day-select"></select></div>
       </div>
     </div></div>
     <div class="sheet-actions">
@@ -623,11 +600,12 @@
 </div>
 
 <!-- ?v= must change with APP_VERSION so phones fetch the new files -->
-<script src="evo-data.js?v=2026-10-29-1"></script>
-<script src="dex-data.js?v=2026-10-29-1"></script>
-<script src="growth.js?v=2026-10-29-1"></script>
-<script src="regions.js?v=2026-10-29-1"></script>
-<script src="parent.js?v=2026-10-29-1"></script>
+<script src="evo-data.js?v=2026-11-09-1"></script>
+<script src="dex-data.js?v=2026-11-09-1"></script>
+<script src="growth.js?v=2026-11-09-1"></script>
+<script src="regions.js?v=2026-11-09-1"></script>
+<script src="rules.js?v=2026-11-09-1"></script>
+<script src="parent.js?v=2026-11-09-1"></script>
 <script>
 (function () {
   "use strict";
@@ -637,13 +615,15 @@
   var REFRESH_MS = 60000;
   // Change on every release: a page left open with older code reloads itself,
   // so every phone works out the same Pokémon.
-  var APP_VERSION = "2026-11-04-1";
+  var APP_VERSION = "2026-11-09-1";
   // Sent with every change; the sheet refuses changes from older pages (MIN_CLIENT_GEN in Code.gs).
-  var CLIENT_GEN = 8;
+  var CLIENT_GEN = 9;
   var STORAGE_KEY = "htrc-2026-autumn-v3";
   var START = new Date(2026, 9, 24);   // Sat 24 Oct 2026
-  var DAY_COUNT = 16;                  // to Sun 8 Nov 2026 (extended by a week)
-  var PRIZE_DAY_INDEX = 15;            // prizes are opened on Sun 8 Nov
+  // The half term was 16 days; old records keep their day number from START. New records use today's.
+  var HALF_TERM_DAYS = 16;
+  // Where each child was when ranks started to come from books passed (the 9 Nov snapshot).
+  var RANK_START = { taiga: { rank: 5, books: 4 }, leo: { rank: 7, books: 5 }, yudai: { rank: 10, books: 10 } };
   var PASS_RATE = 0.8;
   var BURST_RATE = 0.9;
   var CATCH_WOBBLE_MS = 1500;
@@ -676,7 +656,7 @@
     { pct: 150, ball: "ultra", name: "Ultra Ball", reward: "£4", pick: "Pick 1 legendary!" },
     { pct: 200, ball: "master", name: "Master Ball", reward: "£6", pick: "Make it SHINY!" }
   ];
-  // Each ball also gives a Pokémon, chosen once, as soon as it is reached (the money is still given on PRIZE_DAY_INDEX):
+  // Each ball also gives a Pokémon, chosen once, as soon as it is reached (the money is given by a grown-up):
   // the Great and Ultra Balls one of their legendary Pokémon, the Master Ball makes one prize Pokémon shiny.
   // The same as PRIZE_MONS in Code.gs. These are never caught the normal way.
   var PRIZE_MONS = { 1: [144, 145, 146], 2: [150, 151] };
@@ -851,8 +831,6 @@
   var ART_BASE = SPRITE_BASE + "other/official-artwork/";
   var EVOLUTION = ["Charmander", "Charmeleon", "Charizard"];
   var EVOLUTION_IDS = [4, 5, 6];
-  // A new trainer rank every RANK_STEP % of the goal (the same % that decides the prize).
-  var RANK_STEP = 10;
   var RANKS = [
     "Rookie Trainer", "Youngster", "Bug Catcher", "Camper", "Hiker",
     "Gym Challenger", "Badge Collector", "Pokémon Ranger", "Cool Trainer", "Rising Star",
@@ -933,8 +911,8 @@
     var t = new Date(now.getFullYear(), now.getMonth(), now.getDate());
     return Math.round((t - START) / 86400000);
   }
-  function clampDay(i) { return Math.max(0, Math.min(i, DAY_COUNT - 1)); }
-  function fmt(d) { return DAY_NAMES[d.getDay()] + " " + d.getDate() + " " + (d.getMonth() === 9 ? "Oct" : "Nov"); }
+  var MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+  function fmt(d) { return DAY_NAMES[d.getDay()] + " " + d.getDate() + " " + MONTHS[d.getMonth()]; }
   function rate(e) { return e.score / e.total; }
   function noQuiz(e) { return e.site === NO_QUIZ; }
   function isPass(e) { return noQuiz(e) || rate(e) >= PASS_RATE; }
@@ -1011,28 +989,14 @@
     d = d || data();
     var caught = d.entries.filter(isPass).length;
     var correct = d.maths.reduce(function (sum, m) { return sum + m.correct; }, 0);
-    var readPct = Math.floor(caught / target() * 100);
-    var mathsPct = kid().maths ? Math.floor(correct / mathsTarget() * 100) : null;
-    // Both goals count: the lower one decides the prize.
-    var pct = kid().maths ? Math.min(readPct, mathsPct) : readPct;
-    var tier = 0;
-    TIERS.forEach(function (t, i) { if (pct >= t.pct) tier = i + 1; });
-    var rank = Math.min(RANKS.length - 1, Math.floor(pct / RANK_STEP));
-    return { caught: caught, correct: correct, readPct: readPct, mathsPct: mathsPct, pct: pct, tier: tier, rank: rank };
+    var rank = Math.max(RANK_START[current].rank, Rules.rankFromBooks(RANK_START[current], caught));
+    return { caught: caught, correct: correct, rank: rank };
   }
-  function need(goal, pctNeeded) { return Math.ceil(goal * pctNeeded / 100); }
-  // "Next rank: Youngster (10%) - 1 more book and 50 more correct answers"
+  // "Next rank: Gym Challenger - 2 more books"
   function rankNextMessage(s) {
-    if (s.rank >= RANKS.length - 1) return "⭐ Top rank! You are the CHAMPION!";
-    var pct = (s.rank + 1) * RANK_STEP;
-    var parts = [];
-    var moreBooks = need(target(), pct) - s.caught;
-    if (moreBooks > 0) parts.push(moreBooks + " more book" + (moreBooks > 1 ? "s" : ""));
-    if (kid().maths) {
-      var moreCorrect = need(mathsTarget(), pct) - s.correct;
-      if (moreCorrect > 0) parts.push(moreCorrect + " more correct answers");
-    }
-    return "⭐ Next rank: " + RANKS[s.rank + 1] + " (" + pct + "%) — " + parts.join(" and ");
+    var left = Rules.booksToNextRank(RANK_START[current], s.caught);
+    if (left === null) return "⭐ Top rank! You are the CHAMPION!";
+    return "Next rank: " + RANKS[s.rank + 1] + " - " + left + " more book" + (left > 1 ? "s" : "");
   }
 
   // Before PACE_FROM every passed book and every big enough times tables game caught the next Pokémon;
@@ -1334,7 +1298,7 @@
     });
     var count = 1 + (kid().maths ? 1 : 0) + practices.length;
     el("missions").className = "missions" + (count === 1 ? " one" : count === 3 ? " three" : "");
-    var t = clampDay(todayIndex());
+    var t = todayIndex();
     var books = data().entries.filter(function (e) { return e.day === t && isPass(e); }).length;
     var correct = data().maths.filter(function (m) { return m.day === t; }).reduce(function (s, m) { return s + m.correct; }, 0);
     var msg = "Today: " + (books ? "✅ " + books + " book" + (books > 1 ? "s" : "") : "📖 no book yet");
@@ -1371,19 +1335,6 @@
       box.appendChild(g);
     });
   }
-  function fillBar(barId, value, goal) {
-    var bar = el(barId);
-    var maxPct = TIERS[TIERS.length - 1].pct;
-    bar.firstElementChild.style.width = Math.min(100, value / goal * 100 / maxPct * 100) + "%";
-    Array.prototype.slice.call(bar.querySelectorAll(".tick")).forEach(function (n) { bar.removeChild(n); });
-    TIERS.forEach(function (t) {
-      var tick = make("div", "tick");
-      tick.style.left = (t.pct / maxPct * 100) + "%";
-      if (t.pct < maxPct) tick.appendChild(make("span", "", t.pct + "%"));
-      bar.appendChild(tick);
-    });
-  }
-
   // Partner level, experience bar and what comes next.
   function renderGrow(p, chosen) {
     var box = el("grow");
@@ -1425,22 +1376,8 @@
     if (!chosen) box.appendChild(make("small", "", "☆ Choose your partner in the box: it gets the EXP!"));
   }
 
-  // "Next: Great Ball (£2) - 4 more books and 846 more correct answers"
-  function prizeNextMessage(s) {
-    var next = TIERS[s.tier];
-    if (!next) return "🏆 MASTER BALL! You got the top prize!";
-    var parts = [];
-    var moreBooks = need(target(), next.pct) - s.caught;
-    if (moreBooks > 0) parts.push(moreBooks + " more book" + (moreBooks > 1 ? "s" : ""));
-    if (kid().maths) {
-      var moreCorrect = need(mathsTarget(), next.pct) - s.correct;
-      if (moreCorrect > 0) parts.push(moreCorrect + " more correct answers");
-    }
-    var mon = s.tier + 1 === SHINY_PRIZE_TIER ? "a ✨SHINY legendary!" : "a 🌟legendary Pokémon!";
-    return "Next: " + next.name + " (" + next.reward + ") + " + mon + " — " + parts.join(" and ");
-  }
   function renderProgress(s) {
-    var stage = Math.min(2, s.tier === 0 ? (s.pct >= 50 ? 1 : 0) : 2);
+    var stage = Math.min(2, Math.floor(s.rank / 7));
     var w = world();
     var partner = partnerOf(current, w);
     var partnerDex = partner ? partner.c.dex : EVOLUTION_IDS[stage];
@@ -1451,33 +1388,7 @@
     el("rank").textContent = "Rank " + (s.rank + 1) + " " + RANKS[s.rank];
     el("rankMsg").textContent = rankNextMessage(s);
 
-    el("readText").textContent = s.caught + " / " + target() + " books (" + s.readPct + "%)";
-    fillBar("readBar", s.caught, target());
-    el("mathsGoal").className = "goal" + (kid().maths ? "" : " hidden");
-    if (kid().maths) {
-      el("mathsText").textContent = s.correct + " / " + mathsTarget() + " (" + s.mathsPct + "%)";
-      fillBar("mathsBar", s.correct, mathsTarget());
-    }
-
     renderPracticeGoals();
-
-    var ladder = el("ladder");
-    ladder.innerHTML = "";
-    TIERS.forEach(function (t, i) {
-      var box = make("div", "tier" + (s.tier > i ? " got" : ""));
-      box.appendChild(make("div", "ball " + t.ball));
-      box.appendChild(make("b", "", t.name));
-      box.appendChild(make("div", "reward", t.reward));
-      var req = need(target(), t.pct) + " books";
-      if (kid().maths) req += " + " + need(mathsTarget(), t.pct) + " correct";
-      box.appendChild(make("small", "", req));
-      addPrizeMons(box, i + 1, s.tier > i, w);
-      ladder.appendChild(box);
-    });
-
-    el("nextMsg").textContent = prizeNextMessage(s);
-    el("ruleMsg").textContent = (kid().maths ? "Both goals count. " : "") + "You get ONE money prize: the highest ball you reach (given on Sun 8 Nov). " +
-      "Each ball's Pokémon is yours as soon as you reach it!";
   }
   // ---------- prize Pokémon ----------
   function prizeOf(kidId, tier) { return (state.kids[kidId].prizes || []).filter(function (p) { return p.tier === tier; })[0] || null; }
@@ -1545,7 +1456,7 @@
     claiming = true;
     var shiny = tier === SHINY_PRIZE_TIER, who = current;
     var again = prizeTry && prizeTry.kid === who && prizeTry.tier === tier && (shiny ? prizeTry.target : prizeTry.mon) === choice;
-    var p = again ? prizeTry : { id: newId(), kid: who, type: "prize", day: clampDay(todayIndex()), tier: tier, mon: shiny ? 0 : choice, target: shiny ? choice : "" };
+    var p = again ? prizeTry : { id: newId(), kid: who, type: "prize", day: todayIndex(), tier: tier, mon: shiny ? 0 : choice, target: shiny ? choice : "" };
     commit({ action: "prize", prize: p }, function () { state.kids[who].prizes.push(p); }, function (ok, refused) {
       claiming = false;
       prizeTry = ok || refused ? null : p;
@@ -1612,7 +1523,7 @@
     var days = el("days");
     days.innerHTML = "";
     var t = todayIndex();
-    for (var i = 0; i < DAY_COUNT; i++) {
+    for (var i = t - 6; i <= t; i++) {
       var passed = list.filter(function (e) { return e.day === i && isPass(e); });
       var cell = make("div", "day" + (i === t ? " today" : ""));
       cell.appendChild(make("div", "", fmt(dayDate(i)).slice(0, 6)));
@@ -2033,7 +1944,7 @@
     }
     if (!ticketsLeft(who)) return;
     startTrade(who, function (pair) {
-      var tx = tradeRow(who, clampDay(todayIndex()), "ticket", pair);
+      var tx = tradeRow(who, todayIndex(), "ticket", pair);
       tx.ticket = ticketsUsed(who) + 1;
       sendTicketTrade(tx, tradeInfo(pair, who));
     }, function () {});
@@ -2090,9 +2001,6 @@
 
   function renderSettings() {
     Array.prototype.forEach.call(document.querySelectorAll(".sKid"), function (n) { n.textContent = kid().name; });
-    el("sTarget").value = target();
-    el("sMaths").value = mathsTarget();
-    el("sMathsField").className = "field" + (kid().maths ? "" : " hidden");
     var row = el("sPracticeRow");
     if (row.getAttribute("data-kid") === current) {
       kid().practices.forEach(function (type) {
@@ -2121,7 +2029,7 @@
 
   function render() {
     var s = summary();
-    el("dates").textContent = fmt(dayDate(0)) + " → " + fmt(dayDate(DAY_COUNT - 1));
+    el("dates").textContent = "📚 Reading Challenge";
     renderTabs();
     renderMissions();
     renderProgress(s);
@@ -2296,10 +2204,7 @@
   }
 
   // ---------- sheets & overlay ----------
-  // A page left open for days still starts every form on today.
   function openSheet(id) {
-    var day = el(id).querySelector(".day-select");
-    if (day) day.value = String(clampDay(todayIndex()));
     el(id).className = "sheet show";
     window.scrollTo(0, 0);
   }
@@ -2349,17 +2254,14 @@
     if (id) openEvolve(id, "level");
   };
   function tierUpMessage(before, after) {
-    var msg = after.tier > before.tier ? "  🏆 " + TIERS[after.tier - 1].name + " unlocked! (" + TIERS[after.tier - 1].reward + ")" +
-      (!prizeOf(current, after.tier) && prizeChoices(current, after.tier).length ? " Choose your prize Pokémon in My progress!" : "") : "";
-    if (after.rank > before.rank) msg += "  ⭐ RANK UP! You are now a " + RANKS[after.rank] + "!";
-    return msg;
+    return after.rank > before.rank ? " · ⭐ Rank up: " + RANKS[after.rank] + "!" : "";
   }
 
   // ---------- parent dashboard (read only; parent.js draws it; anyone may open it) ----------
   function parentRecords(kidId) {
     var d = state.kids[kidId], out = [];
     function add(x, subject, amount, tried, text) {
-      var w = Parent.studyDay(loggedAt(x), x.day, START, DAY_COUNT);
+      var w = Parent.studyDay(loggedAt(x), x.day, START, HALF_TERM_DAYS);
       out.push({ date: w.date, at: w.at, subject: subject, amount: amount, tried: tried, text: text });
     }
     d.entries.forEach(function (e) { add(e, "book", isPass(e) ? 1 : 0, 1, e.title + (noQuiz(e) ? " (no quiz)" : " " + e.score + "/" + e.total)); });
@@ -2371,8 +2273,7 @@
     return KIDS.map(function (k) {
       return forKid(k.id, function () {
         var s = summary();
-        var goals = ["Books " + s.caught + " / " + target() + " (" + s.readPct + "%)" +
-          (k.maths ? " · TTRS " + s.correct + " / " + mathsTarget() + " (" + s.mathsPct + "%)" : ""), prizeNextMessage(s)];
+        var goals = ["Books " + s.caught + " · " + rankNextMessage(s)];
         var practice = practiceProgress().map(function (x) { return x.cfg.name + " " + x.done + " / " + x.goal + " (" + x.pct + "%)"; });
         if (practice.length) goals.splice(1, 0, practice.join(" · "));
         return { name: k.name, subjects: ["book"].concat(k.maths ? ["maths"] : [], k.practices), records: parentRecords(k.id), goals: goals };
@@ -2401,7 +2302,7 @@
       window.alert("Please check the score. It must be between 0 and " + (isNaN(total) ? "the total" : total) + ".");
       return;
     }
-    var entry = { kid: current, type: "read", day: parseInt(el("fDate").value, 10), title: title, site: site, score: score, total: total };
+    var entry = { kid: current, type: "read", day: todayIndex(), title: title, site: site, score: score, total: total };
     entry.id = recordId(entry, pendingSeed);
     var before = summary();
     var wins = lastTry && lastTry.id === entry.id ? lastTry.wins : winsBall(entry);
@@ -2613,7 +2514,7 @@
   el("evLater").onclick = function () { el("evoSheet").className = "sheet"; };
   function saveEvolve(m, kind, o, button) {
     var who = current;
-    var ev = { kid: who, type: "evolve", kind: kind, day: clampDay(todayIndex()), target: m.id, from: m.c.dex, to: o.to };
+    var ev = { kid: who, type: "evolve", kind: kind, day: todayIndex(), target: m.id, from: m.c.dex, to: o.to };
     if (kind === "level") ev.id = "lv-" + m.id + "-" + m.c.dex;
     else if (stoneTry && stoneTry.target === m.id && stoneTry.from === m.c.dex && stoneTry.to === o.to) ev = stoneTry;
     else { ev.id = newId(); ev.stone = stonesUsed(who) + 1; }
@@ -2663,7 +2564,7 @@
     ev.preventDefault();
     var correct = parseInt(el("mCorrect").value, 10);
     if (isNaN(correct) || correct < 0 || correct > 2000) { window.alert("Please type how many you got right (0 to 2000)."); return; }
-    var item = { kid: current, type: "maths", day: parseInt(el("mDate").value, 10), site: "Times Tables Rock Stars", correct: correct };
+    var item = { kid: current, type: "maths", day: todayIndex(), site: "Times Tables Rock Stars", correct: correct };
     item.id = recordId(item);
     var before = summary();
     var wins = lastTry && lastTry.id === item.id ? lastTry.wins : winsBall(item);
@@ -2696,7 +2597,7 @@
     if (!cfg) return;
     var correct = parseInt(el("pCorrect").value, 10);
     if (isNaN(correct) || correct < 0 || correct > 2000) { window.alert("Please type how many you got right (0 to 2000)."); return; }
-    var item = { kid: current, type: practiceType, day: parseInt(el("pDate").value, 10), site: cfg.name, correct: correct };
+    var item = { kid: current, type: practiceType, day: todayIndex(), site: cfg.name, correct: correct };
     item.id = recordId(item);
     var wins = lastTry && lastTry.id === item.id ? lastTry.wins : winsBall(item);
     addWithReward(item, "practice", wins, el("practiceForm").querySelector("button[type=submit]"), function (ok, evo) {
@@ -2722,10 +2623,8 @@
   updateQuizPart();
 
   el("saveSettings").onclick = function () {
-    var t = parseInt(el("sTarget").value, 10);
-    var m = kid().maths ? parseInt(el("sMaths").value, 10) : mathsTarget();
-    if (isNaN(t) || t < 1 || t > 60) { window.alert("Books goal must be 1 to 60."); return; }
-    if (kid().maths && (isNaN(m) || m < 10 || m > 20000)) { window.alert("Correct answers goal must be 10 to 20000."); return; }
+    var t = target();
+    var m = mathsTarget();
     var goals = {}, badGoal = null;
     kid().practices.forEach(function (type) {
       var raw = el("sGoal-" + type).value.trim();
@@ -2747,17 +2646,6 @@
   };
 
   // ---------- start ----------
-  (function initDaySelects() {
-    var t = String(clampDay(todayIndex()));
-    Array.prototype.forEach.call(document.querySelectorAll(".day-select"), function (sel) {
-      for (var i = 0; i < DAY_COUNT; i++) {
-        var o = make("option", "", fmt(dayDate(i)));
-        o.value = String(i);
-        sel.appendChild(o);
-      }
-      sel.value = t;
-    });
-  })();
   render();
   if (API_URL) {
     setSync("Loading...", false);
