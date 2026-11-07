@@ -223,6 +223,7 @@ var Parent = (function () {
     save.onclick = function () { onSave(s.value, e.value).then(function () { msg.textContent = "Saved!"; }, function (err) { msg.textContent = String(err.message || err); }); };
     stop.onclick = function () { onSave("", "").then(function () { s.value = e.value = ""; msg.textContent = "Event ended."; }, function (err) { msg.textContent = String(err.message || err); }); };
     [make("label", "", "Start "), s, make("label", "", " End "), e, save, stop, msg].forEach(function (n) { box.appendChild(n); });
+    box.appendChild(make("div", "pd-muted", "A start date in the past also doubles books already logged."));
     root.appendChild(box);
   }
 

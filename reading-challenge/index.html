@@ -106,7 +106,7 @@
   .missions.three .mission.read { grid-column: 1 / -1; }
   .today-done { margin-top: 10px; font-size: 14px; text-align: center; }
 
-  /* ---------- 2. progress + prize ladder ---------- */
+  /* ---------- 2. progress ---------- */
   .goal { margin-bottom: 14px; }
   .goal-label { display: flex; justify-content: space-between; font-weight: bold; margin-bottom: 4px; font-size: 16px; }
   .bar { position: relative; height: 26px; border: 3px solid #000; border-radius: 14px; background: #333; overflow: hidden; }
@@ -116,24 +116,8 @@
   .bar.latin > div { background: linear-gradient(90deg, #1f7a4a, var(--green)); }
   .bar.mymaths > div { background: linear-gradient(90deg, #c25e00, #f08c00); }
   .bar.french > div { background: linear-gradient(90deg, #1b4f8a, var(--cyan)); }
-  .bar .tick { position: absolute; top: 0; bottom: 0; width: 3px; background: rgba(255,255,255,.85); }
-  .bar .tick span { position: absolute; top: 2px; left: 5px; font-size: 11px; color: #fff; font-weight: bold; white-space: nowrap; }
 
-  .ladder { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin-top: 6px; }
-  .tier { text-align: center; border: 3px solid #000; border-radius: 14px; padding: 10px 4px; background: #fff; opacity: .55; }
-  .tier.got { opacity: 1; background: #fff6c8; box-shadow: 0 0 0 3px var(--gold); }
-  .tier .ball { margin: 0 auto 6px; width: 46px; height: 46px; }
-  .tier b { display: block; font-size: 14px; }
-  .tier .reward { font-size: 20px; font-weight: bold; margin-top: 2px; }
-  .tier small { display: block; font-size: 12px; color: #555; margin-top: 2px; }
-  .tier-mons { display: flex; justify-content: center; flex-wrap: wrap; min-height: 40px; margin-top: 6px; }
-  .tier-mons .sprite { width: 36px; height: 36px; }
-  .tier-shiny { font-size: 28px; line-height: 40px; }
-  .tier-pick { font-size: 12px; font-weight: bold; color: #7b3fe4; margin-top: 2px; }
-  .tier-pick.got { color: #1d7a3a; }
-  .tier .btn.tier-btn { margin-top: 6px; padding: 6px 8px; font-size: 13px; animation: tierGlow 1.2s ease-in-out infinite alternate; }
   @keyframes tierGlow { from { transform: scale(1); } to { transform: scale(1.08); } }
-  @media (prefers-reduced-motion: reduce) { .tier .btn.tier-btn { animation: none; } }
   .pz-note { font-size: 13px; color: #555; margin-bottom: 10px; }
   .pz-list { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 10px; }
   .pz-opt { border: 3px solid #000; border-radius: 14px; background: #fff; padding: 8px; cursor: pointer; font-family: inherit; font-size: 15px; }
@@ -154,7 +138,6 @@
   details.collection[open] > summary::before { content: "▼ "; }
   .sub-h { font-weight: bold; margin: 16px 0 8px; }
   .days { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 4px; }
-  @media (max-width: 600px) { .days { grid-template-columns: repeat(7, minmax(0, 1fr)); } }
   .day { text-align: center; border: 2px solid #000; border-radius: 10px; padding: 4px 2px; background: #fff; font-size: 11px; }
   .day.today { box-shadow: 0 0 0 3px var(--yellow); }
   .day .ball { width: 28px; height: 28px; margin: 4px auto 2px; border-width: 2px; }
@@ -439,8 +422,6 @@
     <div class="step"><div class="num">1</div><div class="body">
       <b>Type the book title</b>
       <input id="fTitle" required maxlength="120" placeholder="e.g. The Twits">
-      <div class="row" style="margin-top:8px">
-      </div>
     </div></div>
     <div class="step"><div class="num">2</div><div class="body">
       <b>Did you take a quiz?</b>
@@ -490,8 +471,6 @@
     <div class="step"><div class="num">2</div><div class="body">
       <b>How many did you get right?</b>
       <div class="score-row"><input id="mCorrect" type="number" min="0" max="2000" required placeholder="35"><span>correct answers</span></div>
-      <div class="row" style="margin-top:8px">
-      </div>
     </div></div>
     <div class="sheet-actions">
       <button class="btn ghost" type="button" data-close>Cancel</button>
@@ -508,8 +487,6 @@
     <div class="step"><div class="num">1</div><div class="body">
       <b>How many did you get right?</b>
       <div class="score-row"><input id="pCorrect" type="number" min="0" max="2000" required><span>correct answers</span></div>
-      <div class="row" style="margin-top:8px">
-      </div>
     </div></div>
     <div class="sheet-actions">
       <button class="btn ghost" type="button" data-close>Cancel</button>
@@ -586,7 +563,7 @@
     <h3 id="pzTitle"></h3>
     <div class="pz-note" id="pzNote"></div>
     <div class="pz-list" id="pzList"></div>
-    <div class="sheet-actions"><span></span><button class="btn ghost small" type="button" data-close>Not now</button></div>
+    <div class="sheet-actions"><span></span><button class="btn ghost small" type="button" data-close>Choose later</button></div>
   </div>
 </div>
 
@@ -1058,6 +1035,13 @@
       return { id: g.id, kid: g.kid, type: "event", day: g.day, mon: g.mon, shiny: 0 };
     });
   }
+  function eventOf(id) {
+    for (var i = 0; i < KIDS.length; i++) {
+      var g = (state.kids[KIDS[i].id].events || []).filter(function (x) { return x.id === id; })[0];
+      if (g) return g;
+    }
+    return null;
+  }
   function giftOf(id) {
     for (var i = 0; i < KIDS.length; i++) {
       var g = (state.kids[KIDS[i].id].gifts || []).filter(function (x) { return x.id === id; })[0];
@@ -1442,7 +1426,12 @@
     el("pzTitle").textContent = "🌟 Choose your event Pokémon!";
     el("pzNote").textContent = "Holiday event prize · you can choose only once";
     list.innerHTML = "";
-    eventChoices(current).forEach(function (dex) {
+    var choices = eventChoices(current);
+    if (!choices.length) {
+      el("pzNote").textContent = "";
+      list.appendChild(make("div", "pz-note", "No Pokémon to choose this time."));
+    }
+    choices.forEach(function (dex) {
       var name = monEntry(dex)[0];
       var b = make("button", "pz-opt");
       b.type = "button";
@@ -1461,89 +1450,12 @@
     var who = current;
     var entry = { id: newId(), kid: who, mon: dex, day: todayIndex() };
     commit({ action: "eventmon", entry: entry }, function () {
-      state.kids[who].events.push({ id: entry.id, kid: who, type: "event", day: entry.day, title: state.settings.event.start, mon: dex, seq: 1e9 });
+      state.kids[who].events.push({ id: entry.id, kid: who, type: "event", day: entry.day, title: state.settings.event.start, mon: dex, seq: localSeq() });
     }, function (ok) {
       eventClaiming = false;
       if (!ok) return;
       closeSheets();
       show(artwork(dex, name), "🌟 You got " + name + "!", "Holiday event prize · look in your 🎒 Pokémon box!");
-    });
-  }
-
-  // ---------- prize Pokémon ----------
-  function prizeOf(kidId, tier) { return (state.kids[kidId].prizes || []).filter(function (p) { return p.tier === tier; })[0] || null; }
-  // What a ball's prize can be now: its legendary Pokémon the child has never had, or, for the Master Ball,
-  // the child's prize Pokémon in their box that are not shiny yet (record ids).
-  function prizeChoices(kidId, tier, w) {
-    w = w || world();
-    if (tier === SHINY_PRIZE_TIER) {
-      return boxOf(kidId, w).filter(function (m) { return isOwnPrize(kidId, m.id) && !m.c.shiny; }).map(function (m) { return m.id; });
-    }
-    var owned = ownedBy(kidId, w, Regions.speciesOf);
-    return PRIZE_MONS[tier].filter(function (d) { return !owned[d]; });
-  }
-  // A Pokémon the child won as a Great or Ultra Ball prize (a traded one from a brother is not their own prize).
-  function isOwnPrize(kidId, id) { return (state.kids[kidId].prizes || []).some(function (p) { return p.id === id && p.mon; }); }
-  // The prize Pokémon of one ball in the ladder: what it gives, or what was chosen, and a button once it is reached.
-  function addPrizeMons(box, tier, reached, w) {
-    var got = prizeOf(current, tier);
-    var row = make("div", "tier-mons");
-    if (got) {
-      var m = w.mons[tier === SHINY_PRIZE_TIER ? got.target : got.id];
-      if (m) row.appendChild(sprite(m.c.dex, "", m.c.name, m.c.shiny));
-      box.appendChild(row);
-      box.appendChild(make("div", "tier-pick got", "✓ " + (m ? (m.c.shiny ? "✨" : "") + m.c.name : "Got it!")));
-      return;
-    }
-    var choices = prizeChoices(current, tier, w);
-    if (tier === SHINY_PRIZE_TIER) row.appendChild(make("span", "tier-shiny", "✨"));
-    else (choices.length ? choices : PRIZE_MONS[tier]).forEach(function (d) { row.appendChild(sprite(d, "", monEntry(d)[0])); });
-    box.appendChild(row);
-    box.appendChild(make("div", "tier-pick", TIERS[tier - 1].pick));
-    if (!reached) return;
-    if (!choices.length) {
-      var wonOne = (state.kids[current].prizes || []).some(function (p) { return p.mon; });
-      box.appendChild(make("small", "", tier !== SHINY_PRIZE_TIER ? "You have them all!" : wonOne ? "Your prize Pokémon is not in your box" : "Get a legendary prize first!"));
-      return;
-    }
-    var b = make("button", "btn small tier-btn", tier === SHINY_PRIZE_TIER ? "✨ Choose!" : "🌟 Choose!");
-    b.type = "button";
-    b.onclick = function () { openPrize(tier); };
-    box.appendChild(b);
-  }
-  function openPrize(tier) {
-    var w = world(), list = el("pzList");
-    el("pzTitle").textContent = tier === SHINY_PRIZE_TIER ? "✨ Which one becomes SHINY?" : "🌟 Choose your legendary!";
-    el("pzNote").textContent = TIERS[tier - 1].name + " prize · you can choose only once";
-    list.innerHTML = "";
-    prizeChoices(current, tier, w).forEach(function (c) {
-      var m = tier === SHINY_PRIZE_TIER ? w.mons[c] : null;
-      var dex = m ? m.c.dex : c, name = m ? m.c.name : monEntry(c)[0];
-      var b = make("button", "pz-opt");
-      b.type = "button";
-      b.appendChild(artwork(dex, name, "pz-art", !!m));
-      b.appendChild(make("b", "", (m ? "✨" : "") + name));
-      b.onclick = function () { claimPrize(tier, c, dex, name); };
-      list.appendChild(b);
-    });
-    openSheet("prizeSheet");
-  }
-  // The last prize that was "Not saved": sent again with the same id when the same one is chosen
-  // (the sheet may have saved it and only the reply was lost).
-  var claiming = false, prizeTry = null;
-  function claimPrize(tier, choice, dex, name) {
-    if (claiming) return;
-    claiming = true;
-    var shiny = tier === SHINY_PRIZE_TIER, who = current;
-    var again = prizeTry && prizeTry.kid === who && prizeTry.tier === tier && (shiny ? prizeTry.target : prizeTry.mon) === choice;
-    var p = again ? prizeTry : { id: newId(), kid: who, type: "prize", day: todayIndex(), tier: tier, mon: shiny ? 0 : choice, target: shiny ? choice : "" };
-    commit({ action: "prize", prize: p }, function () { state.kids[who].prizes.push(p); }, function (ok, refused) {
-      claiming = false;
-      prizeTry = ok || refused ? null : p;
-      if (!ok) return;
-      closeSheets();
-      show(artwork(dex, name, undefined, shiny), shiny ? "✨ WOW! " + name + " is now SHINY!" : "🌟 You got the legendary " + name + "!",
-        TIERS[tier - 1].name + " prize · look in your 🎒 Pokémon box!");
     });
   }
 
@@ -1907,10 +1819,11 @@
     }
     var how = el("mdHow");
     how.innerHTML = "";
-    var rec = recordOf(id), prize = m.c.tier ? TIERS[m.c.tier - 1] : null, gift = giftOf(id);
-    var how1 = prize ? "🏆 " + prize.name + " prize" + (m.c.shiny ? " · ✨ made shiny with the Master Ball" : "") : gift ? "🏅 Prize: " + gift.title : rec ? recordText(rec) : "Caught!";
-    var line = make("div", "md-line", (m.from !== current ? (prize || gift ? "Won by " : "Caught by ") + kidName(m.from) + ": " : "") + how1);
+    var rec = recordOf(id), prize = m.c.tier ? TIERS[m.c.tier - 1] : null, gift = giftOf(id), evt = eventOf(id);
+    var how1 = prize ? "🏆 " + prize.name + " prize" + (m.c.shiny ? " · ✨ made shiny with the Master Ball" : "") : gift ? "🏅 Prize: " + gift.title : evt ? "🎉 Holiday event" : rec ? recordText(rec) : "Caught!";
+    var line = make("div", "md-line", (m.from !== current ? (prize || gift || evt ? "Won by " : "Caught by ") + kidName(m.from) + ": " : "") + how1);
     if (gift) line.appendChild(make("small", "", fmt(dayDate(gift.day))));
+    if (evt) line.appendChild(make("small", "", fmt(dayDate(evt.day))));
     if (rec) line.appendChild(make("small", "", whenText(rec)));
     how.appendChild(line);
     m.moves.forEach(function (mv) {
@@ -2080,7 +1993,6 @@
   }
 
   function renderSettings() {
-    Array.prototype.forEach.call(document.querySelectorAll(".sKid"), function (n) { n.textContent = kid().name; });
     var row = el("sPracticeRow");
     if (row.getAttribute("data-kid") === current) {
       kid().practices.forEach(function (type) {
@@ -2257,6 +2169,11 @@
       if (text && text.indexOf('var APP_VERSION = "' + APP_VERSION + '"') < 0 && !busy) location.reload();
     }).catch(function () { /* offline: try again next time */ });
   }
+  // Why nothing can be saved yet ("" = the sheet code is the current one).
+  function sheetWaitMessage() {
+    if (state.serverGen >= CLIENT_GEN) return "";
+    return state.serverGen ? "Updating... please try again in a minute." : "Loading... please check the internet and try again in a moment.";
+  }
   // Runs a change locally (no API) or on the shared sheet; calls done(ok).
   function commit(payload, localChange, done) {
     if (!API_URL) {
@@ -2268,8 +2185,9 @@
     }
     // Until the sheet code is the current one (gen 7), nothing is saved: an older sheet would store it wrongly
     // (a gen 6 sheet files French as a book).
-    if (!(state.serverGen >= CLIENT_GEN)) {
-      window.alert(state.serverGen ? "Updating... please try again in a minute." : "Loading... please check the internet and try again in a moment.");
+    var wait = sheetWaitMessage();
+    if (wait) {
+      window.alert(wait);
       refresh();
       done(false, true);
       return;
@@ -2389,6 +2307,8 @@
     var sync = sheetLoadedAt ? "☁ Shared · updated " + sheetLoadedAt.toTimeString().slice(0, 5) + " · opened " + now.toTimeString().slice(0, 5) : el("sync").textContent;
     Parent.render(el("parentRoot"), parentKids(), now, sync, !!sheetLoadedAt);
     Parent.renderEvent(el("parentRoot"), state.settings.event, function (start, end) {
+      var wait = sheetWaitMessage();
+      if (wait) { refresh(); return Promise.reject(new Error(wait)); }
       return withPin(function (pin) { return api({ action: "event", pin: pin, start: start, end: end }); });
     });
     openSheet("parentSheet");
