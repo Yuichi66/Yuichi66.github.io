@@ -116,7 +116,7 @@ function snapshot_() {
       base.ticket = Number(r[8]) || 0;
     }
     else {
-      base.title = String(r[4]);
+      base.title = cellDay_(r[4], base.type);
       base.score = Number(r[6]);
       base.total = Number(r[7]);
       base.partner = String(r[PARTNER_COL - 1] || "");
@@ -479,7 +479,7 @@ function addEventMon_(x) {
   var today = dayKey_(Date.now());
   if (!ev.start || today < ev.start || today > ev.end) throw new Error("Not possible: no holiday event now.");
   var rows = entriesSheet_().getDataRange().getValues().slice(1);
-  if (rows.some(function (r) { return r[2] === "event" && String(r[1]) === kid && String(r[4]) === ev.start; })) throw new Error("Not possible: the event Pokémon was already chosen.");
+  if (rows.some(function (r) { return r[2] === "event" && String(r[1]) === kid && cellDay_(r[4], "event") === ev.start; })) throw new Error("Not possible: the event Pokémon was already chosen.");
   var books = rows.filter(function (r) {
     if (r[2] !== "read" || String(r[1]) !== kid) return false;
     var at = Number(String(r[0]).split("-")[0]);
@@ -492,10 +492,16 @@ function addEventMon_(x) {
   entriesSheet_().appendRow([id, kid, "event", day, ev.start, "Event", "", "", "", new Date(), mon, "", ""]);
 }
 
+// Sheets may turn a typed YYYY-MM-DD into a Date; give event dates back as text.
+function cellDay_(v, type) {
+  if (type === "event" && v instanceof Date) return dayKey_(v.getTime());
+  return String(v === null || v === undefined ? "" : v);
+}
+
 function readEvent_() {
   var out = { start: "", end: "" };
   settingsSheet_().getDataRange().getValues().slice(1).forEach(function (r) {
-    var v = r[1] instanceof Date ? dayKey_(r[1].getTime()) : String(r[1] || "");
+    var v = cellDay_(r[1], "event");
     if (r[0] === "event.start") out.start = v;
     if (r[0] === "event.end") out.end = v;
   });
