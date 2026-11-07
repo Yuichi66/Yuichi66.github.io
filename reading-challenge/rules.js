@@ -20,11 +20,17 @@ var Rules = (function () {
     for (var r = start.rank + 1; r <= rank; r++) used += booksForRank(r);
     return booksForRank(rank + 1) - (books - start.books - used);
   }
-  function pad(n) { return (n < 10 ? "0" : "") + n; }
-  function dayKey(ms) { var d = new Date(ms); return d.getFullYear() + "-" + pad(d.getMonth() + 1) + "-" + pad(d.getDate()); }
-  // Inside a holiday event (both dates included)?
+  // The calendar day in the UK (the family's day), whatever zone the device is set to: YYYY-MM-DD.
+  var londonDay = new Intl.DateTimeFormat("en-GB", { timeZone: "Europe/London", year: "numeric", month: "2-digit", day: "2-digit" });
+  function dayKey(ms) {
+    var p = {};
+    londonDay.formatToParts(new Date(ms)).forEach(function (x) { p[x.type] = x.value; });
+    return p.year + "-" + p.month + "-" + p.day;
+  }
+  var DATE_TEXT = /^\d{4}-\d{2}-\d{2}$/;
+  // Inside a holiday event (both dates included)? Dates must be YYYY-MM-DD text.
   function inEvent(ms, ev) {
-    if (!ev || !ev.start || !ev.end) return false;
+    if (!ev || !DATE_TEXT.test(ev.start) || !DATE_TEXT.test(ev.end)) return false;
     var k = dayKey(ms);
     return k >= ev.start && k <= ev.end;
   }
