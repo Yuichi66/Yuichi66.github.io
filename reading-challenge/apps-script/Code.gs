@@ -126,6 +126,7 @@ function snapshot_() {
   });
   var settings = readSettings_();
   settings.event = readEvent_();
+  settings.eventPast = readEventPast_();
   return { ok: true, gen: SERVER_GEN, entries: entries, settings: settings };
 }
 
@@ -457,8 +458,40 @@ function saveEvent_(pin, start, end) {
   if (start || end) {
     if (!ok.test(start) || !ok.test(end) || start > end) throw new Error("Bad event dates");
   }
+  var today = dayKey_(Date.now()), yesterday = dayKey_(Date.now() - 864e5);
+  var cur = readEvent_(), past = readEventPast_();
+  var started = !!cur.start && cur.start <= today;
+  if (start && past.some(function (w) { return w.start === start; })) throw new Error("That event start was already used");
+  if (start && start === cur.start) {
+    // Same event, new dates: days already passed stay inside it.
+    var floor = started ? (cur.end < yesterday ? cur.end : yesterday) : "";
+    if (end < floor) throw new Error("Bad event dates: days already passed stay in the event");
+    setSetting_("event.end", end);
+    return;
+  }
+  if (started) {
+    // Ending: close at yesterday (at least the first day). Replacing: the old window stops after today.
+    var closeAt;
+    if (!start) closeAt = yesterday < cur.start ? cur.start : (cur.end < yesterday ? cur.end : yesterday);
+    else closeAt = cur.end < today ? cur.end : today;
+    past.push({ start: cur.start, end: closeAt });
+    setSetting_("event.past", JSON.stringify(past));
+  }
   setSetting_("event.start", start);
   setSetting_("event.end", end);
+}
+
+// Earlier event windows, as [{start,end}] (text dates). Date-like values are turned back into text.
+function readEventPast_() {
+  var raw = "";
+  settingsSheet_().getDataRange().getValues().slice(1).forEach(function (r) { if (r[0] === "event.past") raw = r[1]; });
+  var list = [];
+  try { list = JSON.parse(String(raw || "[]")); } catch (e) { list = []; }
+  if (!Array.isArray(list)) return [];
+  function day(v) { return v instanceof Date ? dayKey_(v.getTime()) : String(v || "").slice(0, 10); }
+  var ok = /^\d{4}-\d{2}-\d{2}$/;
+  return list.map(function (w) { return { start: day(w && w.start), end: day(w && w.end) }; })
+    .filter(function (w) { return ok.test(w.start) && ok.test(w.end); });
 }
 
 function dayKey_(ms) {

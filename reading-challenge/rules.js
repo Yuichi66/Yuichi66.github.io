@@ -28,6 +28,11 @@ var Rules = (function () {
     var k = dayKey(ms);
     return k >= ev.start && k <= ev.end;
   }
-  return { MAX_RANK: MAX_RANK, booksForRank: booksForRank, rankFromBooks: rankFromBooks, booksToNextRank: booksToNextRank, dayKey: dayKey, inEvent: inEvent };
+  // Inside any of several holiday event windows (the current one and every past one)?
+  function inAnyEvent(ms, windows) {
+    for (var i = 0; i < (windows || []).length; i++) if (inEvent(ms, windows[i])) return true;
+    return false;
+  }
+  return { MAX_RANK: MAX_RANK, booksForRank: booksForRank, rankFromBooks: rankFromBooks, booksToNextRank: booksToNextRank, dayKey: dayKey, inEvent: inEvent, inAnyEvent: inAnyEvent };
 })();
 if (typeof module !== "undefined") module.exports = Rules;

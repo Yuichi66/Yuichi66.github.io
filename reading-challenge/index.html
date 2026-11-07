@@ -650,11 +650,11 @@
   // Allowed practice goals (correct answers), the same as MIN/MAX_PRACTICE_GOAL in Code.gs.
   var PRACTICE_GOAL_MIN = 10, PRACTICE_GOAL_MAX = 100000;
   var PRACTICE_RULE_FROM = 1792947578805;
-  // Prize tiers: share of the goal needed, ball, reward.
+  // Prize tiers: share of the goal needed, ball, name.
   var TIERS = [
-    { pct: 100, ball: "great", name: "Great Ball", reward: "£2", pick: "Pick 1 legendary!" },
-    { pct: 150, ball: "ultra", name: "Ultra Ball", reward: "£4", pick: "Pick 1 legendary!" },
-    { pct: 200, ball: "master", name: "Master Ball", reward: "£6", pick: "Make it SHINY!" }
+    { pct: 100, ball: "great", name: "Great Ball", pick: "Pick 1 legendary!" },
+    { pct: 150, ball: "ultra", name: "Ultra Ball", pick: "Pick 1 legendary!" },
+    { pct: 200, ball: "master", name: "Master Ball", pick: "Make it SHINY!" }
   ];
   // Each ball also gives a Pokémon, chosen once, as soon as it is reached (the money is given by a grown-up):
   // the Great and Ultra Balls one of their legendary Pokémon, the Master Ball makes one prize Pokémon shiny.
@@ -847,7 +847,7 @@
 
   // ---------- local cache (works even when storage is blocked) ----------
   function emptyState() {
-    var s = { settings: { targets: {}, mathsTargets: {}, practiceGoals: {}, partnerIds: {}, ticketBase: {}, peaks: {}, stoneBase: {}, event: { start: "", end: "" } }, kids: {}, serverGen: 0 };
+    var s = { settings: { targets: {}, mathsTargets: {}, practiceGoals: {}, partnerIds: {}, ticketBase: {}, peaks: {}, stoneBase: {}, event: { start: "", end: "" }, eventPast: [] }, kids: {}, serverGen: 0 };
     KIDS.forEach(function (k) {
       s.settings.targets[k.id] = k.target;
       s.settings.mathsTargets[k.id] = k.mathsTarget;
@@ -1071,8 +1071,8 @@
     var list = d.entries.concat(d.maths, d.practice, extra ? [extra] : []).filter(function (x) { return loggedAt(x) >= PACE_FROM; });
     var ids = {};
     list.forEach(function (x) { ids[x.id] = true; });
-    var ev = state.settings.event;
-    var points = list.reduce(function (sum, x) { return sum + Growth.expOf(x) * (Rules.inEvent(loggedAt(x), ev) ? 2 : 1); }, 0);
+    var windows = [state.settings.event].concat(state.settings.eventPast || []);
+    var points = list.reduce(function (sum, x) { return sum + Growth.expOf(x) * (Rules.inAnyEvent(loggedAt(x), windows) ? 2 : 1); }, 0);
     var used = list.filter(function (x) { return x.mon; }).length +
       d.trades.filter(function (t) { return ids[t.source]; }).length;
     return { points: points, meter: points % BALL_POINTS, left: Math.floor(points / BALL_POINTS) - used };
@@ -1432,7 +1432,7 @@
     var list = Regions.legends(owned, false).filter(notPrize);
     // All of Kanto's legendaries are prizes, so a child with only Kanto open draws from every region.
     if (list.length < 3) list = Regions.legends(owned, true).filter(notPrize);
-    var seed = Number(state.settings.event.start.replace(/-/g, "")) + kidId.length;
+    var seed = Number(state.settings.event.start.replace(/-/g, "")) + kidId.split("").reduce(function (sum, ch) { return sum + ch.charCodeAt(0); }, 0);
     var out = [];
     while (list.length && out.length < 3) out.push(list.splice(seed % list.length, 1)[0]);
     return out;
@@ -2139,6 +2139,7 @@
       if (st.peak !== undefined && st.peak !== "") next.settings.peaks[k.id] = st.peak;
     });
     next.settings.event = (res.settings && res.settings.event) || { start: "", end: "" };
+    next.settings.eventPast = (res.settings && res.settings.eventPast) || [];
     next.serverGen = res.gen || 0;
     // seq: place in the sheet. Trades and evolutions are replayed in this order (phone clocks can be wrong).
     res.entries.forEach(function (e, seq) {
