@@ -420,13 +420,13 @@ function saveEvent_(pin, start, end) {
   if (start || end) {
     if (!ok.test(start) || !ok.test(end) || start > end) throw new Error("Bad event dates");
   }
-  var today = dayKey_(Date.now()), yesterday = dayKey_(Date.now() - 864e5);
+  var today = dayKey_(Date.now());
   var cur = readEvent_(), past = readEventPast_();
   var started = !!cur.start && cur.start <= today;
   if (start && past.some(function (w) { return w.start === start; })) throw new Error("That event start was already used");
   if (start && start === cur.start) {
     // Same event, new dates: days already passed stay inside it.
-    var floor = started ? (cur.end < yesterday ? cur.end : yesterday) : "";
+    var floor = started ? (cur.end < today ? cur.end : today) : "";
     if (end < floor) throw new Error("Bad event dates: days already passed stay in the event");
     setSetting_("event.end", end);
     return;
