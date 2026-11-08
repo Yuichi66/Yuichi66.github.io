@@ -707,6 +707,8 @@
   // instead of one per win. Records before it keep the old rules, so nothing already caught changes.
   var PACE_FROM = 1793168487192;
   var BALL_POINTS = 1500;
+  // Levels came in at 2026-10-28 05:30 UTC: a Pokémon caught from then on starts at Lv.5 (see isFreshCatch).
+  var LEVELS_FROM = 1793165400000;
   // What each Pokémon above evolves into, stage by stage, then its Mega / Gigantamax / special forms.
   // Keyed by the dex number in MONS; [name, dex number]. Not listed = already fully evolved.
   var EVOLVES = {
@@ -1128,14 +1130,14 @@
       if (loggedAt(x) >= NEW_MONS_FROM) addNew();
       // A saved Pokémon outside the first 100 (all 1,025 can be caught now): used as it is,
       // and kept out of the old pool and families, which only pick older records again.
-      if (x.mon && monIndex(x.mon) < 0) { byId[x.id] = { no: i, mon: monEntry(x.mon), steps: 0, shiny: !!x.shiny, tier: x.tier || 0 }; return; }
+      if (x.mon && monIndex(x.mon) < 0) { byId[x.id] = { no: i, mon: monEntry(x.mon), steps: 0, shiny: !!x.shiny, tier: x.tier || 0, fresh: isFreshCatch(x) }; return; }
       // The Pokémon saved with the record is used as it is, so it can never change later.
       var k = x.mon ? monIndex(x.mon) : -1;
       if (k < 0) k = loggedAt(x) >= FAMILY_RULE_FROM ? pickFrom(freshPool(owned, withNew), x.id) : pickFrom(pool, x.id);
       owned[FAMILY(MONS[k][3])] = true;
       pool = pool.filter(function (j) { return j !== k; });
       if (!pool.length) pool = allMonIndexes(withNew);
-      byId[x.id] = { no: i, mon: MONS[k], steps: 0, shiny: !!x.shiny, tier: x.tier || 0 };
+      byId[x.id] = { no: i, mon: MONS[k], steps: 0, shiny: !!x.shiny, tier: x.tier || 0, fresh: isFreshCatch(x) };
     });
     if (Date.now() >= NEW_MONS_FROM) addNew();
     // `pool` is kept as it was, but it no longer decides the next catch: nextMon() picks from the open regions.
@@ -1163,6 +1165,9 @@
   }
   // Evolutions paid for by a win (before levels): replayed along EVOLVES. Level-up and Mega Stone ones are not.
   function isOldEvolve(v) { return (v.kind || "old") === "old"; }
+  // Caught since levels came in (logged from LEVELS_FROM, or saved with a partner): it starts at Lv.5,
+  // even when its form is a later stage (Magmar is the first of its family in Kanto; Magby lives in Johto).
+  function isFreshCatch(x) { return loggedAt(x) >= LEVELS_FROM || !!x.partner; }
   // The next catch of the selected child: from the open regions (regions.js), chosen from the record's id
   // so every phone shows the same one.
   // Common Pokémon come more often (PokeAPI catch rate). Any catch has a 1 in LEGEND_ODDS chance of a legendary
@@ -1614,6 +1619,11 @@
         // Level-up or Mega Stone: only from the form it was saved from (the sheet keeps them in order).
         if (m.c.dex !== x.from) return;
         if (m.startDex === undefined) m.startDex = m.c.dex;
+        if (x.kind === "level") {
+          // It reached this level to evolve, so it is never shown below it (a Mega Stone does not raise it).
+          var step = Growth.nextOf(x.from).filter(function (n) { return n.to === x.to; })[0];
+          m.evolvedAt = Math.max(m.evolvedAt || 0, step ? step.level : Growth.minLevel(x.to));
+        }
         m.evos.push({ v: x, from: [m.c.name, m.c.dex], to: [Growth.nameOf(x.to), x.to] });
         m.c.name = Growth.nameOf(x.to);
         m.c.dex = x.to;
@@ -1632,7 +1642,8 @@
     return { mons: mons, traded: traded, evolved: evolved };
   }
   // Experience goes to the partner saved with each study record, and stays with that Pokémon (also after a trade).
-  // Level = lowest level of its form before any level-up evolution + experience, never below its form now.
+  // Level = start level + experience. A newly caught one starts at Lv.5 and is never shown below the level it
+  // evolved at. One caught before levels came in starts at the lowest level of its form then, never below its form now.
   function addGrowth(mons) {
     var exp = {};
     KIDS.forEach(function (k) {
@@ -1645,10 +1656,12 @@
       var m = mons[id];
       var start = m.startDex === undefined ? m.c.dex : m.startDex;
       m.exp = exp[id] || 0;
-      var fromExp = Growth.levelOf(start, m.exp);
-      m.level = Math.max(Growth.minLevel(m.c.dex), fromExp);
+      var base = m.c.fresh ? Growth.START_LEVEL : Growth.minLevel(start);
+      var floor = m.c.fresh ? Math.max(Growth.START_LEVEL, m.evolvedAt || 0) : Growth.minLevel(m.c.dex);
+      var fromExp = Growth.levelFrom(base, m.exp);
+      m.level = Math.max(floor, fromExp);
       // After a deleted record the form can be above its EXP: start the bar again from 0.
-      m.progress = m.level > fromExp ? { have: 0, need: Growth.EXP_PER_LEVEL } : Growth.progress(start, m.exp);
+      m.progress = m.level > fromExp ? { have: 0, need: Growth.EXP_PER_LEVEL } : Growth.progressFrom(base, m.exp);
       m.ready = Growth.readyOf(m.c.dex, m.level);
       m.evolvesAt = Growth.evolvesAt(m.c.dex);
       m.stones = Growth.stoneOf(m.c.dex);
