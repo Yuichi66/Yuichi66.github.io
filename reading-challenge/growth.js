@@ -5,6 +5,8 @@ var Growth = (function () {
   var DATA = typeof EVO_DATA !== "undefined" ? EVO_DATA : require("./evo-data.js");
   var EXP_PER_LEVEL = 100;
   var MAX_LEVEL = 100;
+  // Every newly caught Pokémon starts here, whatever its form (a Magmar caught in Kanto too).
+  var START_LEVEL = 5;
   var BOOK_PASS_RATE = 0.8;
   // Experience for each kind of record (times tables count most, to make them worth doing).
   var EXP = { maths: 2, book: 300, latin: 0.5, mymaths: 1, french: 0.5 };
@@ -24,15 +26,18 @@ var Growth = (function () {
   function minLevel(form) { var d = info(form); return d ? d[2] : 5; }
   function nameOf(form) { var d = info(form); return d ? d[0] : ""; }
 
-  // startForm: the form before any level-up or Mega Stone evolution. exp: all experience it was given.
-  function levelOf(startForm, exp) {
-    return Math.min(MAX_LEVEL, minLevel(startForm) + Math.floor(exp / EXP_PER_LEVEL));
+  // Level of a Pokémon that started at startLevel and was given exp experience.
+  function levelFrom(startLevel, exp) {
+    return Math.min(MAX_LEVEL, startLevel + Math.floor(exp / EXP_PER_LEVEL));
   }
   // Experience gained inside the current level, and how much the level needs (null at the top level).
-  function progress(startForm, exp) {
-    if (levelOf(startForm, exp) >= MAX_LEVEL) return null;
+  function progressFrom(startLevel, exp) {
+    if (levelFrom(startLevel, exp) >= MAX_LEVEL) return null;
     return { have: exp % EXP_PER_LEVEL, need: EXP_PER_LEVEL };
   }
+  // startForm: the form before any level-up or Mega Stone evolution. exp: all experience it was given.
+  function levelOf(startForm, exp) { return levelFrom(minLevel(startForm), exp); }
+  function progress(startForm, exp) { return progressFrom(minLevel(startForm), exp); }
 
   // Evolutions of this form: [{ to, name, level }]. Empty for a final form, a Mega or a special form.
   function nextOf(form) {
@@ -57,8 +62,9 @@ var Growth = (function () {
   }
 
   return {
-    EXP: EXP, EXP_PER_LEVEL: EXP_PER_LEVEL, MAX_LEVEL: MAX_LEVEL,
+    EXP: EXP, EXP_PER_LEVEL: EXP_PER_LEVEL, MAX_LEVEL: MAX_LEVEL, START_LEVEL: START_LEVEL,
     expOf: expOf, minLevel: minLevel, nameOf: nameOf, levelOf: levelOf, progress: progress,
+    levelFrom: levelFrom, progressFrom: progressFrom,
     nextOf: nextOf, readyOf: readyOf, evolvesAt: evolvesAt, stoneOf: stoneOf
   };
 })();
