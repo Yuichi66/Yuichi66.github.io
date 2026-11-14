@@ -397,6 +397,8 @@
     <div class="sub-h">⭐ Rank legends</div>
     <div class="ladder" id="rankLegends"></div>
     <small class="goal-note" id="rankLegendMsg"></small>
+    <div class="sub-h">🔥 Great weeks</div>
+    <div class="gym" id="greatWeek"></div>
     <div class="sub-h">🏅 Gym badges</div>
     <div class="gym" id="gymBadges"></div>
     <div class="rank-next" id="rankMsg"></div>
@@ -633,12 +635,12 @@
 </div>
 
 <!-- ?v= must change with APP_VERSION so phones fetch the new files -->
-<script src="evo-data.js?v=2026-11-14-7"></script>
-<script src="dex-data.js?v=2026-11-14-7"></script>
-<script src="growth.js?v=2026-11-14-7"></script>
-<script src="regions.js?v=2026-11-14-7"></script>
-<script src="rules.js?v=2026-11-14-7"></script>
-<script src="parent.js?v=2026-11-14-7"></script>
+<script src="evo-data.js?v=2026-11-14-8"></script>
+<script src="dex-data.js?v=2026-11-14-8"></script>
+<script src="growth.js?v=2026-11-14-8"></script>
+<script src="regions.js?v=2026-11-14-8"></script>
+<script src="rules.js?v=2026-11-14-8"></script>
+<script src="parent.js?v=2026-11-14-8"></script>
 <script>
 (function () {
   "use strict";
@@ -648,9 +650,9 @@
   var REFRESH_MS = 60000;
   // Change on every release: a page left open with older code reloads itself,
   // so every phone works out the same Pokémon.
-  var APP_VERSION = "2026-11-14-7";
+  var APP_VERSION = "2026-11-14-8";
   // Sent with every change; the sheet refuses changes from older pages (MIN_CLIENT_GEN in Code.gs).
-  var CLIENT_GEN = 13;
+  var CLIENT_GEN = 14;
   var STORAGE_KEY = "htrc-2026-autumn-v3";
   var START = new Date(2026, 9, 24);   // Sat 24 Oct 2026
   // The half term was 16 days; old records keep their day number from START. New records use today's.
@@ -681,6 +683,9 @@
   // Rank legends: a legendary Pokémon to choose at these ranks (0-based; Rank 10, Rank 15, CHAMPION).
   // The same as RANK_LEGENDS in Code.gs.
   var RANK_LEGENDS = [9, 14, 20];
+  // Great weeks: study on WEEK_DAYS days of a week (Monday to Sunday, UK days) from WEEK_FROM gives a bonus
+  // Pokémon once the week is over. The same as in Code.gs.
+  var WEEK_FROM = "2026-11-16", WEEK_DAYS = 5;
   // Gym badges: one every `step` correct answers in a subject. The same as BADGE_STEPS in Code.gs.
   var BADGES = {
     maths: { step: 5000, name: "Times tables", icon: "🎸" },
@@ -905,7 +910,7 @@
       s.settings.mathsTargets[k.id] = k.mathsTarget;
       s.settings.practiceGoals[k.id] = goalsFrom(k.practiceGoals, k);
       s.settings.partnerIds[k.id] = "";
-      s.kids[k.id] = { entries: [], maths: [], practice: [], evolves: [], trades: [], prizes: [], gifts: [], events: [], awards: [], badges: [], legends: [] };
+      s.kids[k.id] = { entries: [], maths: [], practice: [], evolves: [], trades: [], prizes: [], gifts: [], events: [], awards: [], badges: [], legends: [], weeks: [] };
     });
     return s;
   }
@@ -926,6 +931,7 @@
           if (!base.kids[k.id].awards) base.kids[k.id].awards = [];
           if (!base.kids[k.id].badges) base.kids[k.id].badges = [];
           if (!base.kids[k.id].legends) base.kids[k.id].legends = [];
+          if (!base.kids[k.id].weeks) base.kids[k.id].weeks = [];
           if (parsed.settings.targets[k.id]) base.settings.targets[k.id] = parsed.settings.targets[k.id];
           if (parsed.settings.mathsTargets[k.id]) base.settings.mathsTargets[k.id] = parsed.settings.mathsTargets[k.id];
           if (parsed.settings.partnerIds && parsed.settings.partnerIds[k.id]) base.settings.partnerIds[k.id] = parsed.settings.partnerIds[k.id];
@@ -1097,7 +1103,7 @@
   function catchOrder() {
     var d = data(), used = usedForReward();
     function caught(rule) { return function (x) { return x.mon || (loggedAt(x) < PACE_FROM && rule(x)); }; }
-    var list = d.entries.filter(caught(isPass)).concat(d.maths.filter(caught(mathsCatches)), d.practice.filter(caught(practiceCatches)), prizeMons(d), giftMons(d), eventMons(d), awardMons(d), badgeMons(d), legendMons(d));
+    var list = d.entries.filter(caught(isPass)).concat(d.maths.filter(caught(mathsCatches)), d.practice.filter(caught(practiceCatches)), prizeMons(d), giftMons(d), eventMons(d), awardMons(d), badgeMons(d), legendMons(d), weekMons(d));
     return list.filter(function (x) { return !used[x.id]; }).sort(function (a, b) { return loggedAt(a) - loggedAt(b); });
   }
   // Prize Pokémon of the Great and Ultra Balls, shiny when the Master Ball prize was used on them.
@@ -1125,6 +1131,18 @@
     return (d.awards || []).filter(function (g) { return g.mon; }).map(function (g) {
       return { id: g.id, kid: g.kid, type: "award", day: g.day, mon: g.mon, shiny: 0 };
     });
+  }
+  function weekMons(d) {
+    return (d.weeks || []).filter(function (g) { return g.mon; }).map(function (g) {
+      return { id: g.id, kid: g.kid, type: "week", day: g.day, mon: g.mon, shiny: 0 };
+    });
+  }
+  function weekOf(id) {
+    for (var i = 0; i < KIDS.length; i++) {
+      var g = (state.kids[KIDS[i].id].weeks || []).filter(function (x) { return x.id === id; })[0];
+      if (g) return g;
+    }
+    return null;
   }
   function legendMons(d) {
     return (d.legends || []).filter(function (g) { return g.mon; }).map(function (g) {
@@ -1546,6 +1564,7 @@
     renderPracticeGoals();
     renderLadder(s);
     renderRankLegends(s);
+    renderWeek();
     renderGym();
   }
   // ---------- holiday event ----------
@@ -1729,6 +1748,75 @@
       closeSheets();
       show(artwork(dex, name, undefined, shiny), shiny ? "✨ WOW! " + name + " is now SHINY!" : "🌟 You got the legendary " + name + "!",
         TIERS[tier - 1].name + " prize · look in your 🎒 Pokémon box!");
+    });
+  }
+
+  // ---------- great weeks ----------
+  // Days with study (a book tried, times tables or practice logged; the time in the record's id) in the week
+  // starting on Monday `start`, for a child. The same rule as studyDays_ in Code.gs.
+  function studyDays(kidId, start) {
+    var d = state.kids[kidId], end = Rules.addDays(start, 6), days = {};
+    d.entries.concat(d.maths, d.practice).forEach(function (x) {
+      var ms = loggedAt(x);
+      if (!ms) return;
+      var k = Rules.dayKey(ms);
+      if (k >= start && k <= end) days[k] = true;
+    });
+    return Object.keys(days).length;
+  }
+  // Finished weeks from WEEK_FROM with enough days whose bonus is not caught yet, oldest first.
+  function weeksToClaim(kidId) {
+    var thisWeek = Rules.weekStart(Rules.dayKey(Date.now())), out = [];
+    var got = (state.kids[kidId].weeks || []).map(function (w) { return w.week; });
+    for (var w = WEEK_FROM; w < thisWeek; w = Rules.addDays(w, 7)) {
+      if (got.indexOf(w) < 0 && studyDays(kidId, w) >= WEEK_DAYS) out.push(w);
+    }
+    return out;
+  }
+  function renderWeek() {
+    var box = el("greatWeek"), today = Rules.dayKey(Date.now()), thisWeek = Rules.weekStart(today);
+    box.innerHTML = "";
+    var row = make("div", "gym-row");
+    row.appendChild(make("div", "gym-icon", "🔥"));
+    var body = make("div", "gym-body");
+    if (thisWeek < WEEK_FROM) {
+      body.appendChild(make("b", "", "Starts on " + fmt(new Date(WEEK_FROM + "T00:00")) + "!"));
+      body.appendChild(make("small", "", "Study on " + WEEK_DAYS + " days of a week (Mon to Sun) → a bonus Pokémon the next Monday!"));
+    } else {
+      var n = studyDays(current, thisWeek);
+      body.appendChild(make("b", "", "This week: " + Math.min(n, 7) + " / " + WEEK_DAYS + " days"));
+      body.appendChild(make("small", "", n >= WEEK_DAYS ? "✅ Great week! Your bonus Pokémon comes on Monday!" :
+        "🎯 " + (WEEK_DAYS - n) + " more day" + (WEEK_DAYS - n > 1 ? "s" : "") + " of study → a bonus Pokémon next Monday!"));
+      if (n >= WEEK_DAYS) row.className += " has";
+    }
+    row.appendChild(body);
+    box.appendChild(row);
+    var todo = weeksToClaim(current);
+    if (todo.length) {
+      var b = make("button", "btn purple small", "🎉 Great week from " + fmt(new Date(todo[0] + "T00:00")) + "! Catch your bonus Pokémon");
+      b.type = "button";
+      b.onclick = function () { claimWeek(todo[0]); };
+      box.appendChild(b);
+    }
+  }
+  var weekTry = null, weekSaving = false;
+  function claimWeek(week) {
+    if (weekSaving) return;
+    weekSaving = true;
+    var who = current;
+    var entry = weekTry && weekTry.kid === who && weekTry.week === week ? weekTry : null;
+    if (!entry) {
+      var id = newId();
+      entry = { id: id, kid: who, day: todayIndex(), week: week, mon: nextMon(id)[3] };
+    }
+    var mon = monEntry(entry.mon);
+    commit({ action: "week", entry: entry }, function () {
+      state.kids[who].weeks.push({ id: entry.id, kid: who, type: "week", day: entry.day, week: week, mon: entry.mon, seq: localSeq() });
+    }, function (ok, refused) {
+      weekSaving = false;
+      weekTry = ok || refused ? null : entry;
+      if (!ok) return;
+      show(artwork(entry.mon, mon[0]), "🔥 Great week! You caught " + mon[0] + "!", "Bonus Pokémon · look in your 🎒 Pokémon box!");
     });
   }
 
@@ -1989,9 +2077,18 @@
 
   // Prize badges: prizes given by a grown-up, each with the Pokémon that came with it.
   function renderGifts() {
-    var gifts = data().gifts || [], awards = data().awards || [], badges = data().badges || [], legends = data().legends || [], log = el("giftLog"), byId = catches().byId;
-    el("giftWrap").className = gifts.length || awards.length || badges.length || legends.length ? "" : "hidden";
+    var gifts = data().gifts || [], awards = data().awards || [], badges = data().badges || [], legends = data().legends || [], weeks = data().weeks || [], log = el("giftLog"), byId = catches().byId;
+    el("giftWrap").className = gifts.length || awards.length || badges.length || legends.length || weeks.length ? "" : "hidden";
     log.innerHTML = "";
+    weeks.forEach(function (w) {
+      var c = byId[w.id];
+      var card = make("div", "entry badge-card");
+      card.appendChild(make("div", "badge-medal", "🔥"));
+      card.appendChild(make("div", "title", "Great week from " + fmt(new Date(w.week + "T00:00"))));
+      card.appendChild(make("div", "mon", "🎁 Pokémon: " + (c ? c.name : "a Pokémon")));
+      card.appendChild(make("div", "meta", fmt(dayDate(w.day))));
+      log.appendChild(card);
+    });
     legends.forEach(function (l) {
       var c = byId[l.id];
       var card = make("div", "entry badge-card");
@@ -2383,9 +2480,9 @@
     }
     var how = el("mdHow");
     how.innerHTML = "";
-    var rec = recordOf(id), prize = m.c.tier ? TIERS[m.c.tier - 1] : null, gift = giftOf(id), evt = eventOf(id), aw = awardOf(id), bd = badgeOf(id), lg = legendOf(id);
-    var how1 = prize ? "🏆 " + prize.name + " prize" + (m.c.shiny ? " · ✨ made shiny with the Master Ball" : "") : gift ? "🏅 Prize: " + gift.title : lg ? "⭐ Rank " + (lg.rank + 1) + " " + RANKS[lg.rank] + " legendary" : bd ? "🏅 Gym badge: " + badgeLabel(bd) : aw ? "🏫 " + aw.site + " (" + aw.subject + "): " + aw.title : evt ? "🎉 Holiday event" : rec ? recordText(rec) : "Caught!";
-    var line = make("div", "md-line", (m.from !== current ? (prize || gift || evt || aw || bd || lg ? "Won by " : "Caught by ") + kidName(m.from) + ": " : "") + how1);
+    var rec = recordOf(id), prize = m.c.tier ? TIERS[m.c.tier - 1] : null, gift = giftOf(id), evt = eventOf(id), aw = awardOf(id), bd = badgeOf(id), lg = legendOf(id), wk = weekOf(id);
+    var how1 = prize ? "🏆 " + prize.name + " prize" + (m.c.shiny ? " · ✨ made shiny with the Master Ball" : "") : gift ? "🏅 Prize: " + gift.title : wk ? "🔥 Great week from " + fmt(new Date(wk.week + "T00:00")) : lg ? "⭐ Rank " + (lg.rank + 1) + " " + RANKS[lg.rank] + " legendary" : bd ? "🏅 Gym badge: " + badgeLabel(bd) : aw ? "🏫 " + aw.site + " (" + aw.subject + "): " + aw.title : evt ? "🎉 Holiday event" : rec ? recordText(rec) : "Caught!";
+    var line = make("div", "md-line", (m.from !== current ? (prize || gift || evt || aw || bd || lg || wk ? "Won by " : "Caught by ") + kidName(m.from) + ": " : "") + how1);
     if (gift) line.appendChild(make("small", "", fmt(dayDate(gift.day))));
     if (evt) line.appendChild(make("small", "", fmt(dayDate(evt.day))));
     if (rec) line.appendChild(make("small", "", whenText(rec)));
@@ -2628,6 +2725,7 @@
       else if (e.type === "prize") next.kids[e.kid].prizes.push({ id: e.id, kid: e.kid, type: e.type, day: e.day, tier: e.tier, mon: e.mon || 0, target: e.target || "", seq: seq });
       else if (e.type === "trade") next.kids[e.kid].trades.push({ id: e.id, kid: e.kid, type: e.type, day: e.day, source: e.source || "", give: e.site, get: e.get || "", with: e.with || "", ticket: e.ticket || 0, seq: seq });
       else if (e.type === "event") next.kids[e.kid].events.push({ id: e.id, kid: e.kid, type: "event", day: e.day, title: e.title || "", mon: e.mon || 0, seq: seq });
+      else if (e.type === "gift" && e.weekBonus) next.kids[e.kid].weeks.push({ id: e.id, kid: e.kid, type: "week", day: e.day, week: e.week || "", mon: e.mon || 0, seq: seq });
       else if (e.type === "gift" && e.legend) next.kids[e.kid].legends.push({ id: e.id, kid: e.kid, type: "legend", day: e.day, rank: e.rank || 0, mon: e.mon || 0, seq: seq });
       else if (e.type === "gift" && e.badge) next.kids[e.kid].badges.push({ id: e.id, kid: e.kid, type: "badge", day: e.day, subject: e.subject || "", n: e.n || 0, mon: e.mon || 0, seq: seq });
       else if (e.type === "gift" && e.award) next.kids[e.kid].awards.push({ id: e.id, kid: e.kid, type: "award", day: e.day, title: e.title || "", site: e.site || "", subject: e.subject || "", mon: e.mon || 0, seq: seq });

@@ -49,11 +49,20 @@ var Rules = (function () {
     var need = booksForRank(rank + 1);
     return { have: need - booksToNextRank(start, books), need: need };
   }
+  // Calendar arithmetic on YYYY-MM-DD keys (no time zones involved): n days later, and the Monday that starts its week.
+  function addDays(key, n) {
+    var p = key.split("-").map(Number), d = new Date(Date.UTC(p[0], p[1] - 1, p[2] + n));
+    return d.getUTCFullYear() + "-" + String(d.getUTCMonth() + 1).padStart(2, "0") + "-" + String(d.getUTCDate()).padStart(2, "0");
+  }
+  function weekStart(key) {
+    var p = key.split("-").map(Number);
+    return addDays(key, -((new Date(Date.UTC(p[0], p[1] - 1, p[2])).getUTCDay() + 6) % 7));
+  }
   // Inside any of several holiday event windows (the current one and every past one)?
   function inAnyEvent(ms, windows) {
     for (var i = 0; i < (windows || []).length; i++) if (inEvent(ms, windows[i])) return true;
     return false;
   }
-  return { MAX_RANK: MAX_RANK, booksForRank: booksForRank, rankFromBooks: rankFromBooks, booksToNextRank: booksToNextRank, nextTarget: nextTarget, rankStep: rankStep, dayKey: dayKey, inEvent: inEvent, inAnyEvent: inAnyEvent };
+  return { MAX_RANK: MAX_RANK, booksForRank: booksForRank, rankFromBooks: rankFromBooks, booksToNextRank: booksToNextRank, nextTarget: nextTarget, rankStep: rankStep, dayKey: dayKey, inEvent: inEvent, inAnyEvent: inAnyEvent, addDays: addDays, weekStart: weekStart };
 })();
 if (typeof module !== "undefined") module.exports = Rules;

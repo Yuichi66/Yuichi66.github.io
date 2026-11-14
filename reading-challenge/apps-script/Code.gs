@@ -38,8 +38,8 @@ var SHINY_COL = 13;
 var MAX_ID = 40;
 // Pages older than this may work out Pokémon differently, so their changes are refused.
 var MIN_CLIENT_GEN = 9;
-// Tells pages that this sheet code knows trades (2) and levels, level-up evolutions and Mega Stones (3), the Poké Ball meter (4), all 1,025 Pokémon and regions (5), shiny Pokémon (6), French (7), prize Pokémon (8), no end date, holiday events (9; the parent PIN was dropped on 14 Nov), prize balls from books again (10), school awards (11), gym badges (12), rank legends (13).
-var SERVER_GEN = 13;
+// Tells pages that this sheet code knows trades (2) and levels, level-up evolutions and Mega Stones (3), the Poké Ball meter (4), all 1,025 Pokémon and regions (5), shiny Pokémon (6), French (7), prize Pokémon (8), no end date, holiday events (9; the parent PIN was dropped on 14 Nov), prize balls from books again (10), school awards (11), gym badges (12), rank legends (13), great weeks (14).
+var SERVER_GEN = 14;
 var EVENT_BOOKS = 5;
 // Prize Pokémon (type "prize"), one per ball per child once the ball is reached (the books goal, and for children
 // with times tables the lower of the two goals): "title" = ball (1-3), "mon" = the legendary chosen (Great and
@@ -60,6 +60,12 @@ var BADGE_STEPS = { maths: 5000, latin: 5000, french: 5000, mymaths: 1000 };
 // Rank legends (type "legend"): a legendary Pokémon the child chooses at these ranks (0-based like "peak":
 // Rank 10, Rank 15 and CHAMPION). "title" = the rank. The same as RANK_LEGENDS in index.html.
 var RANK_LEGENDS = [9, 14, 20];
+// Great weeks (type "week"): a bonus Pokémon for a week (Monday to Sunday, UK days) with study on WEEK_DAYS days
+// or more, from WEEK_FROM, once the week is over. A day counts when a book, times tables or practice record was
+// logged on it (the time in its id, like the page). "title" = the Monday. The same as in index.html.
+var WEEK_FROM = "2026-11-16";
+var WEEK_DAYS = 5;
+var STUDY_TYPES = ["read", "maths", "latin", "mymaths", "french"];
 var BADGE_NAMES = { maths: "Times tables", latin: "Latin", french: "French", mymaths: "MyMaths" };
 var PASS_RATE = 0.8;
 var NO_QUIZ = "No quiz";
@@ -91,6 +97,7 @@ function doPost(e) {
     else if (body.action === "award") addAward_(body.entry);
     else if (body.action === "badge") addBadge_(body.entry);
     else if (body.action === "legend") addLegend_(body.entry);
+    else if (body.action === "week") addWeek_(body.entry);
     else throw new Error("Unknown action");
     return json_(snapshot_());
   } catch (err) {
@@ -125,6 +132,13 @@ function snapshot_() {
     else if (base.type === "prize") {
       base.tier = Number(r[4]) || 0;
       base.target = String(r[6] || "");
+    }
+    else if (base.type === "week") {
+      // Sent as a "gift" marked week: 1 (like awards), so older pages show it as a prize badge.
+      base.type = "gift";
+      base.week = cellDay_(r[4], "week");
+      base.title = "Great week from " + base.week;
+      base.weekBonus = 1;
     }
     else if (base.type === "legend") {
       // Sent as a "gift" marked legend: 1 (like awards and badges), so older pages show it as a prize badge.
@@ -575,6 +589,46 @@ function addLegend_(x) {
   entriesSheet_().appendRow([id, kid, "legend", day, rank, "Rank", "", "", "", new Date(), mon, "", ""]);
 }
 
+
+// Calendar arithmetic on YYYY-MM-DD keys, the same as Rules.addDays and Rules.weekStart in rules.js.
+function addDays_(key, n) {
+  var p = key.split("-").map(Number), d = new Date(Date.UTC(p[0], p[1] - 1, p[2] + n));
+  return d.getUTCFullYear() + "-" + ("0" + (d.getUTCMonth() + 1)).slice(-2) + "-" + ("0" + d.getUTCDate()).slice(-2);
+}
+function weekStart_(key) {
+  var p = key.split("-").map(Number);
+  return addDays_(key, -((new Date(Date.UTC(p[0], p[1] - 1, p[2])).getUTCDay() + 6) % 7));
+}
+// Days with study in the week starting on Monday `start` (UK days, from the time in each record's id).
+function studyDays_(kid, start, rows) {
+  var end = addDays_(start, 6), days = {};
+  rows.forEach(function (r) {
+    if (String(r[1]) !== kid || STUDY_TYPES.indexOf(r[2]) < 0) return;
+    var ms = parseInt(String(r[0]), 10);
+    if (!ms) return;
+    var k = dayKey_(ms);
+    if (k >= start && k <= end) days[k] = true;
+  });
+  return Object.keys(days).length;
+}
+// A great week bonus Pokémon. Same id twice = one row; each week once, only after it is over.
+function addWeek_(x) {
+  if (!x) throw new Error("Missing entry");
+  var id = String(x.id || "").slice(0, MAX_ID), kid = String(x.kid || ""), mon = Number(x.mon), day = Number(x.day), week = String(x.week || "");
+  if (!id) throw new Error("Missing id");
+  if (rowOf_(id) > 0) return;
+  if (!KIDS.hasOwnProperty(kid)) throw new Error("Unknown kid");
+  if (!isInt_(day) || day < 0 || day > MAX_DAY) throw new Error("Bad day");
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(week) || weekStart_(week) !== week || week < WEEK_FROM) throw new Error("Bad week");
+  if (!isInt_(mon) || mon <= 0 || mon > MAX_FORM || PRIZE_MONS[1].concat(PRIZE_MONS[2]).indexOf(mon) >= 0) throw new Error("Bad Pokémon");
+  if (dayKey_(Date.now()) <= addDays_(week, 6)) throw new Error("Not possible: that week is not over yet.");
+  var rows = entriesSheet_().getDataRange().getValues().slice(1);
+  if (studyDays_(kid, week, rows) < WEEK_DAYS) throw new Error("Not possible: fewer than " + WEEK_DAYS + " days that week.");
+  if (rows.some(function (r) { return r[2] === "week" && String(r[1]) === kid && cellDay_(r[4], "week") === week; })) throw new Error("Not possible: that week's bonus was already caught.");
+  // Stored with a leading ' so Sheets keeps it as text (a Date would depend on the spreadsheet's time zone).
+  entriesSheet_().appendRow([id, kid, "week", day, "'" + week, "Week", "", "", "", new Date(), mon, "", ""]);
+}
+
 // A prize Pokémon. Same id twice = one row; each ball once per child, and only once it is reached.
 function addPrize_(p) {
   if (!p || p.type !== "prize") throw new Error("Bad prize");
@@ -622,8 +676,10 @@ function prizeTier_(kid, rows) {
 
 // Sheets may turn a typed YYYY-MM-DD into a Date; give event dates back as text.
 function cellDay_(v, type) {
-  if (type === "event" && v instanceof Date) return dayKey_(v.getTime());
-  return String(v === null || v === undefined ? "" : v);
+  if ((type === "event" || type === "week") && v instanceof Date) return dayKey_(v.getTime());
+  var s = String(v === null || v === undefined ? "" : v);
+  // Sheets hides the leading ' that keeps a week as text; a copy that still shows it is read the same.
+  return type === "week" ? s.replace(/^'/, "") : s;
 }
 
 function readEvent_() {
