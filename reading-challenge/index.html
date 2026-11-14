@@ -394,6 +394,9 @@
     <div class="sub-h">🏆 Prize balls</div>
     <div class="ladder" id="ladder"></div>
     <small class="goal-note" id="nextMsg"></small>
+    <div class="sub-h">⭐ Rank legends</div>
+    <div class="ladder" id="rankLegends"></div>
+    <small class="goal-note" id="rankLegendMsg"></small>
     <div class="sub-h">🏅 Gym badges</div>
     <div class="gym" id="gymBadges"></div>
     <div class="rank-next" id="rankMsg"></div>
@@ -630,12 +633,12 @@
 </div>
 
 <!-- ?v= must change with APP_VERSION so phones fetch the new files -->
-<script src="evo-data.js?v=2026-11-14-6"></script>
-<script src="dex-data.js?v=2026-11-14-6"></script>
-<script src="growth.js?v=2026-11-14-6"></script>
-<script src="regions.js?v=2026-11-14-6"></script>
-<script src="rules.js?v=2026-11-14-6"></script>
-<script src="parent.js?v=2026-11-14-6"></script>
+<script src="evo-data.js?v=2026-11-14-7"></script>
+<script src="dex-data.js?v=2026-11-14-7"></script>
+<script src="growth.js?v=2026-11-14-7"></script>
+<script src="regions.js?v=2026-11-14-7"></script>
+<script src="rules.js?v=2026-11-14-7"></script>
+<script src="parent.js?v=2026-11-14-7"></script>
 <script>
 (function () {
   "use strict";
@@ -645,9 +648,9 @@
   var REFRESH_MS = 60000;
   // Change on every release: a page left open with older code reloads itself,
   // so every phone works out the same Pokémon.
-  var APP_VERSION = "2026-11-14-6";
+  var APP_VERSION = "2026-11-14-7";
   // Sent with every change; the sheet refuses changes from older pages (MIN_CLIENT_GEN in Code.gs).
-  var CLIENT_GEN = 12;
+  var CLIENT_GEN = 13;
   var STORAGE_KEY = "htrc-2026-autumn-v3";
   var START = new Date(2026, 9, 24);   // Sat 24 Oct 2026
   // The half term was 16 days; old records keep their day number from START. New records use today's.
@@ -675,6 +678,9 @@
     KS3: ["Latin", "French", "Maths", "English", "Science", "History", "Geography", "Computing", "Music", "Art", "PE", "Other"]
   };
   var AWARDS_PER_DAY = 3;
+  // Rank legends: a legendary Pokémon to choose at these ranks (0-based; Rank 10, Rank 15, CHAMPION).
+  // The same as RANK_LEGENDS in Code.gs.
+  var RANK_LEGENDS = [9, 14, 20];
   // Gym badges: one every `step` correct answers in a subject. The same as BADGE_STEPS in Code.gs.
   var BADGES = {
     maths: { step: 5000, name: "Times tables", icon: "🎸" },
@@ -899,7 +905,7 @@
       s.settings.mathsTargets[k.id] = k.mathsTarget;
       s.settings.practiceGoals[k.id] = goalsFrom(k.practiceGoals, k);
       s.settings.partnerIds[k.id] = "";
-      s.kids[k.id] = { entries: [], maths: [], practice: [], evolves: [], trades: [], prizes: [], gifts: [], events: [], awards: [], badges: [] };
+      s.kids[k.id] = { entries: [], maths: [], practice: [], evolves: [], trades: [], prizes: [], gifts: [], events: [], awards: [], badges: [], legends: [] };
     });
     return s;
   }
@@ -919,6 +925,7 @@
           if (!base.kids[k.id].events) base.kids[k.id].events = [];
           if (!base.kids[k.id].awards) base.kids[k.id].awards = [];
           if (!base.kids[k.id].badges) base.kids[k.id].badges = [];
+          if (!base.kids[k.id].legends) base.kids[k.id].legends = [];
           if (parsed.settings.targets[k.id]) base.settings.targets[k.id] = parsed.settings.targets[k.id];
           if (parsed.settings.mathsTargets[k.id]) base.settings.mathsTargets[k.id] = parsed.settings.mathsTargets[k.id];
           if (parsed.settings.partnerIds && parsed.settings.partnerIds[k.id]) base.settings.partnerIds[k.id] = parsed.settings.partnerIds[k.id];
@@ -1090,7 +1097,7 @@
   function catchOrder() {
     var d = data(), used = usedForReward();
     function caught(rule) { return function (x) { return x.mon || (loggedAt(x) < PACE_FROM && rule(x)); }; }
-    var list = d.entries.filter(caught(isPass)).concat(d.maths.filter(caught(mathsCatches)), d.practice.filter(caught(practiceCatches)), prizeMons(d), giftMons(d), eventMons(d), awardMons(d), badgeMons(d));
+    var list = d.entries.filter(caught(isPass)).concat(d.maths.filter(caught(mathsCatches)), d.practice.filter(caught(practiceCatches)), prizeMons(d), giftMons(d), eventMons(d), awardMons(d), badgeMons(d), legendMons(d));
     return list.filter(function (x) { return !used[x.id]; }).sort(function (a, b) { return loggedAt(a) - loggedAt(b); });
   }
   // Prize Pokémon of the Great and Ultra Balls, shiny when the Master Ball prize was used on them.
@@ -1118,6 +1125,18 @@
     return (d.awards || []).filter(function (g) { return g.mon; }).map(function (g) {
       return { id: g.id, kid: g.kid, type: "award", day: g.day, mon: g.mon, shiny: 0 };
     });
+  }
+  function legendMons(d) {
+    return (d.legends || []).filter(function (g) { return g.mon; }).map(function (g) {
+      return { id: g.id, kid: g.kid, type: "legend", day: g.day, mon: g.mon, shiny: 0 };
+    });
+  }
+  function legendOf(id) {
+    for (var i = 0; i < KIDS.length; i++) {
+      var g = (state.kids[KIDS[i].id].legends || []).filter(function (x) { return x.id === id; })[0];
+      if (g) return g;
+    }
+    return null;
   }
   function badgeMons(d) {
     return (d.badges || []).filter(function (g) { return g.mon; }).map(function (g) {
@@ -1526,6 +1545,7 @@
     renderStudyGoals(s);
     renderPracticeGoals();
     renderLadder(s);
+    renderRankLegends(s);
     renderGym();
   }
   // ---------- holiday event ----------
@@ -1712,6 +1732,95 @@
     });
   }
 
+  // ---------- rank legends ----------
+  // The highest rank the sheet knows for this child (its "peak"), or the rank shown if that is higher and not saved yet.
+  function legendRank(kidId, s) { var p = Number(state.settings.peaks[kidId]); return Math.max(isFinite(p) ? p : 0, s.rank); }
+  function legendOfRank(kidId, rank) { return (state.kids[kidId].legends || []).filter(function (l) { return l.rank === rank; })[0] || null; }
+  // Books still to pass to reach a rank, counting on from this child's start (the same steps as the rank bar).
+  function booksToRank(s, rank) {
+    var start = RANK_START[current], need = start.books;
+    for (var r = start.rank + 1; r <= rank; r++) need += Rules.booksForRank(r);
+    return Math.max(0, need - s.caught);
+  }
+  // Three legendary or mythical Pokémon the child has no family of (open regions first), never a prize one;
+  // the same three on every phone.
+  function legendChoices(kidId, rank) {
+    var owned = familiesOf(kidId);
+    function notPrize(d) { return !isPrizeMon(d); }
+    var list = Regions.legends(owned, false).filter(notPrize);
+    if (list.length < 3) list = Regions.legends(owned, true).filter(notPrize);
+    var seed = hashOf(kidId + "-rank-" + rank), out = [];
+    while (list.length && out.length < 3) out.push(list.splice(seed % list.length, 1)[0]);
+    return out;
+  }
+  function renderRankLegends(s) {
+    var box = el("rankLegends"), have = legendRank(current, s), next = null;
+    box.innerHTML = "";
+    RANK_LEGENDS.forEach(function (rank) {
+      var got = legendOfRank(current, rank), reached = have >= rank;
+      var tile = make("div", "tier" + (reached ? " got" : ""));
+      tile.appendChild(make("div", "tier-shiny", rank === RANKS.length - 1 ? "👑" : "⭐"));
+      tile.appendChild(make("b", "", "Rank " + (rank + 1)));
+      tile.appendChild(make("small", "", RANKS[rank]));
+      if (got) {
+        var m = world().mons[got.id], c = m ? m.c : null;
+        var row = make("div", "tier-mons");
+        if (c) row.appendChild(sprite(c.dex, "", c.name, c.shiny));
+        tile.appendChild(row);
+        tile.appendChild(make("div", "tier-pick got", "✓ " + (c ? c.name : "Got it!")));
+      } else if (reached) {
+        tile.appendChild(make("div", "tier-pick", "Pick 1 legendary!"));
+        var b = make("button", "btn small tier-btn", "🌟 Choose!");
+        b.type = "button";
+        b.onclick = function () { openRankLegend(rank); };
+        tile.appendChild(b);
+      } else {
+        tile.appendChild(make("div", "tier-pick", "Pick 1 legendary!"));
+        if (next === null) next = rank;
+      }
+      box.appendChild(tile);
+    });
+    if (next === null) { el("rankLegendMsg").textContent = ""; return; }
+    var left = booksToRank(s, next);
+    el("rankLegendMsg").textContent = "🎯 Pass " + left + " more book" + (left > 1 ? "s" : "") + " → Rank " + (next + 1) + ": pick 1 🌟legendary!";
+  }
+  function openRankLegend(rank) {
+    var list = el("pzList");
+    el("pzTitle").textContent = "⭐ Choose your Rank " + (rank + 1) + " legendary!";
+    el("pzNote").textContent = "Rank " + (rank + 1) + " " + RANKS[rank] + " · you can choose only once";
+    list.innerHTML = "";
+    var choices = legendChoices(current, rank);
+    if (!choices.length) list.appendChild(make("div", "pz-note", "No Pokémon to choose this time."));
+    choices.forEach(function (dex) {
+      var name = monEntry(dex)[0];
+      var b = make("button", "pz-opt");
+      b.type = "button";
+      b.setAttribute("data-dex", dex);
+      b.appendChild(artwork(dex, name, "pz-art"));
+      b.appendChild(make("b", "", name));
+      b.onclick = function () { saveRankLegend(rank, dex, name); };
+      list.appendChild(b);
+    });
+    openSheet("prizeSheet");
+  }
+  var legendTry = null, legendSaving = false;
+  function saveRankLegend(rank, dex, name) {
+    if (legendSaving) return;
+    legendSaving = true;
+    var who = current;
+    var again = legendTry && legendTry.kid === who && legendTry.rank === rank && legendTry.mon === dex;
+    var entry = again ? legendTry : { id: newId(), kid: who, day: todayIndex(), rank: rank, mon: dex };
+    commit({ action: "legend", entry: entry }, function () {
+      state.kids[who].legends.push({ id: entry.id, kid: who, type: "legend", day: entry.day, rank: rank, mon: dex, seq: localSeq() });
+    }, function (ok, refused) {
+      legendSaving = false;
+      legendTry = ok || refused ? null : entry;
+      if (!ok) return;
+      closeSheets();
+      show(artwork(dex, name), "⭐ You got the legendary " + name + "!", "Rank " + (rank + 1) + " " + RANKS[rank] + " · look in your 🎒 Pokémon box!");
+    });
+  }
+
   // ---------- gym badges ----------
   function badgeSubjects(k) { return (k.maths ? ["maths"] : []).concat(k.practices).filter(function (t) { return BADGES[t]; }); }
   function correctIn(kidId, subject) {
@@ -1880,9 +1989,18 @@
 
   // Prize badges: prizes given by a grown-up, each with the Pokémon that came with it.
   function renderGifts() {
-    var gifts = data().gifts || [], awards = data().awards || [], badges = data().badges || [], log = el("giftLog"), byId = catches().byId;
-    el("giftWrap").className = gifts.length || awards.length || badges.length ? "" : "hidden";
+    var gifts = data().gifts || [], awards = data().awards || [], badges = data().badges || [], legends = data().legends || [], log = el("giftLog"), byId = catches().byId;
+    el("giftWrap").className = gifts.length || awards.length || badges.length || legends.length ? "" : "hidden";
     log.innerHTML = "";
+    legends.forEach(function (l) {
+      var c = byId[l.id];
+      var card = make("div", "entry badge-card");
+      card.appendChild(make("div", "badge-medal", "⭐"));
+      card.appendChild(make("div", "title", "Rank " + (l.rank + 1) + " " + RANKS[l.rank]));
+      card.appendChild(make("div", "mon", "🌟 Legendary: " + (c ? c.name : "a Pokémon")));
+      card.appendChild(make("div", "meta", fmt(dayDate(l.day))));
+      log.appendChild(card);
+    });
     badges.forEach(function (b) {
       var c = byId[b.id];
       var card = make("div", "entry badge-card");
@@ -2265,9 +2383,9 @@
     }
     var how = el("mdHow");
     how.innerHTML = "";
-    var rec = recordOf(id), prize = m.c.tier ? TIERS[m.c.tier - 1] : null, gift = giftOf(id), evt = eventOf(id), aw = awardOf(id), bd = badgeOf(id);
-    var how1 = prize ? "🏆 " + prize.name + " prize" + (m.c.shiny ? " · ✨ made shiny with the Master Ball" : "") : gift ? "🏅 Prize: " + gift.title : bd ? "🏅 Gym badge: " + badgeLabel(bd) : aw ? "🏫 " + aw.site + " (" + aw.subject + "): " + aw.title : evt ? "🎉 Holiday event" : rec ? recordText(rec) : "Caught!";
-    var line = make("div", "md-line", (m.from !== current ? (prize || gift || evt || aw || bd ? "Won by " : "Caught by ") + kidName(m.from) + ": " : "") + how1);
+    var rec = recordOf(id), prize = m.c.tier ? TIERS[m.c.tier - 1] : null, gift = giftOf(id), evt = eventOf(id), aw = awardOf(id), bd = badgeOf(id), lg = legendOf(id);
+    var how1 = prize ? "🏆 " + prize.name + " prize" + (m.c.shiny ? " · ✨ made shiny with the Master Ball" : "") : gift ? "🏅 Prize: " + gift.title : lg ? "⭐ Rank " + (lg.rank + 1) + " " + RANKS[lg.rank] + " legendary" : bd ? "🏅 Gym badge: " + badgeLabel(bd) : aw ? "🏫 " + aw.site + " (" + aw.subject + "): " + aw.title : evt ? "🎉 Holiday event" : rec ? recordText(rec) : "Caught!";
+    var line = make("div", "md-line", (m.from !== current ? (prize || gift || evt || aw || bd || lg ? "Won by " : "Caught by ") + kidName(m.from) + ": " : "") + how1);
     if (gift) line.appendChild(make("small", "", fmt(dayDate(gift.day))));
     if (evt) line.appendChild(make("small", "", fmt(dayDate(evt.day))));
     if (rec) line.appendChild(make("small", "", whenText(rec)));
@@ -2510,6 +2628,7 @@
       else if (e.type === "prize") next.kids[e.kid].prizes.push({ id: e.id, kid: e.kid, type: e.type, day: e.day, tier: e.tier, mon: e.mon || 0, target: e.target || "", seq: seq });
       else if (e.type === "trade") next.kids[e.kid].trades.push({ id: e.id, kid: e.kid, type: e.type, day: e.day, source: e.source || "", give: e.site, get: e.get || "", with: e.with || "", ticket: e.ticket || 0, seq: seq });
       else if (e.type === "event") next.kids[e.kid].events.push({ id: e.id, kid: e.kid, type: "event", day: e.day, title: e.title || "", mon: e.mon || 0, seq: seq });
+      else if (e.type === "gift" && e.legend) next.kids[e.kid].legends.push({ id: e.id, kid: e.kid, type: "legend", day: e.day, rank: e.rank || 0, mon: e.mon || 0, seq: seq });
       else if (e.type === "gift" && e.badge) next.kids[e.kid].badges.push({ id: e.id, kid: e.kid, type: "badge", day: e.day, subject: e.subject || "", n: e.n || 0, mon: e.mon || 0, seq: seq });
       else if (e.type === "gift" && e.award) next.kids[e.kid].awards.push({ id: e.id, kid: e.kid, type: "award", day: e.day, title: e.title || "", site: e.site || "", subject: e.subject || "", mon: e.mon || 0, seq: seq });
       else if (e.type === "gift") next.kids[e.kid].gifts.push({ id: e.id, kid: e.kid, type: e.type, day: e.day, title: e.title || "", mon: e.mon || 0, seq: seq });
@@ -2706,6 +2825,7 @@
     var msg = after.tier > before.tier ? " · 🏆 " + TIERS[after.tier - 1].name + " unlocked!" +
       (!prizeOf(current, after.tier) && prizeChoices(current, after.tier).length ? " Choose your prize Pokémon in My progress!" : "") : "";
     if (after.rank > before.rank) msg += " · ⭐ Rank up: " + RANKS[after.rank] + "!";
+    if (RANK_LEGENDS.some(function (r) { return before.rank < r && after.rank >= r; })) msg += " · 🌟 Rank legendary unlocked! Choose it in My progress!";
     if (after.badges > before.badges) msg += " · 🏅 New gym badge! Choose a Pokémon in My progress!";
     return msg;
   }

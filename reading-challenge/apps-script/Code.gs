@@ -38,8 +38,8 @@ var SHINY_COL = 13;
 var MAX_ID = 40;
 // Pages older than this may work out Pokémon differently, so their changes are refused.
 var MIN_CLIENT_GEN = 9;
-// Tells pages that this sheet code knows trades (2) and levels, level-up evolutions and Mega Stones (3), the Poké Ball meter (4), all 1,025 Pokémon and regions (5), shiny Pokémon (6), French (7), prize Pokémon (8), no end date, holiday events (9; the parent PIN was dropped on 14 Nov), prize balls from books again (10), school awards (11), gym badges (12).
-var SERVER_GEN = 12;
+// Tells pages that this sheet code knows trades (2) and levels, level-up evolutions and Mega Stones (3), the Poké Ball meter (4), all 1,025 Pokémon and regions (5), shiny Pokémon (6), French (7), prize Pokémon (8), no end date, holiday events (9; the parent PIN was dropped on 14 Nov), prize balls from books again (10), school awards (11), gym badges (12), rank legends (13).
+var SERVER_GEN = 13;
 var EVENT_BOOKS = 5;
 // Prize Pokémon (type "prize"), one per ball per child once the ball is reached (the books goal, and for children
 // with times tables the lower of the two goals): "title" = ball (1-3), "mon" = the legendary chosen (Great and
@@ -57,6 +57,9 @@ var MAX_AWARD_TEXT = 120, MAX_AWARD_SUBJECT = 30;
 // Gym badges (type "badge"): one every BADGE_STEPS correct answers in a subject, each with a Pokémon the child
 // chooses. "title" = subject, "score" = which badge (1, 2, ...). The same as BADGES in index.html.
 var BADGE_STEPS = { maths: 5000, latin: 5000, french: 5000, mymaths: 1000 };
+// Rank legends (type "legend"): a legendary Pokémon the child chooses at these ranks (0-based like "peak":
+// Rank 10, Rank 15 and CHAMPION). "title" = the rank. The same as RANK_LEGENDS in index.html.
+var RANK_LEGENDS = [9, 14, 20];
 var BADGE_NAMES = { maths: "Times tables", latin: "Latin", french: "French", mymaths: "MyMaths" };
 var PASS_RATE = 0.8;
 var NO_QUIZ = "No quiz";
@@ -87,6 +90,7 @@ function doPost(e) {
     else if (body.action === "prize") addPrize_(body.prize);
     else if (body.action === "award") addAward_(body.entry);
     else if (body.action === "badge") addBadge_(body.entry);
+    else if (body.action === "legend") addLegend_(body.entry);
     else throw new Error("Unknown action");
     return json_(snapshot_());
   } catch (err) {
@@ -121,6 +125,13 @@ function snapshot_() {
     else if (base.type === "prize") {
       base.tier = Number(r[4]) || 0;
       base.target = String(r[6] || "");
+    }
+    else if (base.type === "legend") {
+      // Sent as a "gift" marked legend: 1 (like awards and badges), so older pages show it as a prize badge.
+      base.type = "gift";
+      base.legend = 1;
+      base.rank = Number(r[4]) || 0;
+      base.title = "Rank " + (base.rank + 1) + " legendary";
     }
     else if (base.type === "badge") {
       // Sent as a "gift" marked badge: 1 (like awards), so older pages show it as a prize badge.
@@ -544,6 +555,24 @@ function addBadge_(x) {
   if (n > Math.floor(correct / BADGE_STEPS[subject])) throw new Error("Not possible: that badge is not reached yet.");
   if (rows.some(function (r) { return r[2] === "badge" && String(r[1]) === kid && String(r[4]) === subject && Number(r[6]) === n; })) throw new Error("Not possible: that badge Pokémon was already chosen.");
   entriesSheet_().appendRow([id, kid, "badge", day, subject, "Badge", n, "", "", new Date(), mon, "", ""]);
+}
+
+
+// A rank legend Pokémon. Same id twice = one row; each rank once, and only once the saved peak has reached it.
+function addLegend_(x) {
+  if (!x) throw new Error("Missing entry");
+  var id = String(x.id || "").slice(0, MAX_ID), kid = String(x.kid || ""), mon = Number(x.mon), day = Number(x.day), rank = Number(x.rank);
+  if (!id) throw new Error("Missing id");
+  if (rowOf_(id) > 0) return;
+  if (!KIDS.hasOwnProperty(kid)) throw new Error("Unknown kid");
+  if (!isInt_(day) || day < 0 || day > MAX_DAY) throw new Error("Bad day");
+  if (RANK_LEGENDS.indexOf(rank) < 0) throw new Error("Bad rank");
+  if (!isInt_(mon) || mon <= 0 || mon > MAX_FORM || PRIZE_MONS[1].concat(PRIZE_MONS[2]).indexOf(mon) >= 0) throw new Error("Bad Pokémon");
+  var peak = readSettings_()[kid].peak;
+  if (peak === "" || Number(peak) < rank) throw new Error("Not possible: that rank is not reached yet.");
+  var rows = entriesSheet_().getDataRange().getValues().slice(1);
+  if (rows.some(function (r) { return r[2] === "legend" && String(r[1]) === kid && Number(r[4]) === rank; })) throw new Error("Not possible: that legendary was already chosen.");
+  entriesSheet_().appendRow([id, kid, "legend", day, rank, "Rank", "", "", "", new Date(), mon, "", ""]);
 }
 
 // A prize Pokémon. Same id twice = one row; each ball once per child, and only once it is reached.
