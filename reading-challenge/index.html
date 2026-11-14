@@ -3,10 +3,10 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Half Term Challenge</title>
+<title>Trainer Academy</title>
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-title" content="Challenge">
+<meta name="apple-mobile-web-app-title" content="Academy">
 <meta name="apple-mobile-web-app-status-bar-style" content="black">
 <meta name="theme-color" content="#e3350d">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
@@ -324,7 +324,7 @@
 
 <div class="wrap">
   <header>
-    <h1>HALF TERM CHALLENGE</h1>
+    <h1>TRAINER ACADEMY</h1>
     <div class="meta-row">
       <span class="pill" id="dates"></span>
       <a class="pill help" href="how-to.html">❓ How to use</a>
@@ -577,12 +577,12 @@
 </div>
 
 <!-- ?v= must change with APP_VERSION so phones fetch the new files -->
-<script src="evo-data.js?v=2026-11-09-1"></script>
-<script src="dex-data.js?v=2026-11-09-1"></script>
-<script src="growth.js?v=2026-11-09-1"></script>
-<script src="regions.js?v=2026-11-09-1"></script>
-<script src="rules.js?v=2026-11-09-1"></script>
-<script src="parent.js?v=2026-11-09-1"></script>
+<script src="evo-data.js?v=2026-11-14-1"></script>
+<script src="dex-data.js?v=2026-11-14-1"></script>
+<script src="growth.js?v=2026-11-14-1"></script>
+<script src="regions.js?v=2026-11-14-1"></script>
+<script src="rules.js?v=2026-11-14-1"></script>
+<script src="parent.js?v=2026-11-14-1"></script>
 <script>
 (function () {
   "use strict";
@@ -592,15 +592,15 @@
   var REFRESH_MS = 60000;
   // Change on every release: a page left open with older code reloads itself,
   // so every phone works out the same Pokémon.
-  var APP_VERSION = "2026-11-09-1";
+  var APP_VERSION = "2026-11-14-1";
   // Sent with every change; the sheet refuses changes from older pages (MIN_CLIENT_GEN in Code.gs).
   var CLIENT_GEN = 9;
   var STORAGE_KEY = "htrc-2026-autumn-v3";
   var START = new Date(2026, 9, 24);   // Sat 24 Oct 2026
   // The half term was 16 days; old records keep their day number from START. New records use today's.
   var HALF_TERM_DAYS = 16;
-  // Where each child was when ranks started to come from books passed (the 9 Nov snapshot).
-  var RANK_START = { taiga: { rank: 5, books: 4 }, leo: { rank: 7, books: 5 }, yudai: { rank: 10, books: 10 } };
+  // Where each child was when ranks started to come from books passed (the 14 Nov snapshot).
+  var RANK_START = { taiga: { rank: 7, books: 5 }, leo: { rank: 8, books: 6 }, yudai: { rank: 13, books: 13 } };
   var PASS_RATE = 0.8;
   var BURST_RATE = 0.9;
   var CATCH_WOBBLE_MS = 1500;
