@@ -130,6 +130,19 @@
   .partner-row .sprite { width: 88px; height: 88px; }
   .partner-row b { font-size: 20px; display: block; }
   .goal-note { display: block; margin-top: 3px; font-size: 13px; font-weight: bold; color: #555; }
+  .ladder { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin-top: 6px; }
+  .tier { text-align: center; border: 3px solid #000; border-radius: 14px; padding: 10px 4px; background: #fff; opacity: .55; }
+  .tier.got { opacity: 1; background: #fff6c8; box-shadow: 0 0 0 3px var(--gold); }
+  .tier .ball { margin: 0 auto 6px; width: 46px; height: 46px; }
+  .tier b { display: block; font-size: 14px; }
+  .tier small { display: block; font-size: 12px; color: #555; margin-top: 2px; }
+  .tier-mons { display: flex; justify-content: center; flex-wrap: wrap; min-height: 40px; margin-top: 6px; }
+  .tier-mons .sprite { width: 36px; height: 36px; }
+  .tier-shiny { font-size: 28px; line-height: 40px; }
+  .tier-pick { font-size: 12px; font-weight: bold; color: #7b3fe4; margin-top: 2px; }
+  .tier-pick.got { color: #1d7a3a; }
+  .tier .btn.tier-btn { margin-top: 6px; padding: 6px 8px; font-size: 13px; animation: tierGlow 1.2s ease-in-out infinite alternate; }
+  @media (prefers-reduced-motion: reduce) { .tier .btn.tier-btn { animation: none; } }
   .rank-next { margin-top: 6px; font-size: 14px; font-weight: bold; color: var(--purple); }
   .rank { display: inline-block; margin-top: 4px; background: var(--yellow); color: #000; padding: 2px 10px; border-radius: 12px; font-weight: bold; font-size: 14px; }
 
@@ -369,6 +382,9 @@
     <div class="grow" id="grow"></div>
     <div id="studyGoals"></div>
     <div id="practiceGoals"></div>
+    <div class="sub-h">🏆 Prize balls</div>
+    <div class="ladder" id="ladder"></div>
+    <small class="goal-note" id="nextMsg"></small>
     <div class="rank-next" id="rankMsg"></div>
     <div class="rule" id="eventMsg"></div>
   </section>
@@ -579,12 +595,12 @@
 </div>
 
 <!-- ?v= must change with APP_VERSION so phones fetch the new files -->
-<script src="evo-data.js?v=2026-11-14-3"></script>
-<script src="dex-data.js?v=2026-11-14-3"></script>
-<script src="growth.js?v=2026-11-14-3"></script>
-<script src="regions.js?v=2026-11-14-3"></script>
-<script src="rules.js?v=2026-11-14-3"></script>
-<script src="parent.js?v=2026-11-14-3"></script>
+<script src="evo-data.js?v=2026-11-14-4"></script>
+<script src="dex-data.js?v=2026-11-14-4"></script>
+<script src="growth.js?v=2026-11-14-4"></script>
+<script src="regions.js?v=2026-11-14-4"></script>
+<script src="rules.js?v=2026-11-14-4"></script>
+<script src="parent.js?v=2026-11-14-4"></script>
 <script>
 (function () {
   "use strict";
@@ -594,9 +610,9 @@
   var REFRESH_MS = 60000;
   // Change on every release: a page left open with older code reloads itself,
   // so every phone works out the same Pokémon.
-  var APP_VERSION = "2026-11-14-3";
+  var APP_VERSION = "2026-11-14-4";
   // Sent with every change; the sheet refuses changes from older pages (MIN_CLIENT_GEN in Code.gs).
-  var CLIENT_GEN = 9;
+  var CLIENT_GEN = 10;
   var STORAGE_KEY = "htrc-2026-autumn-v3";
   var START = new Date(2026, 9, 24);   // Sat 24 Oct 2026
   // The half term was 16 days; old records keep their day number from START. New records use today's.
@@ -629,13 +645,14 @@
   // Allowed practice goals (correct answers), the same as MIN/MAX_PRACTICE_GOAL in Code.gs.
   var PRACTICE_GOAL_MIN = 10, PRACTICE_GOAL_MAX = 100000;
   var PRACTICE_RULE_FROM = 1792947578805;
-  // Prize tiers: share of the goal needed, ball, name.
+  // Prize balls: share of the books goal needed (for times tables children both goals count, the lower one decides),
+  // ball, name. The same as PRIZE_PCTS in Code.gs.
   var TIERS = [
     { pct: 100, ball: "great", name: "Great Ball", pick: "Pick 1 legendary!" },
     { pct: 150, ball: "ultra", name: "Ultra Ball", pick: "Pick 1 legendary!" },
     { pct: 200, ball: "master", name: "Master Ball", pick: "Make it SHINY!" }
   ];
-  // Each ball also gives a Pokémon, chosen once, as soon as it is reached (the money is given by a grown-up):
+  // Each ball gives a Pokémon, chosen once, as soon as it is reached (no money):
   // the Great and Ultra Balls one of their legendary Pokémon, the Master Ball makes one prize Pokémon shiny.
   // The same as PRIZE_MONS in Code.gs. These are never caught the normal way.
   var PRIZE_MONS = { 1: [144, 145, 146], 2: [150, 151] };
@@ -972,8 +989,15 @@
     var caught = d.entries.filter(isPass).length;
     var correct = d.maths.reduce(function (sum, m) { return sum + m.correct; }, 0);
     var rank = Math.max(RANK_START[current].rank, Rules.rankFromBooks(RANK_START[current], caught));
-    return { caught: caught, correct: correct, rank: rank };
+    var readPct = Math.floor(caught / target() * 100);
+    var mathsPct = kid().maths ? Math.floor(correct / mathsTarget() * 100) : null;
+    // Both goals count: the lower one decides the prize ball.
+    var pct = kid().maths ? Math.min(readPct, mathsPct) : readPct;
+    var tier = 0;
+    TIERS.forEach(function (t, i) { if (pct >= t.pct) tier = i + 1; });
+    return { caught: caught, correct: correct, rank: rank, tier: tier };
   }
+  function need(goal, pctNeeded) { return Math.ceil(goal * pctNeeded / 100); }
   // "Next rank: Gym Challenger - 2 more books"
   function rankNextMessage(s) {
     var left = Rules.booksToNextRank(RANK_START[current], s.caught);
@@ -1424,6 +1448,7 @@
 
     renderStudyGoals(s);
     renderPracticeGoals();
+    renderLadder(s);
   }
   // ---------- holiday event ----------
   var EVENT_BOOKS = 5;
@@ -1498,6 +1523,114 @@
       if (!ok) return;
       closeSheets();
       show(artwork(dex, name), "🌟 You got " + name + "!", "Holiday event prize · look in your 🎒 Pokémon box!");
+    });
+  }
+
+  // ---------- prize balls ----------
+  // "🎯 Pass 1 more book → Great Ball: pick 1 🌟legendary!"
+  function prizeNextMessage(s) {
+    var next = TIERS[s.tier];
+    if (!next) return "🏆 MASTER BALL! You got every prize ball!";
+    var parts = [];
+    var moreBooks = need(target(), next.pct) - s.caught;
+    if (moreBooks > 0) parts.push("Pass " + moreBooks + " more book" + (moreBooks > 1 ? "s" : ""));
+    if (kid().maths) {
+      var moreCorrect = need(mathsTarget(), next.pct) - s.correct;
+      if (moreCorrect > 0) parts.push((parts.length ? "" : "Get ") + num(moreCorrect) + " more correct answer" + (moreCorrect > 1 ? "s" : ""));
+    }
+    var mon = s.tier + 1 === SHINY_PRIZE_TIER ? "make a legendary ✨SHINY!" : "pick 1 🌟legendary!";
+    return "🎯 " + parts.join(" and ") + " → " + next.name + ": " + mon;
+  }
+  function renderLadder(s) {
+    var w = world(), ladder = el("ladder");
+    ladder.innerHTML = "";
+    TIERS.forEach(function (t, i) {
+      var box = make("div", "tier" + (s.tier > i ? " got" : ""));
+      box.appendChild(make("div", "ball " + t.ball));
+      box.appendChild(make("b", "", t.name));
+      var req = need(target(), t.pct) + " books";
+      if (kid().maths) req += " + " + num(need(mathsTarget(), t.pct)) + " correct";
+      box.appendChild(make("small", "", req));
+      addPrizeMons(box, i + 1, s.tier > i, w);
+      ladder.appendChild(box);
+    });
+    el("nextMsg").textContent = prizeNextMessage(s);
+  }
+  function prizeOf(kidId, tier) { return (state.kids[kidId].prizes || []).filter(function (p) { return p.tier === tier; })[0] || null; }
+  // What a ball's prize can be now: its legendary Pokémon the child has never had, or, for the Master Ball,
+  // the child's prize Pokémon in their box that are not shiny yet (record ids).
+  function prizeChoices(kidId, tier, w) {
+    w = w || world();
+    if (tier === SHINY_PRIZE_TIER) {
+      return boxOf(kidId, w).filter(function (m) { return isOwnPrize(kidId, m.id) && !m.c.shiny; }).map(function (m) { return m.id; });
+    }
+    var owned = ownedBy(kidId, w, Regions.speciesOf);
+    return PRIZE_MONS[tier].filter(function (d) { return !owned[d]; });
+  }
+  // A Pokémon the child won as a Great or Ultra Ball prize (a traded one from a brother is not their own prize).
+  function isOwnPrize(kidId, id) { return (state.kids[kidId].prizes || []).some(function (p) { return p.id === id && p.mon; }); }
+  // The prize Pokémon of one ball in the ladder: what it gives, or what was chosen, and a button once it is reached.
+  function addPrizeMons(box, tier, reached, w) {
+    var got = prizeOf(current, tier);
+    var row = make("div", "tier-mons");
+    if (got) {
+      var m = w.mons[tier === SHINY_PRIZE_TIER ? got.target : got.id];
+      if (m) row.appendChild(sprite(m.c.dex, "", m.c.name, m.c.shiny));
+      box.appendChild(row);
+      box.appendChild(make("div", "tier-pick got", "✓ " + (m ? (m.c.shiny ? "✨" : "") + m.c.name : "Got it!")));
+      return;
+    }
+    var choices = prizeChoices(current, tier, w);
+    if (tier === SHINY_PRIZE_TIER) row.appendChild(make("span", "tier-shiny", "✨"));
+    else (choices.length ? choices : PRIZE_MONS[tier]).forEach(function (d) { row.appendChild(sprite(d, "", monEntry(d)[0])); });
+    box.appendChild(row);
+    box.appendChild(make("div", "tier-pick", TIERS[tier - 1].pick));
+    if (!reached) return;
+    if (!choices.length) {
+      var wonOne = (state.kids[current].prizes || []).some(function (p) { return p.mon; });
+      box.appendChild(make("small", "", tier !== SHINY_PRIZE_TIER ? "You have them all!" : wonOne ? "Your prize Pokémon is not in your box" : "Get a legendary prize first!"));
+      return;
+    }
+    var b = make("button", "btn small tier-btn", tier === SHINY_PRIZE_TIER ? "✨ Choose!" : "🌟 Choose!");
+    b.type = "button";
+    b.onclick = function () { openPrize(tier); };
+    box.appendChild(b);
+  }
+  function openPrize(tier) {
+    var w = world(), list = el("pzList");
+    el("pzTitle").textContent = tier === SHINY_PRIZE_TIER ? "✨ Which one becomes SHINY?" : "🌟 Choose your legendary!";
+    el("pzNote").textContent = TIERS[tier - 1].name + " prize · you can choose only once";
+    list.innerHTML = "";
+    prizeChoices(current, tier, w).forEach(function (c) {
+      var m = tier === SHINY_PRIZE_TIER ? w.mons[c] : null;
+      var dex = m ? m.c.dex : c, name = m ? m.c.name : monEntry(c)[0];
+      var b = make("button", "pz-opt");
+      b.type = "button";
+      b.appendChild(artwork(dex, name, "pz-art", !!m));
+      b.appendChild(make("b", "", (m ? "✨" : "") + name));
+      b.onclick = function () { claimPrize(tier, c, dex, name); };
+      list.appendChild(b);
+    });
+    openSheet("prizeSheet");
+  }
+  // The last prize that was "Not saved": sent again with the same id when the same one is chosen
+  // (the sheet may have saved it and only the reply was lost).
+  var claiming = false, prizeTry = null;
+  function claimPrize(tier, choice, dex, name) {
+    if (claiming) return;
+    claiming = true;
+    var shiny = tier === SHINY_PRIZE_TIER, who = current;
+    var again = prizeTry && prizeTry.kid === who && prizeTry.tier === tier && (shiny ? prizeTry.target : prizeTry.mon) === choice;
+    var p = again ? prizeTry : { id: newId(), kid: who, type: "prize", day: todayIndex(), tier: tier, mon: shiny ? 0 : choice, target: shiny ? choice : "" };
+    commit({ action: "prize", prize: p }, function () {
+      state.kids[who].prizes.push({ id: p.id, kid: p.kid, type: p.type, day: p.day, tier: p.tier, mon: p.mon, target: p.target, seq: localSeq() });
+    }, function (ok, refused) {
+      claiming = false;
+      prizeTry = ok || refused ? null : p;
+      if (!ok) return;
+      closeSheets();
+      show(artwork(dex, name, undefined, shiny), shiny ? "✨ WOW! " + name + " is now SHINY!" : "🌟 You got the legendary " + name + "!",
+        TIERS[tier - 1].name + " prize · look in your 🎒 Pokémon box!");
     });
   }
 
@@ -2305,7 +2438,10 @@
     if (id) openEvolve(id, "level");
   };
   function tierUpMessage(before, after) {
-    return after.rank > before.rank ? " · ⭐ Rank up: " + RANKS[after.rank] + "!" : "";
+    var msg = after.tier > before.tier ? " · 🏆 " + TIERS[after.tier - 1].name + " unlocked!" +
+      (!prizeOf(current, after.tier) && prizeChoices(current, after.tier).length ? " Choose your prize Pokémon in My progress!" : "") : "";
+    if (after.rank > before.rank) msg += " · ⭐ Rank up: " + RANKS[after.rank] + "!";
+    return msg;
   }
 
   // ---------- parent dashboard (read only; parent.js draws it; anyone may open it) ----------
