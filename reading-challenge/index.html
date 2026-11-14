@@ -129,6 +129,8 @@
   .partner-row { display: flex; align-items: center; gap: 12px; background: linear-gradient(135deg, var(--red), var(--red-dark)); color: #fff; border: 3px solid #000; border-radius: 14px; padding: 6px 12px; margin-bottom: 14px; }
   .partner-row .sprite { width: 88px; height: 88px; }
   .partner-row b { font-size: 20px; display: block; }
+  .award-row { margin-top: 12px; text-align: center; }
+  .award-row small { display: block; margin-top: 4px; color: #555; }
   .goal-note { display: block; margin-top: 3px; font-size: 13px; font-weight: bold; color: #555; }
   .ladder { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin-top: 6px; }
   .tier { text-align: center; border: 3px solid #000; border-radius: 14px; padding: 10px 4px; background: #fff; opacity: .55; }
@@ -387,6 +389,7 @@
     <small class="goal-note" id="nextMsg"></small>
     <div class="rank-next" id="rankMsg"></div>
     <div class="rule" id="eventMsg"></div>
+    <div class="award-row" id="awardBox"></div>
   </section>
 
   <!-- 3. Pokémon box -->
@@ -403,7 +406,7 @@
     <details class="collection">
       <summary>📜 Records</summary>
       <div id="giftWrap" class="hidden">
-        <div class="sub-h">🏅 Prize badges</div>
+        <div class="sub-h">🏅 Awards and prize badges</div>
         <div class="dex" id="giftLog"></div>
       </div>
       <div class="sub-h">Book-dex</div>
@@ -575,6 +578,29 @@
   </div>
 </div>
 
+<!-- School award: what it was for, then a Pokémon to choose (prizeSheet) -->
+<div class="sheet" id="awardSheet">
+  <form class="sheet-card" id="awardForm" autocomplete="off">
+    <h3 id="awTitle"></h3>
+    <div class="step"><div class="num">1</div><div class="body">
+      <b>Which subject?</b>
+      <select id="awSubject" required></select>
+    </div></div>
+    <div class="step"><div class="num">2</div><div class="body">
+      <b>What was it for?</b>
+      <input id="awText" required maxlength="120" placeholder="e.g. most time on TTRS in the school">
+    </div></div>
+    <div class="step"><div class="num">3</div><div class="body">
+      <b>Day you got it</b>
+      <input id="awDate" type="date" required>
+    </div></div>
+    <div class="sheet-actions">
+      <button class="btn ghost" type="button" data-close>Cancel</button>
+      <button class="btn purple" type="submit">Next: choose a Pokémon ▶</button>
+    </div>
+  </form>
+</div>
+
 <!-- Prize Pokémon: choose one legendary (Great / Ultra Ball) or make one shiny (Master Ball) -->
 <div class="sheet" id="prizeSheet">
   <div class="sheet-card">
@@ -595,12 +621,12 @@
 </div>
 
 <!-- ?v= must change with APP_VERSION so phones fetch the new files -->
-<script src="evo-data.js?v=2026-11-14-4"></script>
-<script src="dex-data.js?v=2026-11-14-4"></script>
-<script src="growth.js?v=2026-11-14-4"></script>
-<script src="regions.js?v=2026-11-14-4"></script>
-<script src="rules.js?v=2026-11-14-4"></script>
-<script src="parent.js?v=2026-11-14-4"></script>
+<script src="evo-data.js?v=2026-11-14-5"></script>
+<script src="dex-data.js?v=2026-11-14-5"></script>
+<script src="growth.js?v=2026-11-14-5"></script>
+<script src="regions.js?v=2026-11-14-5"></script>
+<script src="rules.js?v=2026-11-14-5"></script>
+<script src="parent.js?v=2026-11-14-5"></script>
 <script>
 (function () {
   "use strict";
@@ -610,9 +636,9 @@
   var REFRESH_MS = 60000;
   // Change on every release: a page left open with older code reloads itself,
   // so every phone works out the same Pokémon.
-  var APP_VERSION = "2026-11-14-4";
+  var APP_VERSION = "2026-11-14-5";
   // Sent with every change; the sheet refuses changes from older pages (MIN_CLIENT_GEN in Code.gs).
-  var CLIENT_GEN = 10;
+  var CLIENT_GEN = 11;
   var STORAGE_KEY = "htrc-2026-autumn-v3";
   var START = new Date(2026, 9, 24);   // Sat 24 Oct 2026
   // The half term was 16 days; old records keep their day number from START. New records use today's.
@@ -629,11 +655,17 @@
   var RNQ_LOGIN_URL = "https://readnquiz.com/home.aspx?id=50285";
   var RNQ_FIND_URL = "https://readnquiz.com/quiz/find.aspx?xid=50285";
   var KIDS = [
-    { id: "taiga", name: "TAIGA", maths: true, target: 7, mathsTarget: 2500, ks: "KS2", practices: [], practiceGoals: {} },
-    { id: "leo", name: "LEO", maths: true, target: 7, mathsTarget: 2500, ks: "KS2", practices: [], practiceGoals: {} },
+    { id: "taiga", name: "TAIGA", maths: true, target: 7, mathsTarget: 2500, ks: "KS2", practices: [], practiceGoals: {}, award: "Certificate" },
+    { id: "leo", name: "LEO", maths: true, target: 7, mathsTarget: 2500, ks: "KS2", practices: [], practiceGoals: {}, award: "Certificate" },
     { id: "yudai", name: "YUDAI", maths: false, target: 10, mathsTarget: 0, ks: "KS3", practices: ["latin", "mymaths", "french"],
-      practiceGoals: { latin: 10000, mymaths: 1500, french: 5000 } }
+      practiceGoals: { latin: 10000, mymaths: 1500, french: 5000 }, award: "Positive incident" }
   ];
+  // School awards: the kind is the same as AWARD_KINDS in Code.gs; the subjects are what the list offers.
+  var AWARD_SUBJECTS = {
+    KS2: ["Times tables", "Reading", "Maths", "English", "Spelling", "Writing", "Science", "Sport", "Other"],
+    KS3: ["Latin", "French", "Maths", "English", "Science", "History", "Geography", "Computing", "Music", "Art", "PE", "Other"]
+  };
+  var AWARDS_PER_DAY = 3;
   // Extra practice. Before PACE_FROM a session with at least `min` correct answers caught a Pokémon;
   // now it fills the Poké Ball. It does not count towards the prize; its goal (practiceGoals) is only shown as a bar.
   // Sessions logged before PRACTICE_RULE_FROM keep `oldMin`, so nothing already caught changes.
@@ -851,7 +883,7 @@
       s.settings.mathsTargets[k.id] = k.mathsTarget;
       s.settings.practiceGoals[k.id] = goalsFrom(k.practiceGoals, k);
       s.settings.partnerIds[k.id] = "";
-      s.kids[k.id] = { entries: [], maths: [], practice: [], evolves: [], trades: [], prizes: [], gifts: [], events: [] };
+      s.kids[k.id] = { entries: [], maths: [], practice: [], evolves: [], trades: [], prizes: [], gifts: [], events: [], awards: [] };
     });
     return s;
   }
@@ -869,6 +901,7 @@
           if (!base.kids[k.id].prizes) base.kids[k.id].prizes = [];
           if (!base.kids[k.id].gifts) base.kids[k.id].gifts = [];
           if (!base.kids[k.id].events) base.kids[k.id].events = [];
+          if (!base.kids[k.id].awards) base.kids[k.id].awards = [];
           if (parsed.settings.targets[k.id]) base.settings.targets[k.id] = parsed.settings.targets[k.id];
           if (parsed.settings.mathsTargets[k.id]) base.settings.mathsTargets[k.id] = parsed.settings.mathsTargets[k.id];
           if (parsed.settings.partnerIds && parsed.settings.partnerIds[k.id]) base.settings.partnerIds[k.id] = parsed.settings.partnerIds[k.id];
@@ -1040,7 +1073,7 @@
   function catchOrder() {
     var d = data(), used = usedForReward();
     function caught(rule) { return function (x) { return x.mon || (loggedAt(x) < PACE_FROM && rule(x)); }; }
-    var list = d.entries.filter(caught(isPass)).concat(d.maths.filter(caught(mathsCatches)), d.practice.filter(caught(practiceCatches)), prizeMons(d), giftMons(d), eventMons(d));
+    var list = d.entries.filter(caught(isPass)).concat(d.maths.filter(caught(mathsCatches)), d.practice.filter(caught(practiceCatches)), prizeMons(d), giftMons(d), eventMons(d), awardMons(d));
     return list.filter(function (x) { return !used[x.id]; }).sort(function (a, b) { return loggedAt(a) - loggedAt(b); });
   }
   // Prize Pokémon of the Great and Ultra Balls, shiny when the Master Ball prize was used on them.
@@ -1062,6 +1095,19 @@
     return (d.events || []).filter(function (g) { return g.mon; }).map(function (g) {
       return { id: g.id, kid: g.kid, type: "event", day: g.day, mon: g.mon, shiny: 0 };
     });
+  }
+  // School awards a child added: the Pokémon they chose joins the box.
+  function awardMons(d) {
+    return (d.awards || []).filter(function (g) { return g.mon; }).map(function (g) {
+      return { id: g.id, kid: g.kid, type: "award", day: g.day, mon: g.mon, shiny: 0 };
+    });
+  }
+  function awardOf(id) {
+    for (var i = 0; i < KIDS.length; i++) {
+      var g = (state.kids[KIDS[i].id].awards || []).filter(function (x) { return x.id === id; })[0];
+      if (g) return g;
+    }
+    return null;
   }
   function eventOf(id) {
     for (var i = 0; i < KIDS.length; i++) {
@@ -1445,6 +1491,7 @@
     el("rank").textContent = "Rank " + (s.rank + 1) + " " + RANKS[s.rank];
     el("rankMsg").textContent = "";
     renderEvent();
+    renderAwardButton();
 
     renderStudyGoals(s);
     renderPracticeGoals();
@@ -1634,11 +1681,111 @@
     });
   }
 
+  // ---------- school awards ----------
+  function ymdOf(d) { return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0"); }
+  function awardsToday(kidId) {
+    var today = Rules.dayKey(Date.now());
+    return (state.kids[kidId].awards || []).filter(function (a) { return Rules.dayKey(loggedAt(a)) === today; }).length;
+  }
+  function renderAwardButton() {
+    var box = el("awardBox"), n = (data().awards || []).length;
+    box.innerHTML = "";
+    var b = make("button", "btn blue small", "🏅 I got a " + kid().award + "!");
+    b.type = "button";
+    b.onclick = openAward;
+    box.appendChild(b);
+    box.appendChild(make("small", "", n ? "🏫 School awards: " + n + " · each one gives a Pokémon!" : "🏫 Got a " + kid().award + " at school? Add it and choose a Pokémon!"));
+  }
+  function openAward() {
+    if (awardsToday(current) >= AWARDS_PER_DAY) { window.alert(AWARDS_PER_DAY + " awards a day at most. Ask a grown-up."); return; }
+    el("awTitle").textContent = "🏅 My " + kid().award;
+    var sel = el("awSubject");
+    sel.innerHTML = "";
+    sel.appendChild(make("option", "", "Choose..."));
+    sel.firstChild.value = "";
+    AWARD_SUBJECTS[kid().ks].forEach(function (x) { var o = make("option", "", x); o.value = x; sel.appendChild(o); });
+    el("awText").value = "";
+    el("awText").placeholder = kid().ks === "KS3" ? "e.g. top mark in the Latin test" : "e.g. most time on TTRS in the school";
+    var d = el("awDate");
+    d.min = ymdOf(START);
+    d.max = ymdOf(new Date());
+    d.value = d.max;
+    openSheet("awardSheet");
+  }
+  // Three rare Pokémon (catch rate AWARD_RATE or less, no legendaries) the child can catch now, rarest first when
+  // there are fewer; the same three on every phone, and the same until this award is saved.
+  var AWARD_RATE = 45;
+  function awardChoices(kidId) {
+    var owned = familiesOf(kidId);
+    var all = Regions.candidates(owned).filter(function (d) { return !isPrizeMon(d) && !(DEX_DATA[d] && DEX_DATA[d][5]); });
+    var rare = all.filter(function (d) { return Regions.rate(d) <= AWARD_RATE; });
+    var list = rare.length >= 3 ? rare : all.slice().sort(function (a, b) { return Regions.rate(a) - Regions.rate(b) || a - b; }).slice(0, 3);
+    var seed = hashOf(kidId + "-award-" + (state.kids[kidId].awards || []).length);
+    var out = [];
+    while (list.length && out.length < 3) out.push(list.splice(seed % list.length, 1)[0]);
+    return out;
+  }
+  var awardDraft = null, awardTry = null, awardSaving = false;
+  el("awardForm").onsubmit = function (ev) {
+    ev.preventDefault();
+    var subject = el("awSubject").value, text = el("awText").value.trim(), date = el("awDate").value;
+    if (!subject) { window.alert("Please choose the subject."); return; }
+    if (!text) { window.alert("Please type what it was for."); return; }
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || date < el("awDate").min || date > el("awDate").max) { window.alert("Please choose a day from " + el("awDate").min + " to today."); return; }
+    var p = date.split("-").map(Number);
+    var day = Math.round((new Date(p[0], p[1] - 1, p[2]) - START) / 86400000);
+    awardDraft = { kid: current, day: day, kind: kid().award, subject: subject, title: text };
+    var list = el("pzList");
+    el("pzTitle").textContent = "🏅 Choose your award Pokémon!";
+    el("pzNote").textContent = kid().award + " · " + subject + " · you can choose only once";
+    list.innerHTML = "";
+    awardChoices(current).forEach(function (dex) {
+      var name = monEntry(dex)[0];
+      var b = make("button", "pz-opt");
+      b.type = "button";
+      b.setAttribute("data-dex", dex);
+      b.appendChild(artwork(dex, name, "pz-art"));
+      b.appendChild(make("b", "", name));
+      b.onclick = function () { saveAward(dex, name); };
+      list.appendChild(b);
+    });
+    closeSheets();
+    openSheet("prizeSheet");
+  };
+  function saveAward(dex, name) {
+    if (awardSaving || !awardDraft || awardDraft.kid !== current) return;
+    awardSaving = true;
+    var d = awardDraft, who = d.kid;
+    // "Not saved" last time with the same choice: send the same id again (the sheet may have saved it).
+    var again = awardTry && awardTry.kid === who && awardTry.mon === dex && awardTry.title === d.title && awardTry.subject === d.subject && awardTry.day === d.day;
+    var entry = again ? awardTry : { id: newId(), kid: who, day: d.day, kind: d.kind, subject: d.subject, title: d.title, mon: dex };
+    commit({ action: "award", entry: entry }, function () {
+      state.kids[who].awards.push({ id: entry.id, kid: who, type: "award", day: entry.day, title: entry.title, site: entry.kind, subject: entry.subject, mon: dex, seq: localSeq() });
+    }, function (ok, refused) {
+      awardSaving = false;
+      awardTry = ok || refused ? null : entry;
+      if (!ok) return;
+      awardDraft = null;
+      closeSheets();
+      show(artwork(dex, name), "🏅 Well done! You got " + name + "!", entry.kind + " · " + entry.subject + " · look in your 🎒 Pokémon box!");
+    });
+  }
+
   // Prize badges: prizes given by a grown-up, each with the Pokémon that came with it.
   function renderGifts() {
-    var gifts = data().gifts || [], log = el("giftLog"), byId = catches().byId;
-    el("giftWrap").className = gifts.length ? "" : "hidden";
+    var gifts = data().gifts || [], awards = data().awards || [], log = el("giftLog"), byId = catches().byId;
+    el("giftWrap").className = gifts.length || awards.length ? "" : "hidden";
     log.innerHTML = "";
+    awards.forEach(function (a) {
+      var c = byId[a.id];
+      var card = make("div", "entry badge-card");
+      card.appendChild(make("div", "badge-medal", "🏫"));
+      card.appendChild(make("div", "title", a.site + " · " + a.subject));
+      card.appendChild(make("div", "meta", a.title));
+      card.appendChild(make("div", "mon", "🎁 Pokémon: " + (c ? c.name : "a Pokémon")));
+      card.appendChild(make("div", "meta", fmt(dayDate(a.day))));
+      log.appendChild(card);
+    });
     gifts.forEach(function (g) {
       var c = byId[g.id];
       var card = make("div", "entry badge-card");
@@ -2002,9 +2149,9 @@
     }
     var how = el("mdHow");
     how.innerHTML = "";
-    var rec = recordOf(id), prize = m.c.tier ? TIERS[m.c.tier - 1] : null, gift = giftOf(id), evt = eventOf(id);
-    var how1 = prize ? "🏆 " + prize.name + " prize" + (m.c.shiny ? " · ✨ made shiny with the Master Ball" : "") : gift ? "🏅 Prize: " + gift.title : evt ? "🎉 Holiday event" : rec ? recordText(rec) : "Caught!";
-    var line = make("div", "md-line", (m.from !== current ? (prize || gift || evt ? "Won by " : "Caught by ") + kidName(m.from) + ": " : "") + how1);
+    var rec = recordOf(id), prize = m.c.tier ? TIERS[m.c.tier - 1] : null, gift = giftOf(id), evt = eventOf(id), aw = awardOf(id);
+    var how1 = prize ? "🏆 " + prize.name + " prize" + (m.c.shiny ? " · ✨ made shiny with the Master Ball" : "") : gift ? "🏅 Prize: " + gift.title : aw ? "🏫 " + aw.site + " (" + aw.subject + "): " + aw.title : evt ? "🎉 Holiday event" : rec ? recordText(rec) : "Caught!";
+    var line = make("div", "md-line", (m.from !== current ? (prize || gift || evt || aw ? "Won by " : "Caught by ") + kidName(m.from) + ": " : "") + how1);
     if (gift) line.appendChild(make("small", "", fmt(dayDate(gift.day))));
     if (evt) line.appendChild(make("small", "", fmt(dayDate(evt.day))));
     if (rec) line.appendChild(make("small", "", whenText(rec)));
@@ -2247,6 +2394,7 @@
       else if (e.type === "prize") next.kids[e.kid].prizes.push({ id: e.id, kid: e.kid, type: e.type, day: e.day, tier: e.tier, mon: e.mon || 0, target: e.target || "", seq: seq });
       else if (e.type === "trade") next.kids[e.kid].trades.push({ id: e.id, kid: e.kid, type: e.type, day: e.day, source: e.source || "", give: e.site, get: e.get || "", with: e.with || "", ticket: e.ticket || 0, seq: seq });
       else if (e.type === "event") next.kids[e.kid].events.push({ id: e.id, kid: e.kid, type: "event", day: e.day, title: e.title || "", mon: e.mon || 0, seq: seq });
+      else if (e.type === "gift" && e.award) next.kids[e.kid].awards.push({ id: e.id, kid: e.kid, type: "award", day: e.day, title: e.title || "", site: e.site || "", subject: e.subject || "", mon: e.mon || 0, seq: seq });
       else if (e.type === "gift") next.kids[e.kid].gifts.push({ id: e.id, kid: e.kid, type: e.type, day: e.day, title: e.title || "", mon: e.mon || 0, seq: seq });
       else next.kids[e.kid].entries.push(e);
     });
@@ -2392,7 +2540,7 @@
     el(id).className = "sheet show";
     window.scrollTo(0, 0);
   }
-  function closeSheets() { ["readSheet", "mathsSheet", "practiceSheet", "rewardSheet", "monSheet", "tradeSheet", "evoSheet", "parentSheet", "prizeSheet"].forEach(function (id) { el(id).className = "sheet"; }); }
+  function closeSheets() { ["readSheet", "mathsSheet", "practiceSheet", "rewardSheet", "monSheet", "tradeSheet", "evoSheet", "parentSheet", "prizeSheet", "awardSheet"].forEach(function (id) { el(id).className = "sheet"; }); }
   Array.prototype.forEach.call(document.querySelectorAll("[data-close]"), function (b) { b.onclick = closeSheets; });
   // A small ← at the top of every sheet does what its Cancel / Close button at the bottom does.
   var SHEET_EXITS = { rewardSheet: "rwCancel", evoSheet: "evLater", tradeSheet: "trCancel" };

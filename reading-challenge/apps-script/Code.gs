@@ -38,8 +38,8 @@ var SHINY_COL = 13;
 var MAX_ID = 40;
 // Pages older than this may work out Pokémon differently, so their changes are refused.
 var MIN_CLIENT_GEN = 9;
-// Tells pages that this sheet code knows trades (2) and levels, level-up evolutions and Mega Stones (3), the Poké Ball meter (4), all 1,025 Pokémon and regions (5), shiny Pokémon (6), French (7), prize Pokémon (8), no end date, holiday events (9; the parent PIN was dropped on 14 Nov), prize balls from books again (10).
-var SERVER_GEN = 10;
+// Tells pages that this sheet code knows trades (2) and levels, level-up evolutions and Mega Stones (3), the Poké Ball meter (4), all 1,025 Pokémon and regions (5), shiny Pokémon (6), French (7), prize Pokémon (8), no end date, holiday events (9; the parent PIN was dropped on 14 Nov), prize balls from books again (10), school awards (11).
+var SERVER_GEN = 11;
 var EVENT_BOOKS = 5;
 // Prize Pokémon (type "prize"), one per ball per child once the ball is reached (the books goal, and for children
 // with times tables the lower of the two goals): "title" = ball (1-3), "mon" = the legendary chosen (Great and
@@ -48,6 +48,12 @@ var EVENT_BOOKS = 5;
 var PRIZE_PCTS = [100, 150, 200];
 var PRIZE_MONS = { 1: [144, 145, 146], 2: [150, 151] };
 var SHINY_PRIZE_TIER = 3;
+// School awards (type "award"), added by the child and given at once (no grown-up check): "title" = what for,
+// "site" = the kind (Certificate for TAIGA and LEO, Positive incident for YUDAI), "score" = the subject,
+// "mon" = the Pokémon chosen. At most AWARDS_PER_DAY a day per child, so a double tap cannot add many.
+var AWARD_KINDS = { taiga: "Certificate", leo: "Certificate", yudai: "Positive incident" };
+var AWARDS_PER_DAY = 3;
+var MAX_AWARD_TEXT = 120, MAX_AWARD_SUBJECT = 30;
 var PASS_RATE = 0.8;
 var NO_QUIZ = "No quiz";
 // Evolutions from a level or a Mega Stone: "title" holds this word instead of the record that paid for it.
@@ -75,6 +81,7 @@ function doPost(e) {
     else if (body.action === "event") saveEvent_(String(body.start || ""), String(body.end || ""));
     else if (body.action === "eventmon") addEventMon_(body.entry);
     else if (body.action === "prize") addPrize_(body.prize);
+    else if (body.action === "award") addAward_(body.entry);
     else throw new Error("Unknown action");
     return json_(snapshot_());
   } catch (err) {
@@ -109,6 +116,14 @@ function snapshot_() {
     else if (base.type === "prize") {
       base.tier = Number(r[4]) || 0;
       base.target = String(r[6] || "");
+    }
+    else if (base.type === "award") {
+      // Sent as a "gift" marked award: 1, so pages from before awards (gen 9-10) show it as a prize badge with its
+      // Pokémon instead of filing it with the books.
+      base.type = "gift";
+      base.award = 1;
+      base.title = String(r[4]);
+      base.subject = String(r[6]);
     }
     else if (base.type === "trade") {
       base.source = String(r[4]);
@@ -473,6 +488,26 @@ function addEventMon_(x) {
   }).length;
   if (books < EVENT_BOOKS) throw new Error("Not possible: " + (EVENT_BOOKS - books) + " more books first.");
   entriesSheet_().appendRow([id, kid, "event", day, ev.start, "Event", "", "", "", new Date(), mon, "", ""]);
+}
+
+
+// A school award the child added: saved at once with the Pokémon they chose. Same id twice = one row.
+function addAward_(x) {
+  if (!x) throw new Error("Missing entry");
+  var id = String(x.id || "").slice(0, MAX_ID), kid = String(x.kid || ""), mon = Number(x.mon), day = Number(x.day);
+  if (!id) throw new Error("Missing id");
+  if (rowOf_(id) > 0) return;
+  if (!KIDS.hasOwnProperty(kid)) throw new Error("Unknown kid");
+  if (!isInt_(day) || day < 0 || day > MAX_DAY) throw new Error("Bad day");
+  if (String(x.kind || "") !== AWARD_KINDS[kid]) throw new Error("Bad award");
+  var subject = String(x.subject || "").trim(), text = String(x.title || "").trim();
+  if (!subject || subject.length > MAX_AWARD_SUBJECT || !text || text.length > MAX_AWARD_TEXT) throw new Error("Bad award");
+  if (!isInt_(mon) || mon <= 0 || mon > MAX_FORM || PRIZE_MONS[1].concat(PRIZE_MONS[2]).indexOf(mon) >= 0) throw new Error("Bad Pokémon");
+  var today = dayKey_(Date.now());
+  var rows = entriesSheet_().getDataRange().getValues().slice(1);
+  var todays = rows.filter(function (r) { return r[2] === "award" && String(r[1]) === kid && r[9] instanceof Date && dayKey_(r[9].getTime()) === today; }).length;
+  if (todays >= AWARDS_PER_DAY) throw new Error("Not possible: " + AWARDS_PER_DAY + " awards a day at most. Ask a grown-up.");
+  entriesSheet_().appendRow([id, kid, "award", day, asText_(text), AWARD_KINDS[kid], asText_(subject), "", "", new Date(), mon, "", ""]);
 }
 
 // A prize Pokémon. Same id twice = one row; each ball once per child, and only once it is reached.
