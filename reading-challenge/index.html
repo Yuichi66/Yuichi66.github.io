@@ -129,6 +129,13 @@
   .partner-row { display: flex; align-items: center; gap: 12px; background: linear-gradient(135deg, var(--red), var(--red-dark)); color: #fff; border: 3px solid #000; border-radius: 14px; padding: 6px 12px; margin-bottom: 14px; }
   .partner-row .sprite { width: 88px; height: 88px; }
   .partner-row b { font-size: 20px; display: block; }
+  .gym { display: grid; gap: 8px; }
+  .gym-row { display: flex; align-items: center; gap: 10px; border: 3px solid #000; border-radius: 14px; padding: 8px 10px; background: #fff; }
+  .gym-row.has { background: #fff6c8; }
+  .gym-row .gym-icon { font-size: 26px; }
+  .gym-row .gym-body { flex: 1; }
+  .gym-row b { display: block; font-size: 15px; }
+  .gym-row small { display: block; font-size: 13px; color: #555; font-weight: bold; }
   .award-row { margin-top: 12px; text-align: center; }
   .award-row small { display: block; margin-top: 4px; color: #555; }
   .goal-note { display: block; margin-top: 3px; font-size: 13px; font-weight: bold; color: #555; }
@@ -387,6 +394,8 @@
     <div class="sub-h">🏆 Prize balls</div>
     <div class="ladder" id="ladder"></div>
     <small class="goal-note" id="nextMsg"></small>
+    <div class="sub-h">🏅 Gym badges</div>
+    <div class="gym" id="gymBadges"></div>
     <div class="rank-next" id="rankMsg"></div>
     <div class="rule" id="eventMsg"></div>
     <div class="award-row" id="awardBox"></div>
@@ -621,12 +630,12 @@
 </div>
 
 <!-- ?v= must change with APP_VERSION so phones fetch the new files -->
-<script src="evo-data.js?v=2026-11-14-5"></script>
-<script src="dex-data.js?v=2026-11-14-5"></script>
-<script src="growth.js?v=2026-11-14-5"></script>
-<script src="regions.js?v=2026-11-14-5"></script>
-<script src="rules.js?v=2026-11-14-5"></script>
-<script src="parent.js?v=2026-11-14-5"></script>
+<script src="evo-data.js?v=2026-11-14-6"></script>
+<script src="dex-data.js?v=2026-11-14-6"></script>
+<script src="growth.js?v=2026-11-14-6"></script>
+<script src="regions.js?v=2026-11-14-6"></script>
+<script src="rules.js?v=2026-11-14-6"></script>
+<script src="parent.js?v=2026-11-14-6"></script>
 <script>
 (function () {
   "use strict";
@@ -636,9 +645,9 @@
   var REFRESH_MS = 60000;
   // Change on every release: a page left open with older code reloads itself,
   // so every phone works out the same Pokémon.
-  var APP_VERSION = "2026-11-14-5";
+  var APP_VERSION = "2026-11-14-6";
   // Sent with every change; the sheet refuses changes from older pages (MIN_CLIENT_GEN in Code.gs).
-  var CLIENT_GEN = 11;
+  var CLIENT_GEN = 12;
   var STORAGE_KEY = "htrc-2026-autumn-v3";
   var START = new Date(2026, 9, 24);   // Sat 24 Oct 2026
   // The half term was 16 days; old records keep their day number from START. New records use today's.
@@ -666,6 +675,13 @@
     KS3: ["Latin", "French", "Maths", "English", "Science", "History", "Geography", "Computing", "Music", "Art", "PE", "Other"]
   };
   var AWARDS_PER_DAY = 3;
+  // Gym badges: one every `step` correct answers in a subject. The same as BADGE_STEPS in Code.gs.
+  var BADGES = {
+    maths: { step: 5000, name: "Times tables", icon: "🎸" },
+    latin: { step: 5000, name: "Latin", icon: "🏛️" },
+    french: { step: 5000, name: "French", icon: "🇫🇷" },
+    mymaths: { step: 1000, name: "MyMaths", icon: "🧮" }
+  };
   // Extra practice. Before PACE_FROM a session with at least `min` correct answers caught a Pokémon;
   // now it fills the Poké Ball. It does not count towards the prize; its goal (practiceGoals) is only shown as a bar.
   // Sessions logged before PRACTICE_RULE_FROM keep `oldMin`, so nothing already caught changes.
@@ -883,7 +899,7 @@
       s.settings.mathsTargets[k.id] = k.mathsTarget;
       s.settings.practiceGoals[k.id] = goalsFrom(k.practiceGoals, k);
       s.settings.partnerIds[k.id] = "";
-      s.kids[k.id] = { entries: [], maths: [], practice: [], evolves: [], trades: [], prizes: [], gifts: [], events: [], awards: [] };
+      s.kids[k.id] = { entries: [], maths: [], practice: [], evolves: [], trades: [], prizes: [], gifts: [], events: [], awards: [], badges: [] };
     });
     return s;
   }
@@ -902,6 +918,7 @@
           if (!base.kids[k.id].gifts) base.kids[k.id].gifts = [];
           if (!base.kids[k.id].events) base.kids[k.id].events = [];
           if (!base.kids[k.id].awards) base.kids[k.id].awards = [];
+          if (!base.kids[k.id].badges) base.kids[k.id].badges = [];
           if (parsed.settings.targets[k.id]) base.settings.targets[k.id] = parsed.settings.targets[k.id];
           if (parsed.settings.mathsTargets[k.id]) base.settings.mathsTargets[k.id] = parsed.settings.mathsTargets[k.id];
           if (parsed.settings.partnerIds && parsed.settings.partnerIds[k.id]) base.settings.partnerIds[k.id] = parsed.settings.partnerIds[k.id];
@@ -1028,7 +1045,7 @@
     var pct = kid().maths ? Math.min(readPct, mathsPct) : readPct;
     var tier = 0;
     TIERS.forEach(function (t, i) { if (pct >= t.pct) tier = i + 1; });
-    return { caught: caught, correct: correct, rank: rank, tier: tier };
+    return { caught: caught, correct: correct, rank: rank, tier: tier, badges: badgesEarned(current) };
   }
   function need(goal, pctNeeded) { return Math.ceil(goal * pctNeeded / 100); }
   // "Next rank: Gym Challenger - 2 more books"
@@ -1073,7 +1090,7 @@
   function catchOrder() {
     var d = data(), used = usedForReward();
     function caught(rule) { return function (x) { return x.mon || (loggedAt(x) < PACE_FROM && rule(x)); }; }
-    var list = d.entries.filter(caught(isPass)).concat(d.maths.filter(caught(mathsCatches)), d.practice.filter(caught(practiceCatches)), prizeMons(d), giftMons(d), eventMons(d), awardMons(d));
+    var list = d.entries.filter(caught(isPass)).concat(d.maths.filter(caught(mathsCatches)), d.practice.filter(caught(practiceCatches)), prizeMons(d), giftMons(d), eventMons(d), awardMons(d), badgeMons(d));
     return list.filter(function (x) { return !used[x.id]; }).sort(function (a, b) { return loggedAt(a) - loggedAt(b); });
   }
   // Prize Pokémon of the Great and Ultra Balls, shiny when the Master Ball prize was used on them.
@@ -1102,6 +1119,19 @@
       return { id: g.id, kid: g.kid, type: "award", day: g.day, mon: g.mon, shiny: 0 };
     });
   }
+  function badgeMons(d) {
+    return (d.badges || []).filter(function (g) { return g.mon; }).map(function (g) {
+      return { id: g.id, kid: g.kid, type: "badge", day: g.day, mon: g.mon, shiny: 0 };
+    });
+  }
+  function badgeOf(id) {
+    for (var i = 0; i < KIDS.length; i++) {
+      var g = (state.kids[KIDS[i].id].badges || []).filter(function (x) { return x.id === id; })[0];
+      if (g) return g;
+    }
+    return null;
+  }
+  function badgeLabel(b) { return BADGES[b.subject] ? BADGES[b.subject].icon + " " + BADGES[b.subject].name + " " + num(b.n * BADGES[b.subject].step) : "Gym badge"; }
   function awardOf(id) {
     for (var i = 0; i < KIDS.length; i++) {
       var g = (state.kids[KIDS[i].id].awards || []).filter(function (x) { return x.id === id; })[0];
@@ -1496,6 +1526,7 @@
     renderStudyGoals(s);
     renderPracticeGoals();
     renderLadder(s);
+    renderGym();
   }
   // ---------- holiday event ----------
   var EVENT_BOOKS = 5;
@@ -1681,6 +1712,81 @@
     });
   }
 
+  // ---------- gym badges ----------
+  function badgeSubjects(k) { return (k.maths ? ["maths"] : []).concat(k.practices).filter(function (t) { return BADGES[t]; }); }
+  function correctIn(kidId, subject) {
+    var d = state.kids[kidId], list = subject === "maths" ? d.maths : d.practice.filter(function (p) { return p.type === subject; });
+    return list.reduce(function (sum, x) { return sum + (Number(x.correct) || 0); }, 0);
+  }
+  // For each subject: badges earned, badges whose Pokémon was chosen, and the next one to choose (0 = none).
+  function gymOf(kidId) {
+    var k = KIDS.filter(function (x) { return x.id === kidId; })[0];
+    return badgeSubjects(k).map(function (t) {
+      var done = correctIn(kidId, t), earned = Math.floor(done / BADGES[t].step);
+      var chosen = (state.kids[kidId].badges || []).filter(function (b) { return b.subject === t; }).map(function (b) { return b.n; });
+      var open = 0;
+      for (var n = 1; n <= earned; n++) if (chosen.indexOf(n) < 0) { open = n; break; }
+      return { subject: t, cfg: BADGES[t], done: done, earned: earned, open: open, next: (earned + 1) * BADGES[t].step };
+    });
+  }
+  function badgesEarned(kidId) { return gymOf(kidId).reduce(function (sum, g) { return sum + g.earned; }, 0); }
+  function badgeUpNote(before) {
+    return badgesEarned(current) > before ? " · 🏅 New gym badge! Choose a Pokémon in My progress!" : "";
+  }
+  function renderGym() {
+    var box = el("gymBadges");
+    box.innerHTML = "";
+    gymOf(current).forEach(function (g) {
+      var row = make("div", "gym-row" + (g.earned ? " has" : ""));
+      row.appendChild(make("div", "gym-icon", g.cfg.icon));
+      var body = make("div", "gym-body");
+      body.appendChild(make("b", "", g.cfg.name + " badges: " + (g.earned ? "🏅".repeat(Math.min(g.earned, 10)) + (g.earned > 10 ? " ×" + g.earned : "") : "none yet")));
+      body.appendChild(make("small", "", "🎯 " + num(g.next - g.done) + " more correct → badge at " + num(g.next) + "!"));
+      row.appendChild(body);
+      if (g.open) {
+        var b = make("button", "btn small tier-btn", "🏅 Choose!");
+        b.type = "button";
+        b.onclick = function () { openBadge(g.subject, g.open); };
+        row.appendChild(b);
+      }
+      box.appendChild(row);
+    });
+  }
+  function openBadge(subject, n) {
+    var list = el("pzList"), cfg = BADGES[subject];
+    el("pzTitle").textContent = "🏅 Gym badge Pokémon!";
+    el("pzNote").textContent = cfg.icon + " " + cfg.name + " " + num(n * cfg.step) + " correct · you can choose only once";
+    list.innerHTML = "";
+    rareChoices(current, current + "-badge-" + subject + "-" + n).forEach(function (dex) {
+      var name = monEntry(dex)[0];
+      var b = make("button", "pz-opt");
+      b.type = "button";
+      b.setAttribute("data-dex", dex);
+      b.appendChild(artwork(dex, name, "pz-art"));
+      b.appendChild(make("b", "", name));
+      b.onclick = function () { saveBadge(subject, n, dex, name); };
+      list.appendChild(b);
+    });
+    openSheet("prizeSheet");
+  }
+  var badgeTry = null, badgeSaving = false;
+  function saveBadge(subject, n, dex, name) {
+    if (badgeSaving) return;
+    badgeSaving = true;
+    var who = current;
+    var again = badgeTry && badgeTry.kid === who && badgeTry.subject === subject && badgeTry.n === n && badgeTry.mon === dex;
+    var entry = again ? badgeTry : { id: newId(), kid: who, day: todayIndex(), subject: subject, n: n, mon: dex };
+    commit({ action: "badge", entry: entry }, function () {
+      state.kids[who].badges.push({ id: entry.id, kid: who, type: "badge", day: entry.day, subject: subject, n: n, mon: dex, seq: localSeq() });
+    }, function (ok, refused) {
+      badgeSaving = false;
+      badgeTry = ok || refused ? null : entry;
+      if (!ok) return;
+      closeSheets();
+      show(artwork(dex, name), "🏅 Gym badge! You got " + name + "!", BADGES[subject].icon + " " + BADGES[subject].name + " " + num(n * BADGES[subject].step) + " correct · look in your 🎒 Pokémon box!");
+    });
+  }
+
   // ---------- school awards ----------
   function ymdOf(d) { return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0"); }
   function awardsToday(kidId) {
@@ -1715,12 +1821,13 @@
   // Three rare Pokémon (catch rate AWARD_RATE or less, no legendaries) the child can catch now, rarest first when
   // there are fewer; the same three on every phone, and the same until this award is saved.
   var AWARD_RATE = 45;
-  function awardChoices(kidId) {
+  function awardChoices(kidId) { return rareChoices(kidId, kidId + "-award-" + (state.kids[kidId].awards || []).length); }
+  function rareChoices(kidId, seedKey) {
     var owned = familiesOf(kidId);
     var all = Regions.candidates(owned).filter(function (d) { return !isPrizeMon(d) && !(DEX_DATA[d] && DEX_DATA[d][5]); });
     var rare = all.filter(function (d) { return Regions.rate(d) <= AWARD_RATE; });
     var list = rare.length >= 3 ? rare : all.slice().sort(function (a, b) { return Regions.rate(a) - Regions.rate(b) || a - b; }).slice(0, 3);
-    var seed = hashOf(kidId + "-award-" + (state.kids[kidId].awards || []).length);
+    var seed = hashOf(seedKey);
     var out = [];
     while (list.length && out.length < 3) out.push(list.splice(seed % list.length, 1)[0]);
     return out;
@@ -1773,9 +1880,18 @@
 
   // Prize badges: prizes given by a grown-up, each with the Pokémon that came with it.
   function renderGifts() {
-    var gifts = data().gifts || [], awards = data().awards || [], log = el("giftLog"), byId = catches().byId;
-    el("giftWrap").className = gifts.length || awards.length ? "" : "hidden";
+    var gifts = data().gifts || [], awards = data().awards || [], badges = data().badges || [], log = el("giftLog"), byId = catches().byId;
+    el("giftWrap").className = gifts.length || awards.length || badges.length ? "" : "hidden";
     log.innerHTML = "";
+    badges.forEach(function (b) {
+      var c = byId[b.id];
+      var card = make("div", "entry badge-card");
+      card.appendChild(make("div", "badge-medal", "🏅"));
+      card.appendChild(make("div", "title", "Gym badge: " + badgeLabel(b)));
+      card.appendChild(make("div", "mon", "🎁 Pokémon: " + (c ? c.name : "a Pokémon")));
+      card.appendChild(make("div", "meta", fmt(dayDate(b.day))));
+      log.appendChild(card);
+    });
     awards.forEach(function (a) {
       var c = byId[a.id];
       var card = make("div", "entry badge-card");
@@ -2149,9 +2265,9 @@
     }
     var how = el("mdHow");
     how.innerHTML = "";
-    var rec = recordOf(id), prize = m.c.tier ? TIERS[m.c.tier - 1] : null, gift = giftOf(id), evt = eventOf(id), aw = awardOf(id);
-    var how1 = prize ? "🏆 " + prize.name + " prize" + (m.c.shiny ? " · ✨ made shiny with the Master Ball" : "") : gift ? "🏅 Prize: " + gift.title : aw ? "🏫 " + aw.site + " (" + aw.subject + "): " + aw.title : evt ? "🎉 Holiday event" : rec ? recordText(rec) : "Caught!";
-    var line = make("div", "md-line", (m.from !== current ? (prize || gift || evt || aw ? "Won by " : "Caught by ") + kidName(m.from) + ": " : "") + how1);
+    var rec = recordOf(id), prize = m.c.tier ? TIERS[m.c.tier - 1] : null, gift = giftOf(id), evt = eventOf(id), aw = awardOf(id), bd = badgeOf(id);
+    var how1 = prize ? "🏆 " + prize.name + " prize" + (m.c.shiny ? " · ✨ made shiny with the Master Ball" : "") : gift ? "🏅 Prize: " + gift.title : bd ? "🏅 Gym badge: " + badgeLabel(bd) : aw ? "🏫 " + aw.site + " (" + aw.subject + "): " + aw.title : evt ? "🎉 Holiday event" : rec ? recordText(rec) : "Caught!";
+    var line = make("div", "md-line", (m.from !== current ? (prize || gift || evt || aw || bd ? "Won by " : "Caught by ") + kidName(m.from) + ": " : "") + how1);
     if (gift) line.appendChild(make("small", "", fmt(dayDate(gift.day))));
     if (evt) line.appendChild(make("small", "", fmt(dayDate(evt.day))));
     if (rec) line.appendChild(make("small", "", whenText(rec)));
@@ -2394,6 +2510,7 @@
       else if (e.type === "prize") next.kids[e.kid].prizes.push({ id: e.id, kid: e.kid, type: e.type, day: e.day, tier: e.tier, mon: e.mon || 0, target: e.target || "", seq: seq });
       else if (e.type === "trade") next.kids[e.kid].trades.push({ id: e.id, kid: e.kid, type: e.type, day: e.day, source: e.source || "", give: e.site, get: e.get || "", with: e.with || "", ticket: e.ticket || 0, seq: seq });
       else if (e.type === "event") next.kids[e.kid].events.push({ id: e.id, kid: e.kid, type: "event", day: e.day, title: e.title || "", mon: e.mon || 0, seq: seq });
+      else if (e.type === "gift" && e.badge) next.kids[e.kid].badges.push({ id: e.id, kid: e.kid, type: "badge", day: e.day, subject: e.subject || "", n: e.n || 0, mon: e.mon || 0, seq: seq });
       else if (e.type === "gift" && e.award) next.kids[e.kid].awards.push({ id: e.id, kid: e.kid, type: "award", day: e.day, title: e.title || "", site: e.site || "", subject: e.subject || "", mon: e.mon || 0, seq: seq });
       else if (e.type === "gift") next.kids[e.kid].gifts.push({ id: e.id, kid: e.kid, type: e.type, day: e.day, title: e.title || "", mon: e.mon || 0, seq: seq });
       else next.kids[e.kid].entries.push(e);
@@ -2589,6 +2706,7 @@
     var msg = after.tier > before.tier ? " · 🏆 " + TIERS[after.tier - 1].name + " unlocked!" +
       (!prizeOf(current, after.tier) && prizeChoices(current, after.tier).length ? " Choose your prize Pokémon in My progress!" : "") : "";
     if (after.rank > before.rank) msg += " · ⭐ Rank up: " + RANKS[after.rank] + "!";
+    if (after.badges > before.badges) msg += " · 🏅 New gym badge! Choose a Pokémon in My progress!";
     return msg;
   }
 
@@ -2942,11 +3060,12 @@
     var item = { kid: current, type: practiceType, day: todayIndex(), site: cfg.name, correct: correct };
     item.id = recordId(item);
     var wins = lastTry && lastTry.id === item.id ? lastTry.wins : winsBall(item);
+    var badgesBefore = badgesEarned(current);
     addWithReward(item, "practice", wins, el("practiceForm").querySelector("button[type=submit]"), function (ok, evo) {
       if (!ok) return;
       el("pCorrect").value = "";
       closeSheets();
-      var mid = cfg.name + ": " + correct + " correct";
+      var mid = cfg.name + ": " + correct + " correct" + badgeUpNote(badgesBefore);
       if (evo) celebrateEvolve(evo, "+" + correct + "!  " + mid);
       else if (wins) catchPokemon(item, "", "+" + correct + "! ", mid);
       else show(make("div", "ball huge empty"), cfg.icon + " +" + correct, mid + "  ·  " + ballText(item.kid));
