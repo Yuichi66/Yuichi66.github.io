@@ -129,6 +129,7 @@
   .partner-row { display: flex; align-items: center; gap: 12px; background: linear-gradient(135deg, var(--red), var(--red-dark)); color: #fff; border: 3px solid #000; border-radius: 14px; padding: 6px 12px; margin-bottom: 14px; }
   .partner-row .sprite { width: 88px; height: 88px; }
   .partner-row b { font-size: 20px; display: block; }
+  .goal-note { display: block; margin-top: 3px; font-size: 13px; font-weight: bold; color: #555; }
   .rank-next { margin-top: 6px; font-size: 14px; font-weight: bold; color: var(--purple); }
   .rank { display: inline-block; margin-top: 4px; background: var(--yellow); color: #000; padding: 2px 10px; border-radius: 12px; font-weight: bold; font-size: 14px; }
 
@@ -366,6 +367,7 @@
       <div><b id="trainerName"></b><span class="rank" id="rank"></span></div>
     </div>
     <div class="grow" id="grow"></div>
+    <div id="studyGoals"></div>
     <div id="practiceGoals"></div>
     <div class="rank-next" id="rankMsg"></div>
     <div class="rule" id="eventMsg"></div>
@@ -577,12 +579,12 @@
 </div>
 
 <!-- ?v= must change with APP_VERSION so phones fetch the new files -->
-<script src="evo-data.js?v=2026-11-14-2"></script>
-<script src="dex-data.js?v=2026-11-14-2"></script>
-<script src="growth.js?v=2026-11-14-2"></script>
-<script src="regions.js?v=2026-11-14-2"></script>
-<script src="rules.js?v=2026-11-14-2"></script>
-<script src="parent.js?v=2026-11-14-2"></script>
+<script src="evo-data.js?v=2026-11-14-3"></script>
+<script src="dex-data.js?v=2026-11-14-3"></script>
+<script src="growth.js?v=2026-11-14-3"></script>
+<script src="regions.js?v=2026-11-14-3"></script>
+<script src="rules.js?v=2026-11-14-3"></script>
+<script src="parent.js?v=2026-11-14-3"></script>
 <script>
 (function () {
   "use strict";
@@ -592,7 +594,7 @@
   var REFRESH_MS = 60000;
   // Change on every release: a page left open with older code reloads itself,
   // so every phone works out the same Pokémon.
-  var APP_VERSION = "2026-11-14-2";
+  var APP_VERSION = "2026-11-14-3";
   // Sent with every change; the sheet refuses changes from older pages (MIN_CLIENT_GEN in Code.gs).
   var CLIENT_GEN = 9;
   var STORAGE_KEY = "htrc-2026-autumn-v3";
@@ -1316,21 +1318,43 @@
       return { type: type, cfg: PRACTICES[type], done: done, goal: goal, pct: Math.floor(done / goal * 100) };
     });
   }
-  // One bar per practice (full at 100%). Only shows progress: the prize still comes from books.
+  // One progress bar: what was done in all, and what the next target is (the bar fills towards it).
+  function goalBar(box, cls, title, right, note, pct) {
+    var g = make("div", "goal");
+    var label = make("div", "goal-label");
+    label.appendChild(make("span", "", title));
+    label.appendChild(make("span", "", right));
+    g.appendChild(label);
+    var bar = make("div", "bar " + cls);
+    bar.appendChild(make("div")).style.width = Math.max(0, Math.min(100, pct)) + "%";
+    g.appendChild(bar);
+    if (note) g.appendChild(make("small", "goal-note", note));
+    box.appendChild(g);
+  }
+  function num(n) { return Number(n).toLocaleString("en-GB"); }
+  // A running total against its next target, in steps of the child's goal (e.g. 2,500 times tables answers).
+  function totalBar(box, cls, title, done, step) {
+    var t = Rules.nextTarget(done, step);
+    // Filled by the whole total towards the next target, the same as the numbers (9,344 / 10,000 = 93%).
+    goalBar(box, cls, title, num(t.done) + " / " + num(t.next), "🎯 " + num(t.left) + " more correct answer" + (t.left > 1 ? "s" : "") + " → " + num(t.next) + "!", t.done / t.next * 100);
+  }
+  // Books passed in all, and how far through the books for the next rank.
+  function renderStudyGoals(s) {
+    var box = el("studyGoals");
+    box.innerHTML = "";
+    var step = Rules.rankStep(RANK_START[current], s.caught);
+    var left = step.need - step.have;
+    // Filled by all the books passed so far, towards the book total of the next rank (5 / 9 books).
+    goalBar(box, "read", "📖 Books passed", step.need ? num(s.caught) + " / " + num(s.caught + left) + " books" : num(s.caught) + " books",
+      step.need ? "🎯 Pass " + left + " more book" + (left > 1 ? "s" : "") + " → Rank " + (s.rank + 2) + " " + RANKS[s.rank + 1] + "!" : "⭐ Top rank! You are the CHAMPION!",
+      step.need ? s.caught / (s.caught + left) * 100 : 100);
+    if (kid().maths) totalBar(box, "maths", "🎸 Times tables correct", s.correct, state.settings.mathsTargets[current]);
+  }
+  // One bar per practice: correct answers in all and the next target, in steps of its goal.
   function renderPracticeGoals() {
     var box = el("practiceGoals");
     box.innerHTML = "";
-    practiceProgress().forEach(function (x) {
-      var g = make("div", "goal");
-      var label = make("div", "goal-label");
-      label.appendChild(make("span", "", x.cfg.icon + " " + x.cfg.name + " correct"));
-      label.appendChild(make("span", "", x.done + " / " + x.goal + " (" + x.pct + "%)"));
-      g.appendChild(label);
-      var bar = make("div", "bar " + x.type);
-      bar.appendChild(make("div")).style.width = Math.min(100, x.pct) + "%";
-      g.appendChild(bar);
-      box.appendChild(g);
-    });
+    practiceProgress().forEach(function (x) { totalBar(box, x.type, x.cfg.icon + " " + x.cfg.name + " correct", x.done, x.goal); });
   }
   // Partner level, experience bar and what comes next.
   function renderGrow(p, chosen) {
@@ -1348,6 +1372,18 @@
     bbar.appendChild(bfill);
     box.appendChild(bbar);
     if (meter.left) box.appendChild(make("small", "", ballNote(meter).slice(3)));
+    else if (meter.left === 0) box.appendChild(make("small", "goal-note", "🎯 " + num(BALL_POINTS - meter.meter) + " more point" + (BALL_POINTS - meter.meter > 1 ? "s" : "") + " → catch a Pokémon!"));
+    box.appendChild(make("small", "", "How to fill (Poké Ball and EXP): " + fillRules().join(" · ") + (Rules.inEvent(Date.now(), state.settings.event) ? " · 🎉 Poké Ball 2x now!" : "")));
+  }
+  // What each kind of study gives, for this child (the same numbers as Growth.EXP).
+  function fillRules() {
+    var out = ["📖 1 book = " + Growth.EXP.book];
+    if (kid().maths) out.push("🎸 1 correct = " + Growth.EXP.maths);
+    kid().practices.forEach(function (type) {
+      var e = Growth.EXP[type];
+      out.push(PRACTICES[type].icon + " " + (e >= 1 ? "1 correct = " + e : Math.round(1 / e) + " correct = 1"));
+    });
+    return out;
   }
   function renderPartnerGrow(box, p, chosen) {
     var top = make("div", "grow-top");
@@ -1366,8 +1402,8 @@
       box.appendChild(b);
     } else {
       var hint = [];
+      if (p.progress) hint.push("🎯 " + (p.progress.need - p.progress.have) + " more EXP → Lv." + (p.level + 1));
       if (p.evolvesAt) hint.push("Evolves at Lv." + p.evolvesAt);
-      if (kid().maths) hint.push("🎸 1 correct answer = " + Growth.EXP.maths + " EXP");
       if (hint.length) box.appendChild(make("small", "", hint.join(" · ")));
     }
     if (!chosen) box.appendChild(make("small", "", "☆ Choose your partner in the box: it gets the EXP!"));
@@ -1383,9 +1419,10 @@
     el("trainerName").textContent = "Trainer " + kid().name + " & " + (partner && partner.c.shiny ? "✨" : "") + partnerName;
     renderGrow(partner, !!chosenPartnerId(current, w));
     el("rank").textContent = "Rank " + (s.rank + 1) + " " + RANKS[s.rank];
-    el("rankMsg").textContent = rankNextMessage(s);
+    el("rankMsg").textContent = "";
     renderEvent();
 
+    renderStudyGoals(s);
     renderPracticeGoals();
   }
   // ---------- holiday event ----------

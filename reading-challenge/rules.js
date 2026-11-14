@@ -34,11 +34,26 @@ var Rules = (function () {
     var k = dayKey(ms);
     return k >= ev.start && k <= ev.end;
   }
+  // Next target for a running total, in steps of `step` (the child's goal): 9344 in steps of 2500 -> next 10000, 656 left.
+  // The bar shows how far the total is through the current step (0-100).
+  function nextTarget(done, step) {
+    done = Math.max(0, Number(done) || 0);
+    step = Math.max(1, Number(step) || 1);
+    var next = (Math.floor(done / step) + 1) * step;
+    return { done: done, next: next, left: next - done, pct: Math.floor((done - (next - step)) / step * 100) };
+  }
+  // How far a child is from their current rank to the next one, in books: { have, need } (need 0 at the top rank).
+  function rankStep(start, books) {
+    var rank = rankFromBooks(start, books);
+    if (rank >= MAX_RANK) return { have: 0, need: 0 };
+    var need = booksForRank(rank + 1);
+    return { have: need - booksToNextRank(start, books), need: need };
+  }
   // Inside any of several holiday event windows (the current one and every past one)?
   function inAnyEvent(ms, windows) {
     for (var i = 0; i < (windows || []).length; i++) if (inEvent(ms, windows[i])) return true;
     return false;
   }
-  return { MAX_RANK: MAX_RANK, booksForRank: booksForRank, rankFromBooks: rankFromBooks, booksToNextRank: booksToNextRank, dayKey: dayKey, inEvent: inEvent, inAnyEvent: inAnyEvent };
+  return { MAX_RANK: MAX_RANK, booksForRank: booksForRank, rankFromBooks: rankFromBooks, booksToNextRank: booksToNextRank, nextTarget: nextTarget, rankStep: rankStep, dayKey: dayKey, inEvent: inEvent, inAnyEvent: inAnyEvent };
 })();
 if (typeof module !== "undefined") module.exports = Rules;
