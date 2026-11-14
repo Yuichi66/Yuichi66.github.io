@@ -38,7 +38,7 @@ var SHINY_COL = 13;
 var MAX_ID = 40;
 // Pages older than this may work out Pokémon differently, so their changes are refused.
 var MIN_CLIENT_GEN = 9;
-// Tells pages that this sheet code knows trades (2) and levels, level-up evolutions and Mega Stones (3), the Poké Ball meter (4), all 1,025 Pokémon and regions (5), shiny Pokémon (6), French (7), prize Pokémon (8), no end date, holiday events and the parent PIN (9).
+// Tells pages that this sheet code knows trades (2) and levels, level-up evolutions and Mega Stones (3), the Poké Ball meter (4), all 1,025 Pokémon and regions (5), shiny Pokémon (6), French (7), prize Pokémon (8), no end date, holiday events (9; the parent PIN was dropped on 14 Nov).
 var SERVER_GEN = 9;
 var EVENT_BOOKS = 5;
 // The legendary Pokémon of the old ball prizes (type "prize" rows still in the sheet). They are never caught the
@@ -67,8 +67,8 @@ function doPost(e) {
     else if (body.action === "delete") deleteEntry_(String(body.id || ""));
     else if (body.action === "settings") saveSettings_(String(body.kid || ""), body.settings);
     else if (body.action === "partner") savePartner_(String(body.kid || ""), String(body.partnerId || ""));
-    else if (body.action === "parentCheck") checkPin_(body.pin);
-    else if (body.action === "event") saveEvent_(body.pin, String(body.start || ""), String(body.end || ""));
+    else if (body.action === "parentCheck") { /* no parent PIN any more: an old page asking is just told OK */ }
+    else if (body.action === "event") saveEvent_(String(body.start || ""), String(body.end || ""));
     else if (body.action === "eventmon") addEventMon_(body.entry);
     else throw new Error("Unknown action");
     return json_(snapshot_());
@@ -396,26 +396,8 @@ function savePartner_(kid, partnerId) {
   setSetting_(kid + ".partnerId", partnerId);
 }
 
-// The parent PIN lives in Script Properties (PARENT_PIN), never in the page.
-// After MAX_PIN_TRIES wrong tries in a row, every PIN is refused for PIN_LOCK_SECONDS. A right PIN starts the count again.
-var MAX_PIN_TRIES = 5;
-var PIN_LOCK_SECONDS = 15 * 60;
-var PIN_FAILS_KEY = "pinFails";
-function checkPin_(pin) {
-  var cache = CacheService.getScriptCache();
-  var fails = Number(cache.get(PIN_FAILS_KEY)) || 0;
-  if (fails >= MAX_PIN_TRIES) throw new Error("Too many tries. Wait 15 minutes.");
-  var want = PropertiesService.getScriptProperties().getProperty("PARENT_PIN");
-  if (!want || String(pin || "") !== String(want)) {
-    cache.put(PIN_FAILS_KEY, String(fails + 1), PIN_LOCK_SECONDS);
-    throw new Error("Wrong PIN");
-  }
-  cache.remove(PIN_FAILS_KEY);
-}
-
 // Holiday event dates (YYYY-MM-DD, both included). Two empty dates end the event.
-function saveEvent_(pin, start, end) {
-  checkPin_(pin);
+function saveEvent_(start, end) {
   var ok = /^\d{4}-\d{2}-\d{2}$/;
   if (start || end) {
     if (!ok.test(start) || !ok.test(end) || start > end) throw new Error("Bad event dates");

@@ -577,12 +577,12 @@
 </div>
 
 <!-- ?v= must change with APP_VERSION so phones fetch the new files -->
-<script src="evo-data.js?v=2026-11-14-1"></script>
-<script src="dex-data.js?v=2026-11-14-1"></script>
-<script src="growth.js?v=2026-11-14-1"></script>
-<script src="regions.js?v=2026-11-14-1"></script>
-<script src="rules.js?v=2026-11-14-1"></script>
-<script src="parent.js?v=2026-11-14-1"></script>
+<script src="evo-data.js?v=2026-11-14-2"></script>
+<script src="dex-data.js?v=2026-11-14-2"></script>
+<script src="growth.js?v=2026-11-14-2"></script>
+<script src="regions.js?v=2026-11-14-2"></script>
+<script src="rules.js?v=2026-11-14-2"></script>
+<script src="parent.js?v=2026-11-14-2"></script>
 <script>
 (function () {
   "use strict";
@@ -592,7 +592,7 @@
   var REFRESH_MS = 60000;
   // Change on every release: a page left open with older code reloads itself,
   // so every phone works out the same Pokémon.
-  var APP_VERSION = "2026-11-14-1";
+  var APP_VERSION = "2026-11-14-2";
   // Sent with every change; the sheet refuses changes from older pages (MIN_CLIENT_GEN in Code.gs).
   var CLIENT_GEN = 9;
   var STORAGE_KEY = "htrc-2026-autumn-v3";
@@ -2294,25 +2294,6 @@
       });
     });
   }
-  var PIN_KEY = "htrc-parent-pin";
-  function parentPin() { try { return window.localStorage.getItem(PIN_KEY) || ""; } catch (e) { return ""; } }
-  // Asks once per device; kept only after the sheet says it is right.
-  function askParentPin() {
-    var pin = window.prompt("Parent PIN");
-    if (!pin) return Promise.reject(new Error("No PIN"));
-    return api({ action: "parentCheck", pin: pin }).then(function () {
-      try { window.localStorage.setItem(PIN_KEY, pin); } catch (e) { /* storage unavailable: asked again next time */ }
-      return pin;
-    });
-  }
-  // A stored PIN the sheet no longer accepts is forgotten.
-  function withPin(fn) {
-    var pin = parentPin();
-    return (pin ? Promise.resolve(pin) : askParentPin()).then(fn).catch(function (err) {
-      if (err && /Wrong PIN/.test(err.message || "")) { try { window.localStorage.removeItem(PIN_KEY); } catch (e) { /* ignore */ } }
-      throw err;
-    });
-  }
   el("openParent").onclick = function () {
     if (typeof Parent === "undefined") { window.alert("The parent page could not load. Please reload and try again."); return; }
     closeSheets();
@@ -2322,7 +2303,8 @@
     Parent.renderEvent(el("parentRoot"), state.settings.event, function (start, end) {
       var wait = sheetWaitMessage();
       if (wait) { refresh(); return Promise.reject(new Error(wait)); }
-      return withPin(function (pin) { return api({ action: "event", pin: pin, start: start, end: end }); });
+      // No parent PIN (Yuichi, 14 Nov): the dates are saved as they are.
+      return api({ action: "event", start: start, end: end });
     });
     openSheet("parentSheet");
   };
