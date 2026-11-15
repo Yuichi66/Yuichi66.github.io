@@ -8,7 +8,8 @@ var Parent = (function () {
     maths: { name: "TTRS", unit: "correct", color: "#2a78d6" },
     latin: { name: "Latin", unit: "correct", color: "#eb6834" },
     mymaths: { name: "MyMaths", unit: "correct", color: "#1baf7a" },
-    french: { name: "French", unit: "correct", color: "#e87ba4" }
+    french: { name: "French", unit: "correct", color: "#e87ba4" },
+    seneca: { name: "Seneca", unit: "XP", color: "#7b5cd6" }
   };
   var CHART_DAYS = 14;
   var WEEK_DAYS = 7;

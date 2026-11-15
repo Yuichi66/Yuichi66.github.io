@@ -102,6 +102,7 @@
   .mission.maths { background: linear-gradient(135deg, var(--purple), var(--blue)); }
   .mission.latin { background: linear-gradient(135deg, #2fb36d, #1f7a4a); }
   .mission.mymaths { background: linear-gradient(135deg, #f08c00, #c25e00); }
+  .mission.seneca { background: linear-gradient(135deg, #7b5cd6, #4b2fa0); }
   .mission.french { background: linear-gradient(135deg, #2a75bb, #1b4f8a); }
   .missions.three .mission.read { grid-column: 1 / -1; }
   .today-done { margin-top: 10px; font-size: 14px; text-align: center; }
@@ -115,6 +116,7 @@
   .bar.maths > div { background: linear-gradient(90deg, var(--blue), var(--cyan)); }
   .bar.latin > div { background: linear-gradient(90deg, #1f7a4a, var(--green)); }
   .bar.mymaths > div { background: linear-gradient(90deg, #c25e00, #f08c00); }
+  .bar.seneca > div { background: linear-gradient(90deg, #4b2fa0, #7b5cd6); }
   .bar.french > div { background: linear-gradient(90deg, #1b4f8a, var(--cyan)); }
 
   @keyframes tierGlow { from { transform: scale(1); } to { transform: scale(1.08); } }
@@ -377,6 +379,9 @@
       <button class="mission french hidden" type="button" id="open-french">
         <div class="icon">🇫🇷</div><b>French</b><small>Memrise, then tap here</small>
       </button>
+      <button class="mission seneca hidden" type="button" id="open-seneca">
+        <div class="icon">🧠</div><b>Seneca</b><small>Learn, then tap here</small>
+      </button>
     </div>
     <div class="today-done" id="todayDone"></div>
   </section>
@@ -432,7 +437,7 @@
         <div class="dex" id="mathsLog"></div>
       </div>
       <div id="practiceLogWrap">
-        <div class="sub-h">Latin, MyMaths &amp; French log</div>
+        <div class="sub-h">Latin, MyMaths, French &amp; Seneca log</div>
         <div class="dex" id="practiceLog"></div>
       </div>
     </details>
@@ -515,13 +520,13 @@
   </form>
 </div>
 
-<!-- Latin / MyMaths / French steps -->
+<!-- Latin / MyMaths / French / Seneca steps -->
 <div class="sheet" id="practiceSheet">
   <form class="sheet-card" id="practiceForm" autocomplete="off">
     <h3 id="pTitle"></h3>
     <div class="step"><div class="num">1</div><div class="body">
-      <b>How many did you get right?</b>
-      <div class="score-row"><input id="pCorrect" type="number" min="0" max="2000" required><span>correct answers</span></div>
+      <b id="pAsk">How many did you get right?</b>
+      <div class="score-row"><input id="pCorrect" type="number" min="0" max="2000" required><span id="pUnit">correct answers</span></div>
     </div></div>
     <div class="sheet-actions">
       <button class="btn ghost" type="button" data-close>Cancel</button>
@@ -635,12 +640,12 @@
 </div>
 
 <!-- ?v= must change with APP_VERSION so phones fetch the new files -->
-<script src="evo-data.js?v=2026-11-14-8"></script>
-<script src="dex-data.js?v=2026-11-14-8"></script>
-<script src="growth.js?v=2026-11-14-8"></script>
-<script src="regions.js?v=2026-11-14-8"></script>
-<script src="rules.js?v=2026-11-14-8"></script>
-<script src="parent.js?v=2026-11-14-8"></script>
+<script src="evo-data.js?v=2026-11-15-1"></script>
+<script src="dex-data.js?v=2026-11-15-1"></script>
+<script src="growth.js?v=2026-11-15-1"></script>
+<script src="regions.js?v=2026-11-15-1"></script>
+<script src="rules.js?v=2026-11-15-1"></script>
+<script src="parent.js?v=2026-11-15-1"></script>
 <script>
 (function () {
   "use strict";
@@ -650,9 +655,9 @@
   var REFRESH_MS = 60000;
   // Change on every release: a page left open with older code reloads itself,
   // so every phone works out the same Pokémon.
-  var APP_VERSION = "2026-11-14-8";
+  var APP_VERSION = "2026-11-15-1";
   // Sent with every change; the sheet refuses changes from older pages (MIN_CLIENT_GEN in Code.gs).
-  var CLIENT_GEN = 14;
+  var CLIENT_GEN = 15;
   var STORAGE_KEY = "htrc-2026-autumn-v3";
   var START = new Date(2026, 9, 24);   // Sat 24 Oct 2026
   // The half term was 16 days; old records keep their day number from START. New records use today's.
@@ -671,8 +676,8 @@
   var KIDS = [
     { id: "taiga", name: "TAIGA", maths: true, target: 7, mathsTarget: 2500, ks: "KS2", practices: [], practiceGoals: {}, award: "Certificate" },
     { id: "leo", name: "LEO", maths: true, target: 7, mathsTarget: 2500, ks: "KS2", practices: [], practiceGoals: {}, award: "Certificate" },
-    { id: "yudai", name: "YUDAI", maths: false, target: 10, mathsTarget: 0, ks: "KS3", practices: ["latin", "mymaths", "french"],
-      practiceGoals: { latin: 10000, mymaths: 1500, french: 5000 }, award: "Positive incident" }
+    { id: "yudai", name: "YUDAI", maths: false, target: 10, mathsTarget: 0, ks: "KS3", practices: ["latin", "mymaths", "french", "seneca"],
+      practiceGoals: { latin: 10000, mymaths: 1500, french: 5000, seneca: 10000 }, award: "Positive incident" }
   ];
   // School awards: the kind is the same as AWARD_KINDS in Code.gs; the subjects are what the list offers.
   var AWARD_SUBJECTS = {
@@ -691,16 +696,21 @@
     maths: { step: 5000, name: "Times tables", icon: "🎸" },
     latin: { step: 5000, name: "Latin", icon: "🏛️" },
     french: { step: 5000, name: "French", icon: "🇫🇷" },
-    mymaths: { step: 1000, name: "MyMaths", icon: "🧮" }
+    mymaths: { step: 1000, name: "MyMaths", icon: "🧮" },
+    seneca: { step: 10000, name: "Seneca", icon: "🧠" }
   };
-  // Extra practice. Before PACE_FROM a session with at least `min` correct answers caught a Pokémon;
+  // Extra practice (unit: what the child types; max: the most for one session, the same as Code.gs). Before PACE_FROM a session with at least `min` correct answers caught a Pokémon;
   // now it fills the Poké Ball. It does not count towards the prize; its goal (practiceGoals) is only shown as a bar.
   // Sessions logged before PRACTICE_RULE_FROM keep `oldMin`, so nothing already caught changes.
   var PRACTICES = {
-    latin: { name: "Latin", icon: "🏛️", min: 150, oldMin: 50 },
-    mymaths: { name: "MyMaths", icon: "🧮", min: 100 },
-    french: { name: "French", icon: "🇫🇷", min: 150 }
+    latin: { name: "Latin", icon: "🏛️", min: 150, oldMin: 50, unit: "correct", max: 2000 },
+    mymaths: { name: "MyMaths", icon: "🧮", min: 100, unit: "correct", max: 2000 },
+    french: { name: "French", icon: "🇫🇷", min: 150, unit: "correct", max: 2000 },
+    // Seneca XP (not Seneca levels). Added on 15 Nov 2026, after PACE_FROM, so `min` is never used.
+    seneca: { name: "Seneca", icon: "🧠", min: 1, unit: "XP", max: 20000 }
   };
+  // "correct" or "XP" for a subject (times tables and practices).
+  function unitOf(type) { return PRACTICES[type] ? PRACTICES[type].unit : "correct"; }
   // Allowed practice goals (correct answers), the same as MIN/MAX_PRACTICE_GOAL in Code.gs.
   var PRACTICE_GOAL_MIN = 10, PRACTICE_GOAL_MAX = 100000;
   var PRACTICE_RULE_FROM = 1792947578805;
@@ -1433,7 +1443,7 @@
       el("open-" + type).className = "mission " + type + (practices.indexOf(type) >= 0 ? "" : " hidden");
     });
     var count = 1 + (kid().maths ? 1 : 0) + practices.length;
-    el("missions").className = "missions" + (count === 1 ? " one" : count === 3 ? " three" : "");
+    el("missions").className = "missions" + (count === 1 ? " one" : count % 2 === 1 ? " three" : "");
     var t = todayIndex();
     var books = data().entries.filter(function (e) { return e.day === t && isPass(e); }).length;
     var correct = data().maths.filter(function (m) { return m.day === t; }).reduce(function (s, m) { return s + m.correct; }, 0);
@@ -1470,10 +1480,11 @@
   }
   function num(n) { return Number(n).toLocaleString("en-GB"); }
   // A running total against its next target, in steps of the child's goal (e.g. 2,500 times tables answers).
-  function totalBar(box, cls, title, done, step) {
+  function totalBar(box, cls, title, done, step, unit) {
     var t = Rules.nextTarget(done, step);
+    var more = unit === "XP" ? " more XP" : " more correct answer" + (t.left > 1 ? "s" : "");
     // Filled by the whole total towards the next target, the same as the numbers (9,344 / 10,000 = 93%).
-    goalBar(box, cls, title, num(t.done) + " / " + num(t.next), "🎯 " + num(t.left) + " more correct answer" + (t.left > 1 ? "s" : "") + " → " + num(t.next) + "!", t.done / t.next * 100);
+    goalBar(box, cls, title, num(t.done) + " / " + num(t.next), "🎯 " + num(t.left) + more + " → " + num(t.next) + "!", t.done / t.next * 100);
   }
   // Books passed in all, and how far through the books for the next rank.
   function renderStudyGoals(s) {
@@ -1491,7 +1502,7 @@
   function renderPracticeGoals() {
     var box = el("practiceGoals");
     box.innerHTML = "";
-    practiceProgress().forEach(function (x) { totalBar(box, x.type, x.cfg.icon + " " + x.cfg.name + " correct", x.done, x.goal); });
+    practiceProgress().forEach(function (x) { totalBar(box, x.type, x.cfg.icon + " " + x.cfg.name + " " + x.cfg.unit, x.done, x.goal, x.cfg.unit); });
   }
   // Partner level, experience bar and what comes next.
   function renderGrow(p, chosen) {
@@ -1518,7 +1529,8 @@
     if (kid().maths) out.push("🎸 1 correct = " + Growth.EXP.maths);
     kid().practices.forEach(function (type) {
       var e = Growth.EXP[type];
-      out.push(PRACTICES[type].icon + " " + (e >= 1 ? "1 correct = " + e : Math.round(1 / e) + " correct = 1"));
+      var u = PRACTICES[type].unit;
+      out.push(PRACTICES[type].icon + " " + (e >= 1 ? "1 " + u + " = " + e : Math.round(1 / e) + " " + u + " = 1"));
     });
     return out;
   }
@@ -1938,7 +1950,7 @@
       row.appendChild(make("div", "gym-icon", g.cfg.icon));
       var body = make("div", "gym-body");
       body.appendChild(make("b", "", g.cfg.name + " badges: " + (g.earned ? "🏅".repeat(Math.min(g.earned, 10)) + (g.earned > 10 ? " ×" + g.earned : "") : "none yet")));
-      body.appendChild(make("small", "", "🎯 " + num(g.next - g.done) + " more correct → badge at " + num(g.next) + "!"));
+      body.appendChild(make("small", "", "🎯 " + num(g.next - g.done) + " more " + unitOf(g.subject) + " → badge at " + num(g.next) + "!"));
       row.appendChild(body);
       if (g.open) {
         var b = make("button", "btn small tier-btn", "🏅 Choose!");
@@ -1952,7 +1964,7 @@
   function openBadge(subject, n) {
     var list = el("pzList"), cfg = BADGES[subject];
     el("pzTitle").textContent = "🏅 Gym badge Pokémon!";
-    el("pzNote").textContent = cfg.icon + " " + cfg.name + " " + num(n * cfg.step) + " correct · you can choose only once";
+    el("pzNote").textContent = cfg.icon + " " + cfg.name + " " + num(n * cfg.step) + " " + unitOf(subject) + " · you can choose only once";
     list.innerHTML = "";
     rareChoices(current, current + "-badge-" + subject + "-" + n).forEach(function (dex) {
       var name = monEntry(dex)[0];
@@ -1980,7 +1992,7 @@
       badgeTry = ok || refused ? null : entry;
       if (!ok) return;
       closeSheets();
-      show(artwork(dex, name), "🏅 Gym badge! You got " + name + "!", BADGES[subject].icon + " " + BADGES[subject].name + " " + num(n * BADGES[subject].step) + " correct · look in your 🎒 Pokémon box!");
+      show(artwork(dex, name), "🏅 Gym badge! You got " + name + "!", BADGES[subject].icon + " " + BADGES[subject].name + " " + num(n * BADGES[subject].step) + " " + unitOf(subject) + " · look in your 🎒 Pokémon box!");
     });
   }
 
@@ -2200,7 +2212,7 @@
     el("practiceLogWrap").className = kid().practices.length ? "" : "hidden";
     var plog = el("practiceLog");
     plog.innerHTML = "";
-    if (!data().practice.length) plog.appendChild(make("div", "empty-dex", "No Latin, MyMaths or French yet."));
+    if (!data().practice.length) plog.appendChild(make("div", "empty-dex", "No Latin, MyMaths, French or Seneca yet."));
     data().practice.forEach(function (p) {
       var cfg = PRACTICES[p.type] || { name: p.type, icon: "" };
       var card = make("div", "entry");
@@ -2212,9 +2224,9 @@
         monLine(info, nos[p.id]);
         card.appendChild(top);
       } else if (evolved[p.id] || traded[p.id]) evolvedLine(card, paidText(p.id, evolved, traded));
-      card.appendChild(make("div", "title", cfg.icon + " " + cfg.name + ": " + p.correct + " correct"));
+      card.appendChild(make("div", "title", cfg.icon + " " + cfg.name + ": " + p.correct + " " + (cfg.unit || "correct")));
       card.appendChild(make("div", "meta", fmt(dayDate(p.day))));
-      card.appendChild(deleteButton(p, "practice", cfg.name + " " + p.correct + " correct answers"));
+      card.appendChild(deleteButton(p, "practice", cfg.name + " " + p.correct + (cfg.unit === "XP" ? " XP" : " correct answers")));
       plog.appendChild(card);
     });
   }
@@ -2436,7 +2448,7 @@
   }
   function recordText(x) {
     if (x.type === "maths") return "🎸 Times tables: " + x.correct + " correct";
-    if (PRACTICES[x.type]) return PRACTICES[x.type].icon + " " + PRACTICES[x.type].name + ": " + x.correct + " correct";
+    if (PRACTICES[x.type]) return PRACTICES[x.type].icon + " " + PRACTICES[x.type].name + ": " + x.correct + " " + PRACTICES[x.type].unit;
     return "📖 " + x.title + (noQuiz(x) ? " (no quiz)" : " (" + x.score + "/" + x.total + ")");
   }
   function whenText(x) {
@@ -3257,14 +3269,20 @@
     });
   };
 
-  // ---------- Latin / MyMaths / French ----------
+  // ---------- Latin / MyMaths / French / Seneca ----------
   var practiceType = null;
   Object.keys(PRACTICES).forEach(function (type) {
     el("open-" + type).onclick = function () {
       var cfg = PRACTICES[type];
       practiceType = type;
       el("pTitle").textContent = cfg.icon + " " + cfg.name;
-      var rate = type === "mymaths" ? "Every correct answer fills your Poké Ball by 1 and gives 1 EXP." : "You get 1 EXP and fill your Poké Ball by 1 for every 2 correct answers.";
+      var per = Math.round(1 / Growth.EXP[type]);
+      var rate = per === 1 ? "Every correct answer fills your Poké Ball by 1 and gives 1 EXP."
+        : cfg.unit === "XP" ? "Type the Seneca XP you got (not your level). You get 1 EXP and fill your Poké Ball by 1 for every " + per + " XP."
+        : "You get 1 EXP and fill your Poké Ball by 1 for every " + per + " correct answers.";
+      el("pAsk").textContent = cfg.unit === "XP" ? "How much XP did you get?" : "How many did you get right?";
+      el("pUnit").textContent = cfg.unit === "XP" ? "XP" : "correct answers";
+      el("pCorrect").max = cfg.max;
       el("pRule").textContent = rate + " A full ball (" + BALL_POINTS.toLocaleString("en-GB") + ") catches a NEW Pokémon!";
       openSheet("practiceSheet");
     };
@@ -3274,7 +3292,7 @@
     var cfg = PRACTICES[practiceType];
     if (!cfg) return;
     var correct = parseInt(el("pCorrect").value, 10);
-    if (isNaN(correct) || correct < 0 || correct > 2000) { window.alert("Please type how many you got right (0 to 2000)."); return; }
+    if (isNaN(correct) || correct < 0 || correct > cfg.max) { window.alert(cfg.unit === "XP" ? "Please type the XP you got (0 to " + num(cfg.max) + ")." : "Please type how many you got right (0 to " + num(cfg.max) + ")."); return; }
     var item = { kid: current, type: practiceType, day: todayIndex(), site: cfg.name, correct: correct };
     item.id = recordId(item);
     var wins = lastTry && lastTry.id === item.id ? lastTry.wins : winsBall(item);
@@ -3283,7 +3301,7 @@
       if (!ok) return;
       el("pCorrect").value = "";
       closeSheets();
-      var mid = cfg.name + ": " + correct + " correct" + badgeUpNote(badgesBefore);
+      var mid = cfg.name + ": " + correct + " " + cfg.unit + badgeUpNote(badgesBefore);
       if (evo) celebrateEvolve(evo, "+" + correct + "!  " + mid);
       else if (wins) catchPokemon(item, "", "+" + correct + "! ", mid);
       else show(make("div", "ball huge empty"), cfg.icon + " +" + correct, mid + "  ·  " + ballText(item.kid));

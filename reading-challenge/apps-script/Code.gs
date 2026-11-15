@@ -8,11 +8,13 @@
 var KIDS = {
   taiga: { maths: true, target: 7, mathsTarget: 2500, practices: [], practiceGoals: {} },
   leo: { maths: true, target: 7, mathsTarget: 2500, practices: [], practiceGoals: {} },
-  yudai: { maths: false, target: 10, mathsTarget: 0, practices: ["latin", "mymaths", "french"],
-    practiceGoals: { latin: 10000, mymaths: 1500, french: 5000 } }
+  yudai: { maths: false, target: 10, mathsTarget: 0, practices: ["latin", "mymaths", "french", "seneca"],
+    practiceGoals: { latin: 10000, mymaths: 1500, french: 5000, seneca: 10000 } }
 };
 // Extra practice types and the name stored in the "site" column.
-var PRACTICE_SITES = { latin: "Latin", mymaths: "MyMaths", french: "French" };
+var PRACTICE_SITES = { latin: "Latin", mymaths: "MyMaths", french: "French", seneca: "Seneca" };
+// Seneca is saved as XP (not correct answers): one session can be much more than MAX_CORRECT.
+var MAX_PRACTICE_AMOUNT = { seneca: 20000 };
 // Practice goals (correct answers), saved as "<kid>.<type>Goal". Only shown as progress, not used for prizes.
 var MIN_PRACTICE_GOAL = 10;
 var MAX_PRACTICE_GOAL = 100000;
@@ -38,8 +40,8 @@ var SHINY_COL = 13;
 var MAX_ID = 40;
 // Pages older than this may work out Pokémon differently, so their changes are refused.
 var MIN_CLIENT_GEN = 9;
-// Tells pages that this sheet code knows trades (2) and levels, level-up evolutions and Mega Stones (3), the Poké Ball meter (4), all 1,025 Pokémon and regions (5), shiny Pokémon (6), French (7), prize Pokémon (8), no end date, holiday events (9; the parent PIN was dropped on 14 Nov), prize balls from books again (10), school awards (11), gym badges (12), rank legends (13), great weeks (14).
-var SERVER_GEN = 14;
+// Tells pages that this sheet code knows trades (2) and levels, level-up evolutions and Mega Stones (3), the Poké Ball meter (4), all 1,025 Pokémon and regions (5), shiny Pokémon (6), French (7), prize Pokémon (8), no end date, holiday events (9; the parent PIN was dropped on 14 Nov), prize balls from books again (10), school awards (11), gym badges (12), rank legends (13), great weeks (14), Seneca (15).
+var SERVER_GEN = 15;
 var EVENT_BOOKS = 5;
 // Prize Pokémon (type "prize"), one per ball per child once the ball is reached (the books goal, and for children
 // with times tables the lower of the two goals): "title" = ball (1-3), "mon" = the legendary chosen (Great and
@@ -56,7 +58,7 @@ var AWARDS_PER_DAY = 3;
 var MAX_AWARD_TEXT = 120, MAX_AWARD_SUBJECT = 30;
 // Gym badges (type "badge"): one every BADGE_STEPS correct answers in a subject, each with a Pokémon the child
 // chooses. "title" = subject, "score" = which badge (1, 2, ...). The same as BADGES in index.html.
-var BADGE_STEPS = { maths: 5000, latin: 5000, french: 5000, mymaths: 1000 };
+var BADGE_STEPS = { maths: 5000, latin: 5000, french: 5000, mymaths: 1000, seneca: 10000 };
 // Rank legends (type "legend"): a legendary Pokémon the child chooses at these ranks (0-based like "peak":
 // Rank 10, Rank 15 and CHAMPION). "title" = the rank. The same as RANK_LEGENDS in index.html.
 var RANK_LEGENDS = [9, 14, 20];
@@ -65,8 +67,8 @@ var RANK_LEGENDS = [9, 14, 20];
 // logged on it (the time in its id, like the page). "title" = the Monday. The same as in index.html.
 var WEEK_FROM = "2026-11-16";
 var WEEK_DAYS = 5;
-var STUDY_TYPES = ["read", "maths", "latin", "mymaths", "french"];
-var BADGE_NAMES = { maths: "Times tables", latin: "Latin", french: "French", mymaths: "MyMaths" };
+var STUDY_TYPES = ["read", "maths", "latin", "mymaths", "french", "seneca"];
+var BADGE_NAMES = { maths: "Times tables", latin: "Latin", french: "French", mymaths: "MyMaths", seneca: "Seneca" };
 var PASS_RATE = 0.8;
 var NO_QUIZ = "No quiz";
 // Evolutions from a level or a Mega Stone: "title" holds this word instead of the record that paid for it.
@@ -351,7 +353,7 @@ function addEntry_(x) {
   if (PRACTICE_SITES.hasOwnProperty(x.type)) {
     var n = Number(x.correct);
     if (KIDS[kid].practices.indexOf(x.type) < 0) throw new Error("No " + PRACTICE_SITES[x.type] + " for this kid");
-    if (!isInt_(n) || n < 0 || n > MAX_CORRECT) throw new Error("Bad correct answers");
+    if (!isInt_(n) || n < 0 || n > (MAX_PRACTICE_AMOUNT[x.type] || MAX_CORRECT)) throw new Error("Bad correct answers");
     entriesSheet_().appendRow([id, kid, x.type, day, "", PRACTICE_SITES[x.type], "", "", n, new Date(), monOf_(x), partnerOf_(x), shinyOf_(x)]);
     return;
   }
