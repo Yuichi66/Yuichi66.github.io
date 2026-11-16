@@ -40,10 +40,11 @@ var SHINY_COL = 13;
 var MAX_ID = 40;
 // Pages older than this may work out Pokémon differently, so their changes are refused.
 var MIN_CLIENT_GEN = 9;
-// Tells pages that this sheet code knows trades (2) and levels, level-up evolutions and Mega Stones (3), the Poké Ball meter (4), all 1,025 Pokémon and regions (5), shiny Pokémon (6), French (7), prize Pokémon (8), no end date, holiday events (9; the parent PIN was dropped on 14 Nov), prize balls from books again (10), school awards (11), gym badges (12), rank legends (13), great weeks (14), Seneca (15), Pokémon taken away by a grown-up (16).
-var SERVER_GEN = 16;
-// Pokémon taken away (type "release") are only sent to pages from this gen: an older page would file them as books.
-var RELEASE_GEN = 16;
+// Tells pages that this sheet code knows trades (2) and levels, level-up evolutions and Mega Stones (3), the Poké Ball meter (4), all 1,025 Pokémon and regions (5), shiny Pokémon (6), French (7), prize Pokémon (8), no end date, holiday events (9; the parent PIN was dropped on 14 Nov), prize balls from books again (10), school awards (11), gym badges (12), rank legends (13), great weeks (14), Seneca (15), resting Pokémon (17; 16 took them away for good and was never used).
+var SERVER_GEN = 17;
+// Resting Pokémon (types "sleep" and "wake") are only sent to pages from this gen: an older page would file them as books.
+var REST_GEN = 17;
+var REST_TYPES = ["sleep", "wake"];
 var MAX_REASON = 120;
 var EVENT_BOOKS = 5;
 // Prize Pokémon (type "prize"), one per ball per child once the ball is reached (the books goal, and for children
@@ -103,7 +104,8 @@ function doPost(e) {
     else if (body.action === "badge") addBadge_(body.entry);
     else if (body.action === "legend") addLegend_(body.entry);
     else if (body.action === "week") addWeek_(body.entry);
-    else if (body.action === "release") addRelease_(body.pin, body.entry);
+    else if (body.action === "sleep") addSleep_(body.pin, body.entry);
+    else if (body.action === "wake") addWake_(body.pin, body.entry);
     else throw new Error("Unknown action");
     return json_(snapshot_(Number(body.gen)));
   } catch (err) {
@@ -115,7 +117,7 @@ function doPost(e) {
 
 function snapshot_(gen) {
   var rows = entriesSheet_().getDataRange().getValues().slice(1);
-  var entries = rows.filter(function (r) { return r[0] !== "" && (r[2] !== "release" || gen >= RELEASE_GEN); }).map(function (r) {
+  var entries = rows.filter(function (r) { return r[0] !== "" && r[2] !== "release" && (REST_TYPES.indexOf(r[2]) < 0 || gen >= REST_GEN); }).map(function (r) {
     var base = { id: String(r[0]), kid: String(r[1]), type: String(r[2]), day: Number(r[3]), site: String(r[5]), mon: Number(r[MON_COL - 1]) || 0 };
     if (base.type === "maths" || PRACTICE_SITES.hasOwnProperty(base.type)) {
       base.correct = Number(r[8]);
@@ -169,7 +171,8 @@ function snapshot_(gen) {
       base.title = String(r[4]);
       base.subject = String(r[6]);
     }
-    else if (base.type === "release") {
+    else if (base.type === "sleep" || base.type === "wake") {
+      // sleep: "site" = the Pokémon (record that caught it); wake: "site" = the sleep it ends. "title" = why.
       base.title = String(r[4]);
     }
     else if (base.type === "trade") {
@@ -218,6 +221,7 @@ function checkPartner_(x) {
   var partner = String(x.partner || "");
   if (!partner) return;
   if (partner.length > MAX_ID || owners_()[partner] !== String(x.kid)) throw new Error(NOT_POSSIBLE);
+  if (sleeping_()[partner]) throw new Error(RESTING);
 }
 function partnerOf_(x) { return String(x.partner || "").slice(0, MAX_ID); }
 // Only a record that caught a Pokémon can be shiny.
@@ -246,6 +250,7 @@ function addGrowthEvolve_(ev) {
     throw new Error(NOT_POSSIBLE);
   }
   if (owners_()[target] !== kid) throw new Error(NOT_POSSIBLE);
+  if (sleeping_()[target]) throw new Error(RESTING);
   // Evolutions of one Pokémon (saved by any child) follow each other: this one starts where the last one ended.
   var last = rows.filter(function (r) { return isGrowthRow_(r) && String(r[5]) === target; }).pop();
   if (last && Number(last[6]) !== from) throw new Error(NOT_POSSIBLE);
@@ -295,6 +300,8 @@ function checkTrade_(t) {
   if (!give || !get || give === get) throw new Error("Bad trade");
   var owner = owners_();
   if (owner[give] !== kid || owner[get] !== other) throw new Error(NOT_POSSIBLE);
+  var asleep = sleeping_();
+  if (asleep[give] || asleep[get]) throw new Error(RESTING);
 }
 
 // Who has each caught Pokémon now (catch record id -> kid): each record's own child,
@@ -309,10 +316,7 @@ function owners_() {
         owner[give] = other;
         owner[get] = kid;
       }
-    } else if (type === "release") {
-      // Taken away by a grown-up: it leaves the box for good (only while that child still has it).
-      if (owner[String(r[5])] === String(r[1])) delete owner[String(r[5])];
-    } else if (type !== "evolve" && r[MON_COL - 1] !== "") owner[String(r[0])] = String(r[1]);
+    } else if (type !== "evolve" && REST_TYPES.indexOf(type) < 0 && r[MON_COL - 1] !== "") owner[String(r[0])] = String(r[1]);
   });
   return owner;
 }
@@ -417,9 +421,10 @@ function deleteEntry_(id) {
   });
   var paysTraded = rows.some(function (r) { return r[2] === "evolve" && String(r[4]) === id && traded[String(r[5])]; });
   if (traded[id] || paysTraded) throw new Error("Not possible: this record was used in a trade, so it cannot be deleted.");
-  // A Pokémon taken away by a grown-up, and the record that caught it, stay (a grown-up deletes the row in the sheet).
-  if (rows.some(function (r) { return r[2] === "release" && (String(r[0]) === id || String(r[5]) === id); })) {
-    throw new Error("Not possible: a grown-up took this Pokémon away, so this record cannot be deleted.");
+  // Rest records, and the record that caught a Pokémon that has rested, stay (a grown-up deletes rows in the sheet).
+  if (rows.some(function (r) { return REST_TYPES.indexOf(r[2]) >= 0 && String(r[0]) === id; }) ||
+      rows.some(function (r) { return r[2] === "sleep" && String(r[5]) === id; })) {
+    throw new Error("Not possible: a grown-up put this Pokémon to rest, so this record cannot be deleted.");
   }
   // An old evolution under a later level-up or Mega Stone evolution stays (the later one starts from its form).
   var grown = {};
@@ -467,6 +472,7 @@ function savePeak_(kid, rank) {
 function savePartner_(kid, partnerId) {
   if (!KIDS.hasOwnProperty(kid)) throw new Error("Unknown kid");
   if (!partnerId || partnerId.length > MAX_ID || owners_()[partnerId] !== kid) throw new Error(NOT_POSSIBLE);
+  if (sleeping_()[partnerId]) throw new Error(RESTING);
   setSetting_(kid + ".partnerId", partnerId);
 }
 
@@ -488,26 +494,47 @@ function checkPin_(pin) {
   cache.remove(PIN_FAILS_KEY);
 }
 
-// A grown-up takes a Pokémon away (type "release"), with the parent PIN: "title" = why, "site" = the Pokémon
-// (the record that caught it). Only one caught by studying (a book, times tables or practice; never a legendary,
-// a prize or an event Pokémon) that is in the child's box now. The page cannot delete it; a grown-up deletes the
-// row in the sheet to give it back.
-function addRelease_(pin, x) {
+var RESTING = "Not possible: that Pokémon is resting. A grown-up can wake it up.";
+
+// Pokémon resting now: record that caught it -> the sleep row id (a sleep with no wake for it).
+function sleeping_() {
+  var rows = entriesSheet_().getDataRange().getValues().slice(1), woken = {}, out = {};
+  rows.forEach(function (r) { if (r[2] === "wake") woken[String(r[5])] = true; });
+  rows.forEach(function (r) { if (r[2] === "sleep" && !woken[String(r[0])]) out[String(r[5])] = String(r[0]); });
+  return out;
+}
+// A rest record from the parent page: the PIN, an id, a child, a day and why (the reason is shown to the child).
+function restInput_(pin, x) {
   checkPin_(pin);
   if (!x) throw new Error("Missing entry");
-  var id = String(x.id || "").slice(0, MAX_ID);
-  var kid = String(x.kid || "");
-  var target = String(x.target || "").slice(0, MAX_ID);
-  var reason = String(x.reason || "").replace(/\s+/g, " ").trim();
-  var day = Number(x.day);
-  if (!id || !KIDS.hasOwnProperty(kid) || !target) throw new Error("Bad entry");
-  if (!reason || reason.length > MAX_REASON) throw new Error("Please write why (up to " + MAX_REASON + " letters).");
-  if (!isInt_(day) || day < 0 || day > MAX_DAY) throw new Error("Bad day");
-  if (rowOf_(id) > 0) return;
-  var caught = entriesSheet_().getDataRange().getValues().slice(1).filter(function (r) { return String(r[0]) === target; })[0];
-  if (!caught || STUDY_TYPES.indexOf(String(caught[2])) < 0) throw new Error("Not possible: only Pokémon caught by studying can be taken away (not prizes, awards or badges).");
-  if (owners_()[target] !== kid) throw new Error(NOT_POSSIBLE);
-  entriesSheet_().appendRow([id, kid, "release", day, asText_(reason), target, "", "", "", new Date(), "", "", ""]);
+  var out = { id: String(x.id || "").slice(0, MAX_ID), kid: String(x.kid || ""), target: String(x.target || "").slice(0, MAX_ID),
+    reason: String(x.reason || "").replace(/\s+/g, " ").trim(), day: Number(x.day) };
+  if (!out.id || !KIDS.hasOwnProperty(out.kid) || !out.target) throw new Error("Bad entry");
+  if (!out.reason || out.reason.length > MAX_REASON) throw new Error("Please write why (up to " + MAX_REASON + " letters).");
+  if (!isInt_(out.day) || out.day < 0 || out.day > MAX_DAY) throw new Error("Bad day");
+  return out;
+}
+// A grown-up puts a Pokémon to rest (type "sleep"): "title" = why, "site" = the Pokémon (record that caught it).
+// It stays in the box but cannot be traded, evolved or be the partner until a grown-up wakes it. Only one caught by
+// studying (a book, times tables or practice; never a legendary, a prize or an event Pokémon) in that child's box.
+function addSleep_(pin, entry) {
+  var x = restInput_(pin, entry);
+  if (rowOf_(x.id) > 0) return;
+  var caught = entriesSheet_().getDataRange().getValues().slice(1).filter(function (r) { return String(r[0]) === x.target; })[0];
+  if (!caught || STUDY_TYPES.indexOf(String(caught[2])) < 0) throw new Error("Not possible: only Pokémon caught by studying can rest (not prizes, awards or badges).");
+  if (owners_()[x.target] !== x.kid) throw new Error(NOT_POSSIBLE);
+  if (sleeping_()[x.target]) throw new Error("Not possible: that Pokémon is already resting.");
+  entriesSheet_().appendRow([x.id, x.kid, "sleep", x.day, asText_(x.reason), x.target, "", "", "", new Date(), "", "", ""]);
+}
+// A grown-up wakes a resting Pokémon (type "wake"): "title" = why, "site" = the sleep row it ends.
+function addWake_(pin, entry) {
+  var x = restInput_(pin, entry);
+  if (rowOf_(x.id) > 0) return;
+  var rows = entriesSheet_().getDataRange().getValues().slice(1);
+  var sleep = rows.filter(function (r) { return r[2] === "sleep" && String(r[0]) === x.target; })[0];
+  if (!sleep || String(sleep[1]) !== x.kid) throw new Error("Not possible: that Pokémon is not resting.");
+  if (rows.some(function (r) { return r[2] === "wake" && String(r[5]) === x.target; })) throw new Error("Not possible: that Pokémon is already awake.");
+  entriesSheet_().appendRow([x.id, x.kid, "wake", x.day, asText_(x.reason), x.target, "", "", "", new Date(), "", "", ""]);
 }
 
 // Holiday event dates (YYYY-MM-DD, both included). Two empty dates end the event.
