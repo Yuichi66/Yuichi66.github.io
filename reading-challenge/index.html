@@ -288,6 +288,13 @@
   .pd-dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 4px; vertical-align: middle; }
   .pd-goal { font-size: 14px; margin-top: 2px; }
   .pd-h { margin: 18px 0 6px; font-size: 16px; }
+  /* Taking a Pokémon away (grown-up only, with the parent PIN) */
+  .release-box { margin-top: 18px; border: 2px dashed #b3261e; border-radius: 12px; padding: 10px 12px; background: #fff5f3; font-family: Arial, sans-serif; }
+  .release-box h4 { margin: 0 0 4px; font-size: 17px; }
+  .release-box label { display: block; font-weight: bold; margin: 8px 0 0; }
+  .release-box select, .release-box input { display: block; width: 100%; box-sizing: border-box; font: inherit; padding: 6px; margin-top: 2px; }
+  .release-box .btn { margin-top: 10px; background: #b3261e; }
+  .release-card { background: #f1ece4; text-align: center; }
   .pd-chart { margin: 8px 0 12px; }
   .pd-chart-title { font-size: 13px; color: #0b0b0b; margin-bottom: 4px; }
   .pd-plot { display: flex; align-items: flex-end; gap: 2px; height: 90px; border-bottom: 1px solid #c9c8c2; }
@@ -428,6 +435,10 @@
         <div class="sub-h">🏅 Awards and prize badges</div>
         <div class="dex" id="giftLog"></div>
       </div>
+      <div id="releaseWrap" class="hidden">
+        <div class="sub-h">🍂 Pokémon taken away</div>
+        <div class="dex" id="releaseLog"></div>
+      </div>
       <div class="sub-h">Book-dex</div>
       <div class="dex" id="dex"></div>
       <div class="sub-h">This week (a book passed each day)</div>
@@ -493,6 +504,16 @@
   <div class="sheet-card wide">
     <h3>👪 Parent dashboard</h3>
     <div id="parentRoot"></div>
+    <div class="release-box" id="releaseBox">
+      <h4>🍂 Take a Pokémon away</h4>
+      <div class="pd-muted">For a grown-up, with the parent PIN. Legendary and prize Pokémon cannot be taken. The child sees the reason in 📜 Records.</div>
+      <label for="rlKid">Child</label><select id="rlKid"></select>
+      <label for="rlMon">Pokémon</label><select id="rlMon"></select>
+      <label for="rlReason">Why</label><input id="rlReason" maxlength="120" placeholder="e.g. Did not eat lunch" autocomplete="off">
+      <label for="rlPin">Parent PIN</label><input id="rlPin" type="password" inputmode="numeric" autocomplete="off">
+      <button class="btn" type="button" id="rlGo">Take it away</button>
+      <div class="pd-muted" id="rlMsg"></div>
+    </div>
     <div class="sheet-actions">
       <span></span>
       <button class="btn ghost" type="button" data-close>Close</button>
@@ -640,12 +661,12 @@
 </div>
 
 <!-- ?v= must change with APP_VERSION so phones fetch the new files -->
-<script src="evo-data.js?v=2026-11-15-1"></script>
-<script src="dex-data.js?v=2026-11-15-1"></script>
-<script src="growth.js?v=2026-11-15-1"></script>
-<script src="regions.js?v=2026-11-15-1"></script>
-<script src="rules.js?v=2026-11-15-1"></script>
-<script src="parent.js?v=2026-11-15-1"></script>
+<script src="evo-data.js?v=2026-11-16-1"></script>
+<script src="dex-data.js?v=2026-11-16-1"></script>
+<script src="growth.js?v=2026-11-16-1"></script>
+<script src="regions.js?v=2026-11-16-1"></script>
+<script src="rules.js?v=2026-11-16-1"></script>
+<script src="parent.js?v=2026-11-16-1"></script>
 <script>
 (function () {
   "use strict";
@@ -655,9 +676,9 @@
   var REFRESH_MS = 60000;
   // Change on every release: a page left open with older code reloads itself,
   // so every phone works out the same Pokémon.
-  var APP_VERSION = "2026-11-15-1";
+  var APP_VERSION = "2026-11-16-1";
   // Sent with every change; the sheet refuses changes from older pages (MIN_CLIENT_GEN in Code.gs).
-  var CLIENT_GEN = 15;
+  var CLIENT_GEN = 16;
   var STORAGE_KEY = "htrc-2026-autumn-v3";
   var START = new Date(2026, 9, 24);   // Sat 24 Oct 2026
   // The half term was 16 days; old records keep their day number from START. New records use today's.
@@ -920,7 +941,7 @@
       s.settings.mathsTargets[k.id] = k.mathsTarget;
       s.settings.practiceGoals[k.id] = goalsFrom(k.practiceGoals, k);
       s.settings.partnerIds[k.id] = "";
-      s.kids[k.id] = { entries: [], maths: [], practice: [], evolves: [], trades: [], prizes: [], gifts: [], events: [], awards: [], badges: [], legends: [], weeks: [] };
+      s.kids[k.id] = { entries: [], maths: [], practice: [], evolves: [], trades: [], prizes: [], gifts: [], events: [], awards: [], badges: [], legends: [], weeks: [], releases: [] };
     });
     return s;
   }
@@ -942,6 +963,7 @@
           if (!base.kids[k.id].badges) base.kids[k.id].badges = [];
           if (!base.kids[k.id].legends) base.kids[k.id].legends = [];
           if (!base.kids[k.id].weeks) base.kids[k.id].weeks = [];
+          if (!base.kids[k.id].releases) base.kids[k.id].releases = [];
           if (parsed.settings.targets[k.id]) base.settings.targets[k.id] = parsed.settings.targets[k.id];
           if (parsed.settings.mathsTargets[k.id]) base.settings.mathsTargets[k.id] = parsed.settings.mathsTargets[k.id];
           if (parsed.settings.partnerIds && parsed.settings.partnerIds[k.id]) base.settings.partnerIds[k.id] = parsed.settings.partnerIds[k.id];
@@ -1355,6 +1377,8 @@
     var byId = forKid(kidId, function () { return catches().byId; });
     Object.keys(byId).forEach(function (id) { var x = keyOf(byId[id].mon[3]); if (x) owned[x] = true; });
     boxOf(kidId, w).forEach(function (m) { var x = keyOf(m.c.dex); if (x) owned[x] = true; });
+    // One a grown-up took away still counts in the Pokédex (as it was when it left the box).
+    Object.keys(w.mons).forEach(function (id) { var m = w.mons[id]; if (m.released && m.released.kid === kidId) { var x = keyOf(m.c.dex); if (x) owned[x] = true; } });
     return owned;
   }
   function familiesOf(kidId, w) { return ownedBy(kidId, w, Regions.familyOf); }
@@ -1383,7 +1407,9 @@
     var type = make("span", "type", mon[1]);
     type.style.background = mon[2];
     info.appendChild(type);
-    if (c.owner && c.owner !== current) info.appendChild(make("div", "meta", "🔁 Now with " + kidName(c.owner)));
+    // The reason is only for the child it was taken from (a brother who caught it first just sees where it went).
+    if (c.released) info.appendChild(make("div", "meta", c.released.kid === current ? "🍂 Taken away: " + c.released.reason : "🍂 Taken away from " + kidName(c.released.kid)));
+    else if (c.owner && c.owner !== current) info.appendChild(make("div", "meta", "🔁 Now with " + kidName(c.owner)));
   }
   // Card top for a record that was used to evolve or trade a Pokémon instead of catching one.
   function evolvedLine(card, text) {
@@ -2140,6 +2166,26 @@
     });
   }
 
+  // Pokémon a grown-up took away from the child shown, with the reason (newest first).
+  function renderReleases(w) {
+    var list = data().releases.slice().sort(function (a, b) { return loggedAt(b) - loggedAt(a); });
+    el("releaseWrap").className = list.length ? "" : "hidden";
+    var log = el("releaseLog");
+    log.innerHTML = "";
+    list.forEach(function (r) {
+      var m = w.mons[r.target];
+      var card = make("div", "entry release-card");
+      card.appendChild(make("div", "badge-medal", "🍂"));
+      card.appendChild(make("div", "mon", (m ? m.c.name : "A Pokémon") + " was taken away"));
+      card.appendChild(make("div", "title", "Why: " + r.reason));
+      card.appendChild(make("div", "meta", whenText(r)));
+      log.appendChild(card);
+    });
+  }
+  function isTakenAway(id) {
+    return KIDS.some(function (k) { return state.kids[k.id].releases.some(function (r) { return r.target === id; }); });
+  }
+
   function renderCollection() {
     renderGifts();
     var dex = el("dex");
@@ -2147,12 +2193,14 @@
     var list = data().entries;
     if (!list.length) dex.appendChild(make("div", "empty-dex", "No books yet. Read a book and fill your Poké Ball!"));
     var cs = catches(), w = world(), evolved = cs.bySource, traded = w.traded;
+    renderReleases(w);
     Object.keys(w.evolved).forEach(function (id) { evolved[id] = w.evolved[id]; });
     // The Pokémon each record caught, as it is now (it may have been traded, then evolved by its new owner).
     var nos = {};
     Object.keys(cs.byId).forEach(function (id) {
       nos[id] = w.mons[id].c;
       nos[id].owner = w.mons[id].owner;
+      nos[id].released = w.mons[id].released || null;
     });
     list.forEach(function (e) {
       var pass = isPass(e);
@@ -2258,10 +2306,16 @@
           mons[id] = { id: id, c: c, from: k.id, owner: k.id, at: loggedAt({ id: id }), moves: [], evos: [] };
         });
       });
-      events = events.concat(state.kids[k.id].trades, state.kids[k.id].evolves);
+      events = events.concat(state.kids[k.id].trades, state.kids[k.id].evolves, state.kids[k.id].releases);
     });
     events.sort(bySeq);
     events.forEach(function (x) {
+      // Taken away by a grown-up: it leaves the box for good (owner ""), and the reason stays with it.
+      if (x.type === "release") {
+        var gone = mons[x.target];
+        if (gone && gone.owner === x.kid) { gone.owner = ""; gone.released = x; }
+        return;
+      }
       if (x.type === "trade") {
         var give = mons[x.give], get = mons[x.get];
         if (!give || !get || give.owner !== x.kid || get.owner !== x.with || x.with === x.kid) return;
@@ -2633,6 +2687,10 @@
     del.type = "button";
     del.title = "Delete";
     del.onclick = function () {
+      if (isTakenAway(item.id)) {
+        window.alert("A grown-up took this Pokémon away, so this record cannot be deleted. Ask a grown-up.");
+        return;
+      }
       if (inTrade(item.id)) {
         window.alert("This record was used in a trade, so it cannot be deleted. Ask a grown-up to fix it.");
         return;
@@ -2741,6 +2799,7 @@
       else if (e.type === "gift" && e.legend) next.kids[e.kid].legends.push({ id: e.id, kid: e.kid, type: "legend", day: e.day, rank: e.rank || 0, mon: e.mon || 0, seq: seq });
       else if (e.type === "gift" && e.badge) next.kids[e.kid].badges.push({ id: e.id, kid: e.kid, type: "badge", day: e.day, subject: e.subject || "", n: e.n || 0, mon: e.mon || 0, seq: seq });
       else if (e.type === "gift" && e.award) next.kids[e.kid].awards.push({ id: e.id, kid: e.kid, type: "award", day: e.day, title: e.title || "", site: e.site || "", subject: e.subject || "", mon: e.mon || 0, seq: seq });
+      else if (e.type === "release") next.kids[e.kid].releases.push({ id: e.id, kid: e.kid, type: "release", day: e.day, target: e.site, reason: e.title || "", seq: seq });
       else if (e.type === "gift") next.kids[e.kid].gifts.push({ id: e.id, kid: e.kid, type: e.type, day: e.day, title: e.title || "", mon: e.mon || 0, seq: seq });
       else next.kids[e.kid].entries.push(e);
     });
@@ -2777,7 +2836,7 @@
     var signal = ctrl ? ctrl.signal : undefined;
     var req = payload
       ? fetch(API_URL, { method: "POST", body: JSON.stringify(payload), signal: signal })
-      : fetch(API_URL, { cache: "no-store", signal: signal });
+      : fetch(API_URL + (API_URL.indexOf("?") < 0 ? "?" : "&") + "gen=" + CLIENT_GEN, { cache: "no-store", signal: signal });
     return req.then(function (r) {
       if (!r.ok) throw new Error("HTTP " + r.status);
       return r.json();
@@ -2975,7 +3034,64 @@
       // No parent PIN (Yuichi, 14 Nov): the dates are saved as they are.
       return api({ action: "event", start: start, end: end });
     });
+    fillRelease();
     openSheet("parentSheet");
+  };
+
+  // ---------- taking a Pokémon away (grown-up only; the sheet checks the parent PIN) ----------
+  // Only Pokémon caught by studying can be taken: never a legendary (also one caught by luck), a prize or an event Pokémon.
+  function isLegendDex(dex) { return !!(DEX_DATA[dex] && DEX_DATA[dex][5]) || isPrizeMon(dex); }
+  function releasable(kidId, w) {
+    return boxOf(kidId, w).filter(function (m) { return !!recordOf(m.id) && !isLegendDex(m.c.dex) && !isLegendDex(m.c.mon[3]); });
+  }
+  function fillRelease() {
+    var kidSel = el("rlKid"), was = kidSel.value;
+    kidSel.innerHTML = "";
+    KIDS.forEach(function (k) { var o = make("option", "", k.name); o.value = k.id; kidSel.appendChild(o); });
+    if (was) kidSel.value = was;
+    el("rlMsg").textContent = "";
+    fillReleaseMons();
+  }
+  function fillReleaseMons() {
+    var sel = el("rlMon");
+    sel.innerHTML = "";
+    var list = releasable(el("rlKid").value);
+    list.forEach(function (m) {
+      var o = make("option", "", "#" + (m.no + 1) + " " + (m.c.shiny ? "✨ " : "") + m.c.name + " Lv." + m.level);
+      o.value = m.id;
+      sel.appendChild(o);
+    });
+    if (!list.length) { var none = make("option", "", "No Pokémon that can be taken"); none.value = ""; sel.appendChild(none); }
+  }
+  el("rlKid").onchange = fillReleaseMons;
+  el("rlGo").onclick = function () {
+    var btn = el("rlGo");
+    var kidId = el("rlKid").value, target = el("rlMon").value;
+    var reason = el("rlReason").value.replace(/\s+/g, " ").trim(), pin = el("rlPin").value.trim();
+    if (!API_URL) { window.alert("This needs the shared sheet."); return; }
+    if (!target) { window.alert("Choose a Pokémon."); return; }
+    if (!reason) { window.alert("Write why the Pokémon is taken away."); return; }
+    if (!pin) { window.alert("Type the parent PIN."); return; }
+    var wait = sheetWaitMessage();
+    if (wait) { window.alert(wait); refresh(); return; }
+    var m = releasable(kidId).filter(function (x) { return x.id === target; })[0];
+    if (!m) { fillReleaseMons(); return; }
+    if (!window.confirm("Take " + m.c.name + " away from " + kidName(kidId) + "?\nWhy: " + reason)) return;
+    btn.disabled = true;
+    setSync("Saving...", false);
+    api({ action: "release", pin: pin, entry: { id: newId(), kid: kidId, day: todayIndex(), target: target, reason: reason } }).then(function () {
+      el("rlPin").value = "";
+      el("rlReason").value = "";
+      fillReleaseMons();
+      el("rlMsg").textContent = "Done: " + m.c.name + " was taken away from " + kidName(kidId) + ".";
+    }).catch(function (err) {
+      if (err && err.reloading) return;
+      setSync("⚠ Not saved", true);
+      fillReleaseMons();
+      el("rlMsg").textContent = "Not saved. Check the list and try again.";
+      window.alert("Not saved: " + (err && err.message && !/fetch|HTTP|abort/i.test(err.message) ? err.message : "check the internet and try again."));
+      refresh();
+    }).then(function () { btn.disabled = false; });
   };
 
   // ---------- reading ----------

@@ -40,8 +40,11 @@ var SHINY_COL = 13;
 var MAX_ID = 40;
 // Pages older than this may work out Pokémon differently, so their changes are refused.
 var MIN_CLIENT_GEN = 9;
-// Tells pages that this sheet code knows trades (2) and levels, level-up evolutions and Mega Stones (3), the Poké Ball meter (4), all 1,025 Pokémon and regions (5), shiny Pokémon (6), French (7), prize Pokémon (8), no end date, holiday events (9; the parent PIN was dropped on 14 Nov), prize balls from books again (10), school awards (11), gym badges (12), rank legends (13), great weeks (14), Seneca (15).
-var SERVER_GEN = 15;
+// Tells pages that this sheet code knows trades (2) and levels, level-up evolutions and Mega Stones (3), the Poké Ball meter (4), all 1,025 Pokémon and regions (5), shiny Pokémon (6), French (7), prize Pokémon (8), no end date, holiday events (9; the parent PIN was dropped on 14 Nov), prize balls from books again (10), school awards (11), gym badges (12), rank legends (13), great weeks (14), Seneca (15), Pokémon taken away by a grown-up (16).
+var SERVER_GEN = 16;
+// Pokémon taken away (type "release") are only sent to pages from this gen: an older page would file them as books.
+var RELEASE_GEN = 16;
+var MAX_REASON = 120;
 var EVENT_BOOKS = 5;
 // Prize Pokémon (type "prize"), one per ball per child once the ball is reached (the books goal, and for children
 // with times tables the lower of the two goals): "title" = ball (1-3), "mon" = the legendary chosen (Great and
@@ -74,8 +77,8 @@ var NO_QUIZ = "No quiz";
 // Evolutions from a level or a Mega Stone: "title" holds this word instead of the record that paid for it.
 var GROWTH_KINDS = ["level", "stone"];
 
-function doGet() {
-  return json_(snapshot_());
+function doGet(e) {
+  return json_(snapshot_(Number(e && e.parameter && e.parameter.gen) || 0));
 }
 
 function doPost(e) {
@@ -100,8 +103,9 @@ function doPost(e) {
     else if (body.action === "badge") addBadge_(body.entry);
     else if (body.action === "legend") addLegend_(body.entry);
     else if (body.action === "week") addWeek_(body.entry);
+    else if (body.action === "release") addRelease_(body.pin, body.entry);
     else throw new Error("Unknown action");
-    return json_(snapshot_());
+    return json_(snapshot_(Number(body.gen)));
   } catch (err) {
     return json_({ ok: false, error: String(err.message || err) });
   } finally {
@@ -109,9 +113,9 @@ function doPost(e) {
   }
 }
 
-function snapshot_() {
+function snapshot_(gen) {
   var rows = entriesSheet_().getDataRange().getValues().slice(1);
-  var entries = rows.filter(function (r) { return r[0] !== ""; }).map(function (r) {
+  var entries = rows.filter(function (r) { return r[0] !== "" && (r[2] !== "release" || gen >= RELEASE_GEN); }).map(function (r) {
     var base = { id: String(r[0]), kid: String(r[1]), type: String(r[2]), day: Number(r[3]), site: String(r[5]), mon: Number(r[MON_COL - 1]) || 0 };
     if (base.type === "maths" || PRACTICE_SITES.hasOwnProperty(base.type)) {
       base.correct = Number(r[8]);
@@ -164,6 +168,9 @@ function snapshot_() {
       base.award = 1;
       base.title = String(r[4]);
       base.subject = String(r[6]);
+    }
+    else if (base.type === "release") {
+      base.title = String(r[4]);
     }
     else if (base.type === "trade") {
       base.source = String(r[4]);
@@ -302,6 +309,9 @@ function owners_() {
         owner[give] = other;
         owner[get] = kid;
       }
+    } else if (type === "release") {
+      // Taken away by a grown-up: it leaves the box for good (only while that child still has it).
+      if (owner[String(r[5])] === String(r[1])) delete owner[String(r[5])];
     } else if (type !== "evolve" && r[MON_COL - 1] !== "") owner[String(r[0])] = String(r[1]);
   });
   return owner;
@@ -407,6 +417,10 @@ function deleteEntry_(id) {
   });
   var paysTraded = rows.some(function (r) { return r[2] === "evolve" && String(r[4]) === id && traded[String(r[5])]; });
   if (traded[id] || paysTraded) throw new Error("Not possible: this record was used in a trade, so it cannot be deleted.");
+  // A Pokémon taken away by a grown-up, and the record that caught it, stay (a grown-up deletes the row in the sheet).
+  if (rows.some(function (r) { return r[2] === "release" && (String(r[0]) === id || String(r[5]) === id); })) {
+    throw new Error("Not possible: a grown-up took this Pokémon away, so this record cannot be deleted.");
+  }
   // An old evolution under a later level-up or Mega Stone evolution stays (the later one starts from its form).
   var grown = {};
   rows.forEach(function (r) { if (isGrowthRow_(r)) grown[String(r[5])] = true; });
@@ -454,6 +468,46 @@ function savePartner_(kid, partnerId) {
   if (!KIDS.hasOwnProperty(kid)) throw new Error("Unknown kid");
   if (!partnerId || partnerId.length > MAX_ID || owners_()[partnerId] !== kid) throw new Error(NOT_POSSIBLE);
   setSetting_(kid + ".partnerId", partnerId);
+}
+
+// The parent PIN lives in Script Properties (PARENT_PIN), never in the page.
+// After MAX_PIN_TRIES wrong tries in a row, every PIN is refused for PIN_LOCK_SECONDS. A right PIN starts the count again.
+var MAX_PIN_TRIES = 5;
+var PIN_LOCK_SECONDS = 15 * 60;
+var PIN_FAILS_KEY = "pinFails";
+function checkPin_(pin) {
+  var want = PropertiesService.getScriptProperties().getProperty("PARENT_PIN");
+  if (!want) throw new Error("No parent PIN yet: add PARENT_PIN in Apps Script > Project Settings > Script Properties.");
+  var cache = CacheService.getScriptCache();
+  var fails = Number(cache.get(PIN_FAILS_KEY)) || 0;
+  if (fails >= MAX_PIN_TRIES) throw new Error("Too many tries. Wait 15 minutes.");
+  if (String(pin || "") !== String(want)) {
+    cache.put(PIN_FAILS_KEY, String(fails + 1), PIN_LOCK_SECONDS);
+    throw new Error("Wrong PIN");
+  }
+  cache.remove(PIN_FAILS_KEY);
+}
+
+// A grown-up takes a Pokémon away (type "release"), with the parent PIN: "title" = why, "site" = the Pokémon
+// (the record that caught it). Only one caught by studying (a book, times tables or practice; never a legendary,
+// a prize or an event Pokémon) that is in the child's box now. The page cannot delete it; a grown-up deletes the
+// row in the sheet to give it back.
+function addRelease_(pin, x) {
+  checkPin_(pin);
+  if (!x) throw new Error("Missing entry");
+  var id = String(x.id || "").slice(0, MAX_ID);
+  var kid = String(x.kid || "");
+  var target = String(x.target || "").slice(0, MAX_ID);
+  var reason = String(x.reason || "").replace(/\s+/g, " ").trim();
+  var day = Number(x.day);
+  if (!id || !KIDS.hasOwnProperty(kid) || !target) throw new Error("Bad entry");
+  if (!reason || reason.length > MAX_REASON) throw new Error("Please write why (up to " + MAX_REASON + " letters).");
+  if (!isInt_(day) || day < 0 || day > MAX_DAY) throw new Error("Bad day");
+  if (rowOf_(id) > 0) return;
+  var caught = entriesSheet_().getDataRange().getValues().slice(1).filter(function (r) { return String(r[0]) === target; })[0];
+  if (!caught || STUDY_TYPES.indexOf(String(caught[2])) < 0) throw new Error("Not possible: only Pokémon caught by studying can be taken away (not prizes, awards or badges).");
+  if (owners_()[target] !== kid) throw new Error(NOT_POSSIBLE);
+  entriesSheet_().appendRow([id, kid, "release", day, asText_(reason), target, "", "", "", new Date(), "", "", ""]);
 }
 
 // Holiday event dates (YYYY-MM-DD, both included). Two empty dates end the event.
