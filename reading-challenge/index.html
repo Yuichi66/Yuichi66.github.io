@@ -125,6 +125,15 @@
   .pz-opt { border: 3px solid #000; border-radius: 14px; background: #fff; padding: 8px; cursor: pointer; font-family: inherit; font-size: 15px; }
   .pz-opt:hover, .pz-opt:focus-visible { background: #fff6c8; }
   .pz-art { width: 100%; max-width: 120px; height: auto; display: block; margin: 0 auto 4px; }
+  .pz-tabs { display: flex; gap: 8px; margin-bottom: 10px; }
+  .pz-tab { flex: 1; border: 3px solid #000; border-radius: 12px; background: #eee; padding: 8px 4px; font-family: inherit; font-size: 15px; font-weight: bold; cursor: pointer; }
+  .pz-tab.on { background: var(--yellow); box-shadow: 0 3px 0 #000; }
+  .bey-box { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+  .bey-tile { border: 3px solid #000; border-radius: 16px; padding: 6px 4px 8px; text-align: center; background: radial-gradient(circle at 50% 40%, #fff 0 45%, #cfe3ff 100%); box-shadow: 0 4px 0 #000; }
+  .bey-tile img { display: block; width: 100%; aspect-ratio: 1; object-fit: contain; border-radius: 50%; }
+  .bey-tile b { display: block; font-size: 13px; line-height: 1.2; overflow-wrap: anywhere; }
+  .bey-box .empty-dex { grid-column: 1 / -1; }
+  .bey-big { width: 180px; height: 180px; object-fit: contain; border-radius: 50%; background: #fff; }
   .next { margin-top: 12px; font-weight: bold; text-align: center; font-size: 16px; }
   .rule { font-size: 12px; color: #555; text-align: center; margin-top: 4px; }
 
@@ -433,6 +442,8 @@
     <div class="stones" id="boxStones"></div>
     <div class="stones" id="boxRegion"></div>
     <div class="box" id="box"></div>
+    <div class="sub-h" id="beyTitle"></div>
+    <div class="bey-box" id="beyBox"></div>
   </section>
 
   <!-- 4. Records -->
@@ -470,7 +481,7 @@
       <span id="saved" style="margin-left:8px"></span>
     </div>
   </details>
-  <div class="credit">Pokémon images from PokeAPI. Pokémon © Nintendo / Creatures / GAME FREAK / The Pokémon Company. Family fan project, not official.</div>
+  <div class="credit">Pokémon images from PokeAPI. Pokémon © Nintendo / Creatures / GAME FREAK / The Pokémon Company. Beyblade photos from the Beyblade Wiki; Beyblade © Takara Tomy / Hasbro. Family fan project, not official.</div>
 </div>
 
 <!-- Reading steps -->
@@ -658,7 +669,12 @@
   <div class="sheet-card">
     <h3 id="pzTitle"></h3>
     <div class="pz-note" id="pzNote"></div>
+    <div class="pz-tabs hidden" id="pzTabs">
+      <button class="pz-tab on" type="button" id="pzTabMon">🎒 Pokémon</button>
+      <button class="pz-tab" type="button" id="pzTabBey">🌀 Beyblade</button>
+    </div>
     <div class="pz-list" id="pzList"></div>
+    <div class="pz-list hidden" id="pzBeys"></div>
     <div class="sheet-actions"><span></span><button class="btn ghost small" type="button" data-close>Choose later</button></div>
   </div>
 </div>
@@ -673,12 +689,13 @@
 </div>
 
 <!-- ?v= must change with APP_VERSION so phones fetch the new files -->
-<script src="evo-data.js?v=2026-11-16-2"></script>
-<script src="dex-data.js?v=2026-11-16-2"></script>
-<script src="growth.js?v=2026-11-16-2"></script>
-<script src="regions.js?v=2026-11-16-2"></script>
-<script src="rules.js?v=2026-11-16-2"></script>
-<script src="parent.js?v=2026-11-16-2"></script>
+<script src="evo-data.js?v=2026-11-18-1"></script>
+<script src="dex-data.js?v=2026-11-18-1"></script>
+<script src="growth.js?v=2026-11-18-1"></script>
+<script src="regions.js?v=2026-11-18-1"></script>
+<script src="rules.js?v=2026-11-18-1"></script>
+<script src="parent.js?v=2026-11-18-1"></script>
+<script src="bey-data.js?v=2026-11-18-1"></script>
 <script>
 (function () {
   "use strict";
@@ -688,9 +705,9 @@
   var REFRESH_MS = 60000;
   // Change on every release: a page left open with older code reloads itself,
   // so every phone works out the same Pokémon.
-  var APP_VERSION = "2026-11-16-2";
+  var APP_VERSION = "2026-11-18-1";
   // Sent with every change; the sheet refuses changes from older pages (MIN_CLIENT_GEN in Code.gs).
-  var CLIENT_GEN = 17;
+  var CLIENT_GEN = 18;
   var STORAGE_KEY = "htrc-2026-autumn-v3";
   var START = new Date(2026, 9, 24);   // Sat 24 Oct 2026
   // The half term was 16 days; old records keep their day number from START. New records use today's.
@@ -1899,7 +1916,12 @@
       tile.appendChild(make("div", "tier-shiny", rank === RANKS.length - 1 ? "👑" : "⭐"));
       tile.appendChild(make("b", "", "Rank " + (rank + 1)));
       tile.appendChild(make("small", "", RANKS[rank]));
-      if (got) {
+      if (got && got.bey) {
+        var brow = make("div", "tier-mons");
+        brow.appendChild(beyPhoto(got.bey, "sprite"));
+        tile.appendChild(brow);
+        tile.appendChild(make("div", "tier-pick got", "✓ 🌀 " + beyName(got.bey)));
+      } else if (got) {
         var m = world().mons[got.id], c = m ? m.c : null;
         var row = make("div", "tier-mons");
         if (c) row.appendChild(sprite(c.dex, "", c.name, c.shiny));
@@ -1935,26 +1957,32 @@
       b.setAttribute("data-dex", dex);
       b.appendChild(artwork(dex, name, "pz-art"));
       b.appendChild(make("b", "", name));
-      b.onclick = function () { saveRankLegend(rank, dex, name); };
+      b.onclick = function () { saveRankLegend(rank, { mon: dex }, name); };
       list.appendChild(b);
     });
     openSheet("prizeSheet");
+    prizeTabs(function (beys) {
+      return fillBeyChoices(beys, current + "-rank-" + rank, function (id) { saveRankLegend(rank, { bey: id }, beyName(id)); });
+    });
   }
   var legendTry = null, legendSaving = false;
-  function saveRankLegend(rank, dex, name) {
+  // pick = { mon: dex } or { bey: Beyblade id }.
+  function saveRankLegend(rank, pick, name) {
     if (legendSaving) return;
     legendSaving = true;
     var who = current;
-    var again = legendTry && legendTry.kid === who && legendTry.rank === rank && legendTry.mon === dex;
-    var entry = again ? legendTry : { id: newId(), kid: who, day: todayIndex(), rank: rank, mon: dex };
+    var again = legendTry && legendTry.kid === who && legendTry.rank === rank && samePick(legendTry, pick);
+    var entry = again ? legendTry : withPick({ id: newId(), kid: who, day: todayIndex(), rank: rank }, pick);
     commit({ action: "legend", entry: entry }, function () {
-      state.kids[who].legends.push({ id: entry.id, kid: who, type: "legend", day: entry.day, rank: rank, mon: dex, seq: localSeq() });
+      state.kids[who].legends.push({ id: entry.id, kid: who, type: "legend", day: entry.day, rank: rank, mon: pick.mon || 0, bey: pick.bey || 0, seq: localSeq() });
     }, function (ok, refused) {
       legendSaving = false;
       legendTry = ok || refused ? null : entry;
       if (!ok) return;
       closeSheets();
-      show(artwork(dex, name), "⭐ You got the legendary " + name + "!", "Rank " + (rank + 1) + " " + RANKS[rank] + " · look in your 🎒 Pokémon box!");
+      var where = "Rank " + (rank + 1) + " " + RANKS[rank];
+      if (pick.bey) show(beyPhoto(pick.bey, "bey-big"), "🌀 You got the Beyblade " + name + "!", where + " · look in your 🌀 Beyblades!");
+      else show(artwork(pick.mon, name), "⭐ You got the legendary " + name + "!", where + " · look in your 🎒 Pokémon box!");
     });
   }
 
@@ -2000,7 +2028,7 @@
   }
   function openBadge(subject, n) {
     var list = el("pzList"), cfg = BADGES[subject];
-    el("pzTitle").textContent = "🏅 Gym badge Pokémon!";
+    el("pzTitle").textContent = "🏅 Gym badge prize!";
     el("pzNote").textContent = cfg.icon + " " + cfg.name + " " + num(n * cfg.step) + " " + unitOf(subject) + " · you can choose only once";
     list.innerHTML = "";
     rareChoices(current, current + "-badge-" + subject + "-" + n).forEach(function (dex) {
@@ -2010,26 +2038,107 @@
       b.setAttribute("data-dex", dex);
       b.appendChild(artwork(dex, name, "pz-art"));
       b.appendChild(make("b", "", name));
-      b.onclick = function () { saveBadge(subject, n, dex, name); };
+      b.onclick = function () { saveBadge(subject, n, { mon: dex }, name); };
       list.appendChild(b);
     });
     openSheet("prizeSheet");
+    prizeTabs(function (beys) {
+      return fillBeyChoices(beys, current + "-badge-" + subject + "-" + n, function (id) { saveBadge(subject, n, { bey: id }, beyName(id)); });
+    });
   }
   var badgeTry = null, badgeSaving = false;
-  function saveBadge(subject, n, dex, name) {
+  // pick = { mon: dex } or { bey: Beyblade id }.
+  function saveBadge(subject, n, pick, name) {
     if (badgeSaving) return;
     badgeSaving = true;
     var who = current;
-    var again = badgeTry && badgeTry.kid === who && badgeTry.subject === subject && badgeTry.n === n && badgeTry.mon === dex;
-    var entry = again ? badgeTry : { id: newId(), kid: who, day: todayIndex(), subject: subject, n: n, mon: dex };
+    var again = badgeTry && badgeTry.kid === who && badgeTry.subject === subject && badgeTry.n === n && samePick(badgeTry, pick);
+    var entry = again ? badgeTry : withPick({ id: newId(), kid: who, day: todayIndex(), subject: subject, n: n }, pick);
     commit({ action: "badge", entry: entry }, function () {
-      state.kids[who].badges.push({ id: entry.id, kid: who, type: "badge", day: entry.day, subject: subject, n: n, mon: dex, seq: localSeq() });
+      state.kids[who].badges.push({ id: entry.id, kid: who, type: "badge", day: entry.day, subject: subject, n: n, mon: pick.mon || 0, bey: pick.bey || 0, seq: localSeq() });
     }, function (ok, refused) {
       badgeSaving = false;
       badgeTry = ok || refused ? null : entry;
       if (!ok) return;
       closeSheets();
-      show(artwork(dex, name), "🏅 Gym badge! You got " + name + "!", BADGES[subject].icon + " " + BADGES[subject].name + " " + num(n * BADGES[subject].step) + " " + unitOf(subject) + " · look in your 🎒 Pokémon box!");
+      var where = BADGES[subject].icon + " " + BADGES[subject].name + " " + num(n * BADGES[subject].step) + " " + unitOf(subject);
+      if (pick.bey) show(beyPhoto(pick.bey, "bey-big"), "🏅 Gym badge! You got the Beyblade " + name + "!", where + " · look in your 🌀 Beyblades!");
+      else show(artwork(pick.mon, name), "🏅 Gym badge! You got " + name + "!", where + " · look in your 🎒 Pokémon box!");
+    });
+  }
+
+  // ---------- Beyblades ----------
+  // A gym badge or rank legend can give a Beyblade (bey-data.js: [id, name, combo], photo beys/<id>.jpg) instead
+  // of a Pokémon. Beyblades are only collected: they never count for rank, Pokédex, regions, trades, EXP or the meter.
+  var BEYS = typeof BEY_DATA !== "undefined" ? BEY_DATA : [];
+  function beyById(id) { return BEYS.filter(function (b) { return b[0] === id; })[0] || null; }
+  function beyName(id) { var b = beyById(id); return b ? b[1] : "a Beyblade"; }
+  function beyPhoto(id, cls) {
+    var img = make("img", cls);
+    img.src = "beys/" + id + ".jpg";
+    img.alt = beyName(id);
+    return img;
+  }
+  // The child's Beyblades, in the order they got them.
+  function beysOf(kidId) {
+    var d = state.kids[kidId];
+    return (d.badges || []).concat(d.legends || []).filter(function (g) { return g.bey; }).sort(function (a, b) { return a.seq - b.seq; });
+  }
+  // Three Beyblades the child does not have yet; the same three on every phone for the same badge or rank.
+  function beyChoices(kidId, key) {
+    var have = {};
+    beysOf(kidId).forEach(function (g) { have[g.bey] = true; });
+    var list = BEYS.map(function (b) { return b[0]; }).filter(function (id) { return !have[id]; });
+    var seed = hashOf(key + "-bey"), out = [];
+    while (list.length && out.length < 3) out.push(list.splice(seed % list.length, 1)[0]);
+    return out;
+  }
+  // Fills the Beyblade tab of the choose sheet; returns how many there are to choose.
+  function fillBeyChoices(list, key, onPick) {
+    var choices = beyChoices(current, key);
+    choices.forEach(function (id) {
+      var b = make("button", "pz-opt");
+      b.type = "button";
+      b.setAttribute("data-bey", id);
+      b.appendChild(beyPhoto(id, "pz-art"));
+      b.appendChild(make("b", "", beyName(id)));
+      b.onclick = function () { onPick(id); };
+      list.appendChild(b);
+    });
+    return choices.length;
+  }
+  function withPick(entry, pick) {
+    if (pick.bey) entry.bey = pick.bey; else entry.mon = pick.mon;
+    return entry;
+  }
+  function samePick(entry, pick) { return pick.bey ? entry.bey === pick.bey : entry.mon === pick.mon; }
+  // The Pokémon / Beyblade tabs of the choose sheet: shown only when fillBeys gives Beyblades to choose.
+  function prizeTabs(fillBeys) {
+    var beys = el("pzBeys");
+    beys.innerHTML = "";
+    var count = fillBeys && BEYS.length ? fillBeys(beys) : 0;
+    el("pzTabs").className = "pz-tabs" + (count ? "" : " hidden");
+    prizeTab("mon");
+  }
+  function prizeTab(which) {
+    el("pzList").className = "pz-list" + (which === "mon" ? "" : " hidden");
+    el("pzBeys").className = "pz-list" + (which === "bey" ? "" : " hidden");
+    el("pzTabMon").className = "pz-tab" + (which === "mon" ? " on" : "");
+    el("pzTabBey").className = "pz-tab" + (which === "bey" ? " on" : "");
+  }
+  el("pzTabMon").onclick = function () { prizeTab("mon"); };
+  el("pzTabBey").onclick = function () { prizeTab("bey"); };
+  function renderBeys() {
+    var box = el("beyBox"), mine = beysOf(current);
+    el("beyTitle").textContent = BEYS.length ? "🌀 Beyblades " + mine.length + " / " + BEYS.length : "";
+    box.innerHTML = "";
+    if (!BEYS.length) return;
+    if (!mine.length) box.appendChild(make("div", "empty-dex", "No Beyblades yet. At a 🏅 gym badge or ⭐ rank legend, tap 🌀 Beyblade to choose one!"));
+    mine.forEach(function (g) {
+      var tile = make("div", "bey-tile");
+      tile.appendChild(beyPhoto(g.bey));
+      tile.appendChild(make("b", "", beyName(g.bey)));
+      box.appendChild(tile);
     });
   }
 
@@ -2143,7 +2252,7 @@
       var card = make("div", "entry badge-card");
       card.appendChild(make("div", "badge-medal", "⭐"));
       card.appendChild(make("div", "title", "Rank " + (l.rank + 1) + " " + RANKS[l.rank]));
-      card.appendChild(make("div", "mon", "🌟 Legendary: " + (c ? c.name : "a Pokémon")));
+      card.appendChild(make("div", "mon", l.bey ? "🌀 Beyblade: " + beyName(l.bey) : "🌟 Legendary: " + (c ? c.name : "a Pokémon")));
       card.appendChild(make("div", "meta", fmt(dayDate(l.day))));
       log.appendChild(card);
     });
@@ -2152,7 +2261,7 @@
       var card = make("div", "entry badge-card");
       card.appendChild(make("div", "badge-medal", "🏅"));
       card.appendChild(make("div", "title", "Gym badge: " + badgeLabel(b)));
-      card.appendChild(make("div", "mon", "🎁 Pokémon: " + (c ? c.name : "a Pokémon")));
+      card.appendChild(make("div", "mon", b.bey ? "🌀 Beyblade: " + beyName(b.bey) : "🎁 Pokémon: " + (c ? c.name : "a Pokémon")));
       card.appendChild(make("div", "meta", fmt(dayDate(b.day))));
       log.appendChild(card);
     });
@@ -2505,6 +2614,7 @@
     var stones = stonesLeft(current);
     el("boxStones").textContent = "💎 Mega Stones: " + stones + (stones ? " · Tap a Pokémon that can Mega Evolve" : " · Rank up to get one");
     el("boxRegion").textContent = regionText(current, w);
+    renderBeys();
     if (openMonId && el("monSheet").className.indexOf("show") >= 0) fillMon(openMonId);
   }
   var openMonId = null;
@@ -2822,8 +2932,8 @@
       else if (e.type === "trade") next.kids[e.kid].trades.push({ id: e.id, kid: e.kid, type: e.type, day: e.day, source: e.source || "", give: e.site, get: e.get || "", with: e.with || "", ticket: e.ticket || 0, seq: seq });
       else if (e.type === "event") next.kids[e.kid].events.push({ id: e.id, kid: e.kid, type: "event", day: e.day, title: e.title || "", mon: e.mon || 0, seq: seq });
       else if (e.type === "gift" && e.weekBonus) next.kids[e.kid].weeks.push({ id: e.id, kid: e.kid, type: "week", day: e.day, week: e.week || "", mon: e.mon || 0, seq: seq });
-      else if (e.type === "gift" && e.legend) next.kids[e.kid].legends.push({ id: e.id, kid: e.kid, type: "legend", day: e.day, rank: e.rank || 0, mon: e.mon || 0, seq: seq });
-      else if (e.type === "gift" && e.badge) next.kids[e.kid].badges.push({ id: e.id, kid: e.kid, type: "badge", day: e.day, subject: e.subject || "", n: e.n || 0, mon: e.mon || 0, seq: seq });
+      else if (e.type === "gift" && e.legend) next.kids[e.kid].legends.push({ id: e.id, kid: e.kid, type: "legend", day: e.day, rank: e.rank || 0, mon: e.mon || 0, bey: e.bey || 0, seq: seq });
+      else if (e.type === "gift" && e.badge) next.kids[e.kid].badges.push({ id: e.id, kid: e.kid, type: "badge", day: e.day, subject: e.subject || "", n: e.n || 0, mon: e.mon || 0, bey: e.bey || 0, seq: seq });
       else if (e.type === "gift" && e.award) next.kids[e.kid].awards.push({ id: e.id, kid: e.kid, type: "award", day: e.day, title: e.title || "", site: e.site || "", subject: e.subject || "", mon: e.mon || 0, seq: seq });
       else if (e.type === "sleep") next.kids[e.kid].sleeps.push({ id: e.id, kid: e.kid, type: "sleep", day: e.day, target: e.site, reason: e.title || "", seq: seq });
       else if (e.type === "wake") next.kids[e.kid].wakes.push({ id: e.id, kid: e.kid, type: "wake", day: e.day, target: e.site, reason: e.title || "", seq: seq });
@@ -2969,6 +3079,7 @@
 
   // ---------- sheets & overlay ----------
   function openSheet(id) {
+    if (id === "prizeSheet") prizeTabs(null);
     el(id).className = "sheet show";
     window.scrollTo(0, 0);
   }

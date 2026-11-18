@@ -40,8 +40,14 @@ var SHINY_COL = 13;
 var MAX_ID = 40;
 // Pages older than this may work out Pokémon differently, so their changes are refused.
 var MIN_CLIENT_GEN = 9;
-// Tells pages that this sheet code knows trades (2) and levels, level-up evolutions and Mega Stones (3), the Poké Ball meter (4), all 1,025 Pokémon and regions (5), shiny Pokémon (6), French (7), prize Pokémon (8), no end date, holiday events (9; the parent PIN was dropped on 14 Nov), prize balls from books again (10), school awards (11), gym badges (12), rank legends (13), great weeks (14), Seneca (15), resting Pokémon (17; 16 took them away for good and was never used).
-var SERVER_GEN = 17;
+// Tells pages that this sheet code knows trades (2) and levels, level-up evolutions and Mega Stones (3), the Poké Ball meter (4), all 1,025 Pokémon and regions (5), shiny Pokémon (6), French (7), prize Pokémon (8), no end date, holiday events (9; the parent PIN was dropped on 14 Nov), prize balls from books again (10), school awards (11), gym badges (12), rank legends (13), great weeks (14), Seneca (15), resting Pokémon (17; 16 took them away for good and was never used), Beyblades (18).
+var SERVER_GEN = 18;
+// A gym badge or rank legend can give a Beyblade instead of a Pokémon: the row keeps "mon" empty and the Beyblade
+// id (1-MAX_BEY, see bey-data.js) in "total". Such rows are only sent to pages from this gen: an older page would
+// show the badge as a Pokémon with none.
+var BEY_GEN = 18;
+var BEY_COL = 8;
+var MAX_BEY = 999;
 // Resting Pokémon (types "sleep" and "wake") are only sent to pages from this gen: an older page would file them as books.
 var REST_GEN = 17;
 var REST_TYPES = ["sleep", "wake"];
@@ -117,7 +123,9 @@ function doPost(e) {
 
 function snapshot_(gen) {
   var rows = entriesSheet_().getDataRange().getValues().slice(1);
-  var entries = rows.filter(function (r) { return r[0] !== "" && r[2] !== "release" && (REST_TYPES.indexOf(r[2]) < 0 || gen >= REST_GEN); }).map(function (r) {
+  var entries = rows.filter(function (r) {
+    return r[0] !== "" && r[2] !== "release" && (REST_TYPES.indexOf(r[2]) < 0 || gen >= REST_GEN) && (!isBeyRow_(r) || gen >= BEY_GEN);
+  }).map(function (r) {
     var base = { id: String(r[0]), kid: String(r[1]), type: String(r[2]), day: Number(r[3]), site: String(r[5]), mon: Number(r[MON_COL - 1]) || 0 };
     if (base.type === "maths" || PRACTICE_SITES.hasOwnProperty(base.type)) {
       base.correct = Number(r[8]);
@@ -154,6 +162,7 @@ function snapshot_(gen) {
       base.legend = 1;
       base.rank = Number(r[4]) || 0;
       base.title = "Rank " + (base.rank + 1) + " legendary";
+      if (isBeyRow_(r)) base.bey = Number(r[BEY_COL - 1]);
     }
     else if (base.type === "badge") {
       // Sent as a "gift" marked badge: 1 (like awards), so older pages show it as a prize badge.
@@ -162,6 +171,7 @@ function snapshot_(gen) {
       base.subject = String(r[4]);
       base.n = Number(r[6]) || 0;
       base.title = "Gym badge: " + (BADGE_NAMES[base.subject] || base.subject) + " " + String(base.n * (BADGE_STEPS[base.subject] || 0)).replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+      if (isBeyRow_(r)) base.bey = Number(r[BEY_COL - 1]);
     }
     else if (base.type === "award") {
       // Sent as a "gift" marked award: 1, so pages from before awards (gen 9-10) show it as a prize badge with its
@@ -639,37 +649,55 @@ function badgeSubjects_(kid) {
 // A gym badge Pokémon. Same id twice = one row; each badge once, and only once its correct answers are reached.
 function addBadge_(x) {
   if (!x) throw new Error("Missing entry");
-  var id = String(x.id || "").slice(0, MAX_ID), kid = String(x.kid || ""), mon = Number(x.mon), day = Number(x.day), n = Number(x.n);
+  var id = String(x.id || "").slice(0, MAX_ID), kid = String(x.kid || ""), day = Number(x.day), n = Number(x.n);
   var subject = String(x.subject || "");
   if (!id) throw new Error("Missing id");
   if (rowOf_(id) > 0) return;
   if (!KIDS.hasOwnProperty(kid)) throw new Error("Unknown kid");
   if (!isInt_(day) || day < 0 || day > MAX_DAY) throw new Error("Bad day");
   if (badgeSubjects_(kid).indexOf(subject) < 0 || !isInt_(n) || n < 1) throw new Error("Bad badge");
-  if (!isInt_(mon) || mon <= 0 || mon > MAX_FORM || PRIZE_MONS[1].concat(PRIZE_MONS[2]).indexOf(mon) >= 0) throw new Error("Bad Pokémon");
   var rows = entriesSheet_().getDataRange().getValues().slice(1);
+  var pick = prizePick_(x, kid, rows);
   var correct = rows.filter(function (r) { return String(r[1]) === kid && r[2] === subject; }).reduce(function (sum, r) { return sum + (Number(r[8]) || 0); }, 0);
   if (n > Math.floor(correct / BADGE_STEPS[subject])) throw new Error("Not possible: that badge is not reached yet.");
   if (rows.some(function (r) { return r[2] === "badge" && String(r[1]) === kid && String(r[4]) === subject && Number(r[6]) === n; })) throw new Error("Not possible: that badge Pokémon was already chosen.");
-  entriesSheet_().appendRow([id, kid, "badge", day, subject, "Badge", n, "", "", new Date(), mon, "", ""]);
+  entriesSheet_().appendRow([id, kid, "badge", day, subject, "Badge", n, pick.bey, "", new Date(), pick.mon, "", ""]);
+}
+
+// A Beyblade row: a gym badge or rank legend that gave a Beyblade (its id in "total") instead of a Pokémon.
+function isBeyRow_(r) {
+  return (r[2] === "badge" || r[2] === "legend") && Number(r[BEY_COL - 1]) > 0;
+}
+// What a gym badge or rank legend gives: a Pokémon ("mon", never a prize legendary) or a Beyblade ("bey")
+// the child does not have yet. The page knows the Beyblades; the sheet only checks the id is a whole number.
+function prizePick_(x, kid, rows) {
+  if (x.bey !== undefined && x.bey !== null && x.bey !== "") {
+    var bey = Number(x.bey);
+    if (!isInt_(bey) || bey < 1 || bey > MAX_BEY || Number(x.mon) > 0) throw new Error("Bad Beyblade");
+    if (rows.some(function (r) { return isBeyRow_(r) && String(r[1]) === kid && Number(r[BEY_COL - 1]) === bey; })) throw new Error("Not possible: that Beyblade is already yours.");
+    return { mon: "", bey: bey };
+  }
+  var mon = Number(x.mon);
+  if (!isInt_(mon) || mon <= 0 || mon > MAX_FORM || PRIZE_MONS[1].concat(PRIZE_MONS[2]).indexOf(mon) >= 0) throw new Error("Bad Pokémon");
+  return { mon: mon, bey: "" };
 }
 
 
 // A rank legend Pokémon. Same id twice = one row; each rank once, and only once the saved peak has reached it.
 function addLegend_(x) {
   if (!x) throw new Error("Missing entry");
-  var id = String(x.id || "").slice(0, MAX_ID), kid = String(x.kid || ""), mon = Number(x.mon), day = Number(x.day), rank = Number(x.rank);
+  var id = String(x.id || "").slice(0, MAX_ID), kid = String(x.kid || ""), day = Number(x.day), rank = Number(x.rank);
   if (!id) throw new Error("Missing id");
   if (rowOf_(id) > 0) return;
   if (!KIDS.hasOwnProperty(kid)) throw new Error("Unknown kid");
   if (!isInt_(day) || day < 0 || day > MAX_DAY) throw new Error("Bad day");
   if (RANK_LEGENDS.indexOf(rank) < 0) throw new Error("Bad rank");
-  if (!isInt_(mon) || mon <= 0 || mon > MAX_FORM || PRIZE_MONS[1].concat(PRIZE_MONS[2]).indexOf(mon) >= 0) throw new Error("Bad Pokémon");
+  var rows = entriesSheet_().getDataRange().getValues().slice(1);
+  var pick = prizePick_(x, kid, rows);
   var peak = readSettings_()[kid].peak;
   if (peak === "" || Number(peak) < rank) throw new Error("Not possible: that rank is not reached yet.");
-  var rows = entriesSheet_().getDataRange().getValues().slice(1);
   if (rows.some(function (r) { return r[2] === "legend" && String(r[1]) === kid && Number(r[4]) === rank; })) throw new Error("Not possible: that legendary was already chosen.");
-  entriesSheet_().appendRow([id, kid, "legend", day, rank, "Rank", "", "", "", new Date(), mon, "", ""]);
+  entriesSheet_().appendRow([id, kid, "legend", day, rank, "Rank", "", pick.bey, "", new Date(), pick.mon, "", ""]);
 }
 
 
