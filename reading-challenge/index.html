@@ -689,13 +689,13 @@
 </div>
 
 <!-- ?v= must change with APP_VERSION so phones fetch the new files -->
-<script src="evo-data.js?v=2026-11-18-2"></script>
-<script src="dex-data.js?v=2026-11-18-2"></script>
-<script src="growth.js?v=2026-11-18-2"></script>
-<script src="regions.js?v=2026-11-18-2"></script>
-<script src="rules.js?v=2026-11-18-2"></script>
-<script src="parent.js?v=2026-11-18-2"></script>
-<script src="bey-data.js?v=2026-11-18-2"></script>
+<script src="evo-data.js?v=2026-11-18-4"></script>
+<script src="dex-data.js?v=2026-11-18-4"></script>
+<script src="growth.js?v=2026-11-18-4"></script>
+<script src="regions.js?v=2026-11-18-4"></script>
+<script src="rules.js?v=2026-11-18-4"></script>
+<script src="parent.js?v=2026-11-18-4"></script>
+<script src="bey-data.js?v=2026-11-18-4"></script>
 <script>
 (function () {
   "use strict";
@@ -705,9 +705,9 @@
   var REFRESH_MS = 60000;
   // Change on every release: a page left open with older code reloads itself,
   // so every phone works out the same Pokémon.
-  var APP_VERSION = "2026-11-18-2";
+  var APP_VERSION = "2026-11-18-4";
   // Sent with every change; the sheet refuses changes from older pages (MIN_CLIENT_GEN in Code.gs).
-  var CLIENT_GEN = 18;
+  var CLIENT_GEN = 19;
   var STORAGE_KEY = "htrc-2026-autumn-v3";
   var START = new Date(2026, 9, 24);   // Sat 24 Oct 2026
   // The half term was 16 days; old records keep their day number from START. New records use today's.
@@ -741,6 +741,8 @@
   // Great weeks: study on WEEK_DAYS days of a week (Monday to Sunday, UK days) from WEEK_FROM gives a bonus
   // Pokémon once the week is over. The same as in Code.gs.
   var WEEK_FROM = "2026-11-16", WEEK_DAYS = 5;
+  // Bonus Beyblades: extra Beyblades a child may choose, one per reason. The same as BONUS_BEYS in Code.gs.
+  var BONUS_BEYS = { taiga: ["Sorry: the times tables bar showed 12,500, but there was no badge there"], yudai: ["Well done: a positive incident in Geography"] };
   // Gym badges: one every `step` correct answers in a subject. The same as BADGE_STEPS in Code.gs.
   var BADGES = {
     maths: { step: 5000, name: "Times tables", icon: "🎸" },
@@ -970,7 +972,7 @@
       s.settings.mathsTargets[k.id] = k.mathsTarget;
       s.settings.practiceGoals[k.id] = goalsFrom(k.practiceGoals, k);
       s.settings.partnerIds[k.id] = "";
-      s.kids[k.id] = { entries: [], maths: [], practice: [], evolves: [], trades: [], prizes: [], gifts: [], events: [], awards: [], badges: [], legends: [], weeks: [], sleeps: [], wakes: [] };
+      s.kids[k.id] = { entries: [], maths: [], practice: [], evolves: [], trades: [], prizes: [], gifts: [], events: [], awards: [], badges: [], legends: [], weeks: [], sleeps: [], wakes: [], bonuses: [] };
     });
     return s;
   }
@@ -994,6 +996,7 @@
           if (!base.kids[k.id].weeks) base.kids[k.id].weeks = [];
           if (!base.kids[k.id].sleeps) base.kids[k.id].sleeps = [];
           if (!base.kids[k.id].wakes) base.kids[k.id].wakes = [];
+          if (!base.kids[k.id].bonuses) base.kids[k.id].bonuses = [];
           if (parsed.settings.targets[k.id]) base.settings.targets[k.id] = parsed.settings.targets[k.id];
           if (parsed.settings.mathsTargets[k.id]) base.settings.mathsTargets[k.id] = parsed.settings.mathsTargets[k.id];
           if (parsed.settings.partnerIds && parsed.settings.partnerIds[k.id]) base.settings.partnerIds[k.id] = parsed.settings.partnerIds[k.id];
@@ -1533,18 +1536,16 @@
     box.appendChild(g);
   }
   function num(n) { return Number(n).toLocaleString("en-GB"); }
-  // A running total against its next target, in steps of the child's goal. Every target must give a gym badge:
-  // a goal that is not a whole number of badges (times tables 2,500, MyMaths 1,500) uses the badge step instead,
-  // so the bar never promises a number where nothing happens (TAIGA reached 12,500 and got nothing, 18 Nov 2026).
-  function barStep(subject, goal) {
-    var badge = BADGES[subject];
-    return badge && goal % badge.step !== 0 ? badge.step : goal;
-  }
+  // A running total against its next target. A subject with gym badges always aims at its next badge and says so
+  // ("→ 🏅 gym badge at 15,000!"), so the bar never shows a number where nothing happens (TAIGA reached the bar's
+  // 12,500 and got nothing, 18 Nov 2026). Only a subject without badges uses the child's goal.
+  function barStep(subject, goal) { return BADGES[subject] ? BADGES[subject].step : goal; }
   function totalBar(box, cls, title, done, step, unit) {
     var t = Rules.nextTarget(done, barStep(cls, step));
     var more = unit === "XP" ? " more XP" : " more correct answer" + (t.left > 1 ? "s" : "");
+    var prize = BADGES[cls] ? "🏅 gym badge at " : "";
     // Filled by the whole total towards the next target, the same as the numbers (9,344 / 10,000 = 93%).
-    goalBar(box, cls, title, num(t.done) + " / " + num(t.next), "🎯 " + num(t.left) + more + " → " + num(t.next) + "!", t.done / t.next * 100);
+    goalBar(box, cls, title, num(t.done) + " / " + num(t.next), "🎯 " + num(t.left) + more + " → " + prize + num(t.next) + "!", t.done / t.next * 100);
   }
   // Books passed in all, and how far through the books for the next rank.
   function renderStudyGoals(s) {
@@ -2016,6 +2017,7 @@
   function renderGym() {
     var box = el("gymBadges");
     box.innerHTML = "";
+    renderBonusRow(box);
     gymOf(current).forEach(function (g) {
       var row = make("div", "gym-row" + (g.earned ? " has" : ""));
       row.appendChild(make("div", "gym-icon", g.cfg.icon));
@@ -2073,6 +2075,57 @@
     });
   }
 
+  // ---------- bonus Beyblades ----------
+  // The next bonus Beyblade the child may choose: { n, why } (n = how many were chosen before), or null.
+  function bonusLeft(kidId) {
+    var all = BONUS_BEYS[kidId] || [], used = (state.kids[kidId].bonuses || []).length;
+    return used < all.length ? { n: used, why: all[used] } : null;
+  }
+  function renderBonusRow(box) {
+    var left = bonusLeft(current);
+    if (!left || !BEYS.length) return;
+    var row = make("div", "gym-row has bonus");
+    row.appendChild(make("div", "gym-icon", "🎁"));
+    var body = make("div", "gym-body");
+    body.appendChild(make("b", "", "A present for you: choose 1 🌀 Beyblade!"));
+    body.appendChild(make("small", "", left.why + "."));
+    row.appendChild(body);
+    var b = make("button", "btn small tier-btn", "🌀 Choose!");
+    b.type = "button";
+    b.onclick = function () { openBonus(left.n); };
+    row.appendChild(b);
+    box.appendChild(row);
+  }
+  function openBonus(n) {
+    el("pzTitle").textContent = "🎁 A Beyblade for you!";
+    el("pzNote").textContent = "Choose 1 Beyblade · you can choose only once";
+    el("pzList").innerHTML = "";
+    openSheet("prizeSheet");
+    prizeTabs(function (beys) {
+      return fillBeyChoices(beys, current + "-bonus-" + n, function (id) { saveBonus(n, id); });
+    });
+    // Only Beyblades here: no Pokémon tab.
+    el("pzTabs").className = "pz-tabs hidden";
+    prizeTab("bey");
+  }
+  var bonusTry = null, bonusSaving = false;
+  function saveBonus(n, bey) {
+    if (bonusSaving) return;
+    bonusSaving = true;
+    var who = current;
+    var again = bonusTry && bonusTry.kid === who && bonusTry.n === n && bonusTry.bey === bey;
+    var entry = again ? bonusTry : { id: newId(), kid: who, day: todayIndex(), n: n, bey: bey };
+    commit({ action: "bonusbey", entry: { id: entry.id, kid: entry.kid, day: entry.day, bey: entry.bey } }, function () {
+      state.kids[who].bonuses.push({ id: entry.id, kid: who, type: "bonus", day: entry.day, title: BONUS_BEYS[who][n], bey: bey, seq: localSeq() });
+    }, function (ok, refused) {
+      bonusSaving = false;
+      bonusTry = ok || refused ? null : entry;
+      if (!ok) return;
+      closeSheets();
+      show(beyPhoto(bey, "bey-big"), "🎁 You got the Beyblade " + beyName(bey) + "!", "Look in your 🌀 Beyblades!");
+    });
+  }
+
   // ---------- Beyblades ----------
   // A gym badge or rank legend can give a Beyblade (bey-data.js: [id, name, combo], photo beys/<id>.jpg) instead
   // of a Pokémon. Beyblades are only collected: they never count for rank, Pokédex, regions, trades, EXP or the meter.
@@ -2088,7 +2141,7 @@
   // The child's Beyblades, in the order they got them.
   function beysOf(kidId) {
     var d = state.kids[kidId];
-    return (d.badges || []).concat(d.legends || []).filter(function (g) { return g.bey; }).sort(function (a, b) { return a.seq - b.seq; });
+    return (d.badges || []).concat(d.legends || [], d.bonuses || []).filter(function (g) { return g.bey; }).sort(function (a, b) { return a.seq - b.seq; });
   }
   // Three Beyblades the child does not have yet; the same three on every phone for the same badge or rank.
   function beyChoices(kidId, key) {
@@ -2942,6 +2995,7 @@
       else if (e.type === "gift" && e.badge) next.kids[e.kid].badges.push({ id: e.id, kid: e.kid, type: "badge", day: e.day, subject: e.subject || "", n: e.n || 0, mon: e.mon || 0, bey: e.bey || 0, seq: seq });
       else if (e.type === "gift" && e.award) next.kids[e.kid].awards.push({ id: e.id, kid: e.kid, type: "award", day: e.day, title: e.title || "", site: e.site || "", subject: e.subject || "", mon: e.mon || 0, seq: seq });
       else if (e.type === "sleep") next.kids[e.kid].sleeps.push({ id: e.id, kid: e.kid, type: "sleep", day: e.day, target: e.site, reason: e.title || "", seq: seq });
+      else if (e.type === "bonus") next.kids[e.kid].bonuses.push({ id: e.id, kid: e.kid, type: "bonus", day: e.day, title: e.title || "", bey: e.bey || 0, seq: seq });
       else if (e.type === "wake") next.kids[e.kid].wakes.push({ id: e.id, kid: e.kid, type: "wake", day: e.day, target: e.site, reason: e.title || "", seq: seq });
       else if (e.type === "gift") next.kids[e.kid].gifts.push({ id: e.id, kid: e.kid, type: e.type, day: e.day, title: e.title || "", mon: e.mon || 0, seq: seq });
       else next.kids[e.kid].entries.push(e);
@@ -3163,7 +3217,7 @@
         // The same next target as the child's bar (always a gym badge), so the two never disagree.
         var practice = practiceProgress().map(function (x) {
           var t = Rules.nextTarget(x.done, barStep(x.type, x.goal));
-          return x.cfg.name + " " + x.done + " / " + t.next + " (" + Math.floor(t.done / t.next * 100) + "%)";
+          return x.cfg.name + " " + x.done + " / " + t.next + " (" + Math.floor(t.done / t.next * 100) + "%, next 🏅 gym badge)";
         });
         if (practice.length) goals.splice(1, 0, practice.join(" · "));
         return { name: k.name, subjects: ["book"].concat(k.maths ? ["maths"] : [], k.practices), records: parentRecords(k.id), goals: goals };

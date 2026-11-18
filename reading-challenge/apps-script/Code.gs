@@ -40,13 +40,17 @@ var SHINY_COL = 13;
 var MAX_ID = 40;
 // Pages older than this may work out Pokémon differently, so their changes are refused.
 var MIN_CLIENT_GEN = 9;
-// Tells pages that this sheet code knows trades (2) and levels, level-up evolutions and Mega Stones (3), the Poké Ball meter (4), all 1,025 Pokémon and regions (5), shiny Pokémon (6), French (7), prize Pokémon (8), no end date, holiday events (9; the parent PIN was dropped on 14 Nov), prize balls from books again (10), school awards (11), gym badges (12), rank legends (13), great weeks (14), Seneca (15), resting Pokémon (17; 16 took them away for good and was never used), Beyblades (18).
-var SERVER_GEN = 18;
+// Tells pages that this sheet code knows trades (2) and levels, level-up evolutions and Mega Stones (3), the Poké Ball meter (4), all 1,025 Pokémon and regions (5), shiny Pokémon (6), French (7), prize Pokémon (8), no end date, holiday events (9; the parent PIN was dropped on 14 Nov), prize balls from books again (10), school awards (11), gym badges (12), rank legends (13), great weeks (14), Seneca (15), resting Pokémon (17; 16 took them away for good and was never used), Beyblades (18), bonus Beyblades (19).
+var SERVER_GEN = 19;
 // A gym badge or rank legend can give a Beyblade instead of a Pokémon: the row keeps "mon" empty and the Beyblade
 // id (1-MAX_BEY, see bey-data.js) in "total". Such rows are only sent to pages from this gen: an older page would
 // show the badge as a Pokémon with none.
 var BEY_GEN = 18;
 var BEY_COL = 8;
+// Bonus Beyblades (type "bonus"): extra Beyblades a child may choose, one per reason (the same as BONUS_BEYS in
+// index.html). Only sent to pages from BONUS_GEN: an older page would file the row as a book.
+var BONUS_BEYS = { taiga: ["Sorry: the times tables bar showed 12,500, but there was no badge there"], yudai: ["Well done: a positive incident in Geography"] };
+var BONUS_GEN = 19;
 var MAX_BEY = 999;
 // Resting Pokémon (types "sleep" and "wake") are only sent to pages from this gen: an older page would file them as books.
 var REST_GEN = 17;
@@ -109,6 +113,7 @@ function doPost(e) {
     else if (body.action === "award") addAward_(body.entry);
     else if (body.action === "badge") addBadge_(body.entry);
     else if (body.action === "legend") addLegend_(body.entry);
+    else if (body.action === "bonusbey") addBonusBey_(body.entry);
     else if (body.action === "week") addWeek_(body.entry);
     else if (body.action === "sleep") addSleep_(body.pin, body.entry);
     else if (body.action === "wake") addWake_(body.pin, body.entry);
@@ -124,7 +129,7 @@ function doPost(e) {
 function snapshot_(gen) {
   var rows = entriesSheet_().getDataRange().getValues().slice(1);
   var entries = rows.filter(function (r) {
-    return r[0] !== "" && r[2] !== "release" && (REST_TYPES.indexOf(r[2]) < 0 || gen >= REST_GEN) && (!isBeyRow_(r) || gen >= BEY_GEN);
+    return r[0] !== "" && r[2] !== "release" && (REST_TYPES.indexOf(r[2]) < 0 || gen >= REST_GEN) && (!isBeyRow_(r) || gen >= BEY_GEN) && (r[2] !== "bonus" || gen >= BONUS_GEN);
   }).map(function (r) {
     var base = { id: String(r[0]), kid: String(r[1]), type: String(r[2]), day: Number(r[3]), site: String(r[5]), mon: Number(r[MON_COL - 1]) || 0 };
     if (base.type === "maths" || PRACTICE_SITES.hasOwnProperty(base.type)) {
@@ -180,6 +185,10 @@ function snapshot_(gen) {
       base.award = 1;
       base.title = String(r[4]);
       base.subject = String(r[6]);
+    }
+    else if (base.type === "bonus") {
+      base.title = String(r[4]);
+      base.bey = Number(r[BEY_COL - 1]) || 0;
     }
     else if (base.type === "sleep" || base.type === "wake") {
       // sleep: "site" = the Pokémon (record that caught it); wake: "site" = the sleep it ends. "title" = why.
@@ -664,9 +673,27 @@ function addBadge_(x) {
   entriesSheet_().appendRow([id, kid, "badge", day, subject, "Badge", n, pick.bey, "", new Date(), pick.mon, "", ""]);
 }
 
-// A Beyblade row: a gym badge or rank legend that gave a Beyblade (its id in "total") instead of a Pokémon.
+// A Beyblade row: a gym badge or rank legend that gave a Beyblade (its id in "total") instead of a Pokémon,
+// or a bonus Beyblade.
 function isBeyRow_(r) {
-  return (r[2] === "badge" || r[2] === "legend") && Number(r[BEY_COL - 1]) > 0;
+  return (r[2] === "badge" || r[2] === "legend" || r[2] === "bonus") && Number(r[BEY_COL - 1]) > 0;
+}
+// A bonus Beyblade (type "bonus"): one of the BONUS_BEYS a child may choose. "title" = why, "total" = the Beyblade.
+// Same id twice = one row; never more than the child's BONUS_BEYS.
+function addBonusBey_(x) {
+  if (!x) throw new Error("Missing entry");
+  var id = String(x.id || "").slice(0, MAX_ID), kid = String(x.kid || ""), day = Number(x.day);
+  if (!id) throw new Error("Missing id");
+  if (rowOf_(id) > 0) return;
+  if (!KIDS.hasOwnProperty(kid)) throw new Error("Unknown kid");
+  if (!isInt_(day) || day < 0 || day > MAX_DAY) throw new Error("Bad day");
+  if (x.bey === undefined || x.bey === null || x.bey === "") throw new Error("Bad Beyblade");
+  var allowed = BONUS_BEYS[kid] || [];
+  var rows = entriesSheet_().getDataRange().getValues().slice(1);
+  var used = rows.filter(function (r) { return r[2] === "bonus" && String(r[1]) === kid; }).length;
+  if (used >= allowed.length) throw new Error("Not possible: no bonus Beyblade to choose.");
+  var pick = prizePick_(x, kid, rows);
+  entriesSheet_().appendRow([id, kid, "bonus", day, allowed[used], "Bonus", "", pick.bey, "", new Date(), "", "", ""]);
 }
 // What a gym badge or rank legend gives: a Pokémon ("mon", never a prize legendary) or a Beyblade ("bey")
 // the child does not have yet. The page knows the Beyblades; the sheet only checks the id is a whole number.
