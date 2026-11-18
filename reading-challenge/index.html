@@ -689,13 +689,13 @@
 </div>
 
 <!-- ?v= must change with APP_VERSION so phones fetch the new files -->
-<script src="evo-data.js?v=2026-11-18-1"></script>
-<script src="dex-data.js?v=2026-11-18-1"></script>
-<script src="growth.js?v=2026-11-18-1"></script>
-<script src="regions.js?v=2026-11-18-1"></script>
-<script src="rules.js?v=2026-11-18-1"></script>
-<script src="parent.js?v=2026-11-18-1"></script>
-<script src="bey-data.js?v=2026-11-18-1"></script>
+<script src="evo-data.js?v=2026-11-18-2"></script>
+<script src="dex-data.js?v=2026-11-18-2"></script>
+<script src="growth.js?v=2026-11-18-2"></script>
+<script src="regions.js?v=2026-11-18-2"></script>
+<script src="rules.js?v=2026-11-18-2"></script>
+<script src="parent.js?v=2026-11-18-2"></script>
+<script src="bey-data.js?v=2026-11-18-2"></script>
 <script>
 (function () {
   "use strict";
@@ -705,7 +705,7 @@
   var REFRESH_MS = 60000;
   // Change on every release: a page left open with older code reloads itself,
   // so every phone works out the same Pokémon.
-  var APP_VERSION = "2026-11-18-1";
+  var APP_VERSION = "2026-11-18-2";
   // Sent with every change; the sheet refuses changes from older pages (MIN_CLIENT_GEN in Code.gs).
   var CLIENT_GEN = 18;
   var STORAGE_KEY = "htrc-2026-autumn-v3";
@@ -1533,9 +1533,15 @@
     box.appendChild(g);
   }
   function num(n) { return Number(n).toLocaleString("en-GB"); }
-  // A running total against its next target, in steps of the child's goal (e.g. 2,500 times tables answers).
+  // A running total against its next target, in steps of the child's goal. Every target must give a gym badge:
+  // a goal that is not a whole number of badges (times tables 2,500, MyMaths 1,500) uses the badge step instead,
+  // so the bar never promises a number where nothing happens (TAIGA reached 12,500 and got nothing, 18 Nov 2026).
+  function barStep(subject, goal) {
+    var badge = BADGES[subject];
+    return badge && goal % badge.step !== 0 ? badge.step : goal;
+  }
   function totalBar(box, cls, title, done, step, unit) {
-    var t = Rules.nextTarget(done, step);
+    var t = Rules.nextTarget(done, barStep(cls, step));
     var more = unit === "XP" ? " more XP" : " more correct answer" + (t.left > 1 ? "s" : "");
     // Filled by the whole total towards the next target, the same as the numbers (9,344 / 10,000 = 93%).
     goalBar(box, cls, title, num(t.done) + " / " + num(t.next), "🎯 " + num(t.left) + more + " → " + num(t.next) + "!", t.done / t.next * 100);
@@ -3154,7 +3160,11 @@
       return forKid(k.id, function () {
         var s = summary();
         var goals = ["Books " + s.caught + " · " + rankNextMessage(s)];
-        var practice = practiceProgress().map(function (x) { return x.cfg.name + " " + x.done + " / " + x.goal + " (" + x.pct + "%)"; });
+        // The same next target as the child's bar (always a gym badge), so the two never disagree.
+        var practice = practiceProgress().map(function (x) {
+          var t = Rules.nextTarget(x.done, barStep(x.type, x.goal));
+          return x.cfg.name + " " + x.done + " / " + t.next + " (" + Math.floor(t.done / t.next * 100) + "%)";
+        });
         if (practice.length) goals.splice(1, 0, practice.join(" · "));
         return { name: k.name, subjects: ["book"].concat(k.maths ? ["maths"] : [], k.practices), records: parentRecords(k.id), goals: goals };
       });
