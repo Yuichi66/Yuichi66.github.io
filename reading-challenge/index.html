@@ -699,14 +699,14 @@
 </div>
 
 <!-- ?v= must change with APP_VERSION so phones fetch the new files -->
-<script src="evo-data.js?v=2026-11-21-2"></script>
-<script src="dex-data.js?v=2026-11-21-2"></script>
-<script src="growth.js?v=2026-11-21-2"></script>
-<script src="regions.js?v=2026-11-21-2"></script>
-<script src="rules.js?v=2026-11-21-2"></script>
-<script src="parent.js?v=2026-11-21-2"></script>
-<script src="bey-data.js?v=2026-11-21-2"></script>
-<script src="battle.js?v=2026-11-21-2"></script>
+<script src="evo-data.js?v=2026-11-21-3"></script>
+<script src="dex-data.js?v=2026-11-21-3"></script>
+<script src="growth.js?v=2026-11-21-3"></script>
+<script src="regions.js?v=2026-11-21-3"></script>
+<script src="rules.js?v=2026-11-21-3"></script>
+<script src="parent.js?v=2026-11-21-3"></script>
+<script src="bey-data.js?v=2026-11-21-3"></script>
+<script src="battle.js?v=2026-11-21-3"></script>
 <script>
 (function () {
   "use strict";
@@ -716,7 +716,7 @@
   var REFRESH_MS = 60000;
   // Change on every release: a page left open with older code reloads itself,
   // so every phone works out the same Pokémon.
-  var APP_VERSION = "2026-11-21-2";
+  var APP_VERSION = "2026-11-21-3";
   // Sent with every change; the sheet refuses changes from older pages (MIN_CLIENT_GEN in Code.gs).
   var CLIENT_GEN = 19;
   var STORAGE_KEY = "htrc-2026-autumn-v3";
@@ -2133,7 +2133,7 @@
       var b = make("button", "btn purple small", "▶ Watch the battle!");
       b.type = "button"; b.id = "watchBattle";
       b.onclick = function () {
-        BeyBattle.play({ fighters: battleFighters(wk), seed: wk.from, note: "Pokémon caught from study, " + range });
+        BeyBattle.play({ fighters: battleFighters(wk), seed: wk.from, note: "Pokémon caught from study, " + range, onEnd: render });
       };
       body.appendChild(b);
     }
@@ -3163,7 +3163,7 @@
   function reloadIfOutdated() {
     if (location.protocol === "file:") return;
     fetch(location.pathname, { cache: "no-store" }).then(function (r) { return r.ok ? r.text() : ""; }).then(function (text) {
-      var busy = document.querySelector(".sheet.show, .overlay.show");
+      var busy = document.querySelector(".sheet.show, .overlay.show, .bb");
       // Busy now: the next check (every minute) tries again; the sheet also refuses changes from old pages.
       if (text && text.indexOf('var APP_VERSION = "' + APP_VERSION + '"') < 0 && !busy) location.reload();
     }).catch(function () { /* offline: try again next time */ });
@@ -3528,7 +3528,7 @@
     catch (e) { return {}; }
   })();
   function celebrateGift() {
-    if (growthNote || document.querySelector(".sheet.show, .overlay.show")) return;
+    if (growthNote || document.querySelector(".sheet.show, .overlay.show, .bb")) return;
     var g = (data().gifts || []).filter(function (x) { return !giftsSeen[x.id]; })[0];
     if (!g) return;
     var c = catches().byId[g.id];
