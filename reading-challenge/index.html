@@ -699,14 +699,14 @@
 </div>
 
 <!-- ?v= must change with APP_VERSION so phones fetch the new files -->
-<script src="evo-data.js?v=2026-11-21-3"></script>
-<script src="dex-data.js?v=2026-11-21-3"></script>
-<script src="growth.js?v=2026-11-21-3"></script>
-<script src="regions.js?v=2026-11-21-3"></script>
-<script src="rules.js?v=2026-11-21-3"></script>
-<script src="parent.js?v=2026-11-21-3"></script>
-<script src="bey-data.js?v=2026-11-21-3"></script>
-<script src="battle.js?v=2026-11-21-3"></script>
+<script src="evo-data.js?v=2026-11-21-4"></script>
+<script src="dex-data.js?v=2026-11-21-4"></script>
+<script src="growth.js?v=2026-11-21-4"></script>
+<script src="regions.js?v=2026-11-21-4"></script>
+<script src="rules.js?v=2026-11-21-4"></script>
+<script src="parent.js?v=2026-11-21-4"></script>
+<script src="bey-data.js?v=2026-11-21-4"></script>
+<script src="battle.js?v=2026-11-21-4"></script>
 <script>
 (function () {
   "use strict";
@@ -716,7 +716,7 @@
   var REFRESH_MS = 60000;
   // Change on every release: a page left open with older code reloads itself,
   // so every phone works out the same Pokémon.
-  var APP_VERSION = "2026-11-21-3";
+  var APP_VERSION = "2026-11-21-4";
   // Sent with every change; the sheet refuses changes from older pages (MIN_CLIENT_GEN in Code.gs).
   var CLIENT_GEN = 19;
   var STORAGE_KEY = "htrc-2026-autumn-v3";
@@ -972,7 +972,11 @@
   var DAY_NAMES = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
   var state = load();
-  var current = KIDS[0].id;
+  // The child shown first: ?kid=yudai (or taiga, leo) in the address opens that child's page; otherwise the first.
+  var current = (function () {
+    var m = /[?&]kid=([a-z]+)/.exec(location.search);
+    return m && KIDS.some(function (k) { return k.id === m[1]; }) ? m[1] : KIDS[0].id;
+  })();
   // Seed of the next book, made early so "Who's that Pokémon?" shows the one it will catch.
   var pendingSeed = newSeed();
 
