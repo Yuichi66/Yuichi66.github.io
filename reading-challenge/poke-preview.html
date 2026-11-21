@@ -1,0 +1,14 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Pokémon Battle Preview</title><meta name="robots" content="noindex">
+<style>html,body{margin:0;height:100%;background:#10142a;color:#fff;font-family:system-ui,-apple-system,sans-serif}
+main{min-height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;padding:24px 16px;box-sizing:border-box;text-align:center}
+h1{font-size:26px;margin:0}p{margin:0;opacity:.8;font-size:15px;max-width:420px;line-height:1.5}
+button{font:inherit;font-size:20px;font-weight:700;border:0;border-radius:14px;padding:16px 28px;background:#ffcb05;color:#10142a}</style></head>
+<body><main><h1>⚔️ Pokémon Battle Preview</h1>
+<p>A preview with this week's catches (Mon 16 Nov to Fri 20 Nov). The first real Pokémon Battle is on Sat 28 Nov.</p>
+<button id="go">▶ Watch the battle!</button></main>
+<script src="battle.js?v=2026-11-21-5"></script><script src="pokebattle.js?v=2026-11-21-5"></script>
+<script>var OPTS = {"fighters":[{"name":"TAIGA","monName":"Gigantamax Charizard","level":65,"type":"Fire","img":"https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/10196.png","img2":"https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/10196.png","score":6,"color":"#e3350d"},{"name":"LEO","monName":"Gigantamax Snorlax","level":42,"type":"Normal","img":"https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/10206.png","img2":"https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/10206.png","score":5,"color":"#2a75bb"},{"name":"YUDAI","monName":"Scyther","level":12,"type":"Bug","img":"https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/123.png","img2":"https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/123.png","score":1,"color":"#2fb36d"}],"seed":"2026-11-16","note":"Preview: Pokémon caught from study, Mon 16 Nov to Fri 20 Nov"};
+document.getElementById("go").onclick = function () { PokeBattle.play(JSON.parse(JSON.stringify(OPTS))); };</script>
+</body></html>
