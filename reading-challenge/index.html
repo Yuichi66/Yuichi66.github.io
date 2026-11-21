@@ -148,6 +148,7 @@
   /* Beyblade Battle card (battle.js draws the battle itself) */
   .battle-card { display: flex; align-items: center; gap: 12px; color: #fff; background: radial-gradient(circle at 20% 30%, #31508a 0, #0b1224 80%); }
   .battle-card .battle-icon { font-size: 40px; animation: spin 1.2s linear infinite; }
+  .battle-card .battle-icon.poke { animation: none; }
   .battle-card .battle-body { flex: 1; }
   .battle-card b { display: block; font-size: 20px; color: var(--yellow); }
   .battle-card small { display: block; opacity: .85; margin: 2px 0 8px; }
@@ -699,14 +700,15 @@
 </div>
 
 <!-- ?v= must change with APP_VERSION so phones fetch the new files -->
-<script src="evo-data.js?v=2026-11-21-4"></script>
-<script src="dex-data.js?v=2026-11-21-4"></script>
-<script src="growth.js?v=2026-11-21-4"></script>
-<script src="regions.js?v=2026-11-21-4"></script>
-<script src="rules.js?v=2026-11-21-4"></script>
-<script src="parent.js?v=2026-11-21-4"></script>
-<script src="bey-data.js?v=2026-11-21-4"></script>
-<script src="battle.js?v=2026-11-21-4"></script>
+<script src="evo-data.js?v=2026-11-21-5"></script>
+<script src="dex-data.js?v=2026-11-21-5"></script>
+<script src="growth.js?v=2026-11-21-5"></script>
+<script src="regions.js?v=2026-11-21-5"></script>
+<script src="rules.js?v=2026-11-21-5"></script>
+<script src="parent.js?v=2026-11-21-5"></script>
+<script src="bey-data.js?v=2026-11-21-5"></script>
+<script src="battle.js?v=2026-11-21-5"></script>
+<script src="pokebattle.js?v=2026-11-21-5"></script>
 <script>
 (function () {
   "use strict";
@@ -716,7 +718,7 @@
   var REFRESH_MS = 60000;
   // Change on every release: a page left open with older code reloads itself,
   // so every phone works out the same Pokémon.
-  var APP_VERSION = "2026-11-21-4";
+  var APP_VERSION = "2026-11-21-5";
   // Sent with every change; the sheet refuses changes from older pages (MIN_CLIENT_GEN in Code.gs).
   var CLIENT_GEN = 19;
   var STORAGE_KEY = "htrc-2026-autumn-v3";
@@ -2097,10 +2099,17 @@
   }
 
   // ---------- Beyblade Battle ----------
-  // On Saturday and Sunday every child sees the same battle of the three children's Beyblades (battle.js).
+  // On Saturday and Sunday every child sees the same battle: the children's Beyblades (battle.js) one week, their
+  // partner Pokémon (pokebattle.js) the next, starting with Beyblades in the week of BATTLE_FROM.
   // Points = Pokémon caught from study (a book, times tables or practice record that caught one) from Monday
   // to Friday of this week (UK days). The most points wins; the same number means both win. No prize.
   var BATTLE_COLORS = { taiga: "#e3350d", leo: "#2a75bb", yudai: "#2fb36d" };
+  var BATTLE_FROM = "2026-11-16";
+  // "bey" or "poke" for the week starting on Monday `mon`.
+  function battleKind(mon) {
+    var weeks = Math.round((Date.parse(mon + "T12:00:00Z") - Date.parse(BATTLE_FROM + "T12:00:00Z")) / (7 * 864e5));
+    return ((weeks % 2) + 2) % 2 === 0 ? "bey" : "poke";
+  }
   function studyCatches(kidId, from, to) {
     var d = state.kids[kidId];
     return d.entries.concat(d.maths, d.practice).filter(function (x) {
@@ -2111,7 +2120,7 @@
   // This week's battle: { from: Monday, to: Friday, open: true on Saturday and Sunday }.
   function battleWeek() {
     var today = Rules.dayKey(Date.now()), mon = Rules.weekStart(today), fri = Rules.addDays(mon, 4);
-    return { from: mon, to: fri, open: today > fri };
+    return { from: mon, to: fri, open: today > fri, kind: battleKind(mon) };
   }
   function battleFighters(wk) {
     return KIDS.map(function (k) {
@@ -2120,24 +2129,36 @@
         score: studyCatches(k.id, wk.from, wk.to), color: BATTLE_COLORS[k.id] || "#7b3fe4" };
     });
   }
+  // Each child's partner Pokémon (the one shown in My progress) with its level and first type.
+  function pokeFighters(wk) {
+    var w = world();
+    return KIDS.map(function (k) {
+      var m = partnerOf(k.id, w), score = studyCatches(k.id, wk.from, wk.to), color = BATTLE_COLORS[k.id] || "#7b3fe4";
+      if (!m) return { name: k.name, monName: "", level: 0, type: "Normal", img: "", score: score, color: color };
+      return { name: k.name, monName: (m.c.shiny ? "✨" : "") + m.c.name, level: m.level, type: monEntry(Regions.speciesOf(m.c.dex) || m.c.dex)[1],
+        img: artUrl(m.c.dex, m.c.shiny), img2: spriteUrl(m.c.dex, m.c.shiny), score: score, color: color };
+    });
+  }
   function renderBattle() {
     var box = el("battleCard"), wk = battleWeek();
     box.innerHTML = "";
-    if (typeof BeyBattle === "undefined") { box.className = "panel battle-card hidden"; return; }
+    var poke = wk.kind === "poke", title = poke ? "Pokémon Battle" : "Beyblade Battle";
+    if (typeof BeyBattle === "undefined" || poke && typeof PokeBattle === "undefined") { box.className = "panel battle-card hidden"; return; }
     box.className = "panel battle-card" + (wk.open ? "" : " soon");
-    box.appendChild(make("div", "battle-icon", "🌀"));
+    box.appendChild(make("div", "battle-icon" + (poke ? " poke" : ""), poke ? "⚔️" : "🌀"));
     var body = make("div", "battle-body");
     var range = fmt(new Date(wk.from + "T00:00")) + " to " + fmt(new Date(wk.to + "T00:00"));
     if (!wk.open) {
-      body.appendChild(make("b", "", "Beyblade Battle on Saturday!"));
-      body.appendChild(make("small", "", "Who catches the most Pokémon from Monday to Friday? Their Beyblade wins!"));
+      body.appendChild(make("b", "", title + " on Saturday!"));
+      body.appendChild(make("small", "", "Who catches the most Pokémon from Monday to Friday? " + (poke ? "Their partner Pokémon" : "Their Beyblade") + " wins!"));
     } else {
-      body.appendChild(make("b", "", "Beyblade Battle!"));
+      body.appendChild(make("b", "", title + "!"));
       body.appendChild(make("small", "", "Who caught the most Pokémon from " + range + "?"));
       var b = make("button", "btn purple small", "▶ Watch the battle!");
       b.type = "button"; b.id = "watchBattle";
       b.onclick = function () {
-        BeyBattle.play({ fighters: battleFighters(wk), seed: wk.from, note: "Pokémon caught from study, " + range, onEnd: render });
+        var o = { seed: wk.from, note: "Pokémon caught from study, " + range, onEnd: render };
+        if (poke) { o.fighters = pokeFighters(wk); PokeBattle.play(o); } else { o.fighters = battleFighters(wk); BeyBattle.play(o); }
       };
       body.appendChild(b);
     }

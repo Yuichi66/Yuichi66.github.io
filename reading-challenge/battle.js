@@ -622,5 +622,6 @@ var BeyBattle = (function () {
     return { close: finish };
   }
 
-  return { play: play, result: result };
+  // kit: the parts pokebattle.js shares (seeded random, sound, the screen's styles, easing).
+  return { play: play, result: result, kit: { rng: rng, Sound: Sound, addStyle: addStyle, clamp: clamp, ease: ease, pop: pop } };
 })();
