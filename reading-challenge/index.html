@@ -145,6 +145,13 @@
   .gym-row.has { background: #fff6c8; }
   .gym-row .gym-icon { font-size: 26px; }
   .gym-row .gym-body { flex: 1; }
+  /* Beyblade Battle card (battle.js draws the battle itself) */
+  .battle-card { display: flex; align-items: center; gap: 12px; color: #fff; background: radial-gradient(circle at 20% 30%, #31508a 0, #0b1224 80%); }
+  .battle-card .battle-icon { font-size: 40px; animation: spin 1.2s linear infinite; }
+  .battle-card .battle-body { flex: 1; }
+  .battle-card b { display: block; font-size: 20px; color: var(--yellow); }
+  .battle-card small { display: block; opacity: .85; margin: 2px 0 8px; }
+  .battle-card.soon small { margin-bottom: 0; }
   .gym-row b { display: block; font-size: 15px; }
   .gym-row small { display: block; font-size: 13px; color: #555; font-weight: bold; }
   .award-row { margin-top: 12px; text-align: center; }
@@ -383,6 +390,9 @@
   </header>
 
   <div class="tabs" id="tabs"></div>
+
+  <!-- Beyblade Battle (Saturday and Sunday) -->
+  <section class="panel battle-card hidden" id="battleCard"></section>
 
   <!-- 1. Today's missions -->
   <section class="panel">
@@ -689,13 +699,14 @@
 </div>
 
 <!-- ?v= must change with APP_VERSION so phones fetch the new files -->
-<script src="evo-data.js?v=2026-11-21-1"></script>
-<script src="dex-data.js?v=2026-11-21-1"></script>
-<script src="growth.js?v=2026-11-21-1"></script>
-<script src="regions.js?v=2026-11-21-1"></script>
-<script src="rules.js?v=2026-11-21-1"></script>
-<script src="parent.js?v=2026-11-21-1"></script>
-<script src="bey-data.js?v=2026-11-21-1"></script>
+<script src="evo-data.js?v=2026-11-21-2"></script>
+<script src="dex-data.js?v=2026-11-21-2"></script>
+<script src="growth.js?v=2026-11-21-2"></script>
+<script src="regions.js?v=2026-11-21-2"></script>
+<script src="rules.js?v=2026-11-21-2"></script>
+<script src="parent.js?v=2026-11-21-2"></script>
+<script src="bey-data.js?v=2026-11-21-2"></script>
+<script src="battle.js?v=2026-11-21-2"></script>
 <script>
 (function () {
   "use strict";
@@ -705,7 +716,7 @@
   var REFRESH_MS = 60000;
   // Change on every release: a page left open with older code reloads itself,
   // so every phone works out the same Pokémon.
-  var APP_VERSION = "2026-11-21-1";
+  var APP_VERSION = "2026-11-21-2";
   // Sent with every change; the sheet refuses changes from older pages (MIN_CLIENT_GEN in Code.gs).
   var CLIENT_GEN = 19;
   var STORAGE_KEY = "htrc-2026-autumn-v3";
@@ -2081,6 +2092,54 @@
     });
   }
 
+  // ---------- Beyblade Battle ----------
+  // On Saturday and Sunday every child sees the same battle of the three children's Beyblades (battle.js).
+  // Points = Pokémon caught from study (a book, times tables or practice record that caught one) from Monday
+  // to Friday of this week (UK days). The most points wins; the same number means both win. No prize.
+  var BATTLE_COLORS = { taiga: "#e3350d", leo: "#2a75bb", yudai: "#2fb36d" };
+  function studyCatches(kidId, from, to) {
+    var d = state.kids[kidId];
+    return d.entries.concat(d.maths, d.practice).filter(function (x) {
+      var k = Rules.dayKey(loggedAt(x));
+      return x.mon && loggedAt(x) && k >= from && k <= to;
+    }).length;
+  }
+  // This week's battle: { from: Monday, to: Friday, open: true on Saturday and Sunday }.
+  function battleWeek() {
+    var today = Rules.dayKey(Date.now()), mon = Rules.weekStart(today), fri = Rules.addDays(mon, 4);
+    return { from: mon, to: fri, open: today > fri };
+  }
+  function battleFighters(wk) {
+    return KIDS.map(function (k) {
+      var bs = beysOf(k.id), last = bs[bs.length - 1];
+      return { name: k.name, beyName: last ? beyName(last.bey) : "", img: last && beyById(last.bey) ? "beys/" + last.bey + ".jpg" : "",
+        score: studyCatches(k.id, wk.from, wk.to), color: BATTLE_COLORS[k.id] || "#7b3fe4" };
+    });
+  }
+  function renderBattle() {
+    var box = el("battleCard"), wk = battleWeek();
+    box.innerHTML = "";
+    if (typeof BeyBattle === "undefined") { box.className = "panel battle-card hidden"; return; }
+    box.className = "panel battle-card" + (wk.open ? "" : " soon");
+    box.appendChild(make("div", "battle-icon", "🌀"));
+    var body = make("div", "battle-body");
+    var range = fmt(new Date(wk.from + "T00:00")) + " to " + fmt(new Date(wk.to + "T00:00"));
+    if (!wk.open) {
+      body.appendChild(make("b", "", "Beyblade Battle on Saturday!"));
+      body.appendChild(make("small", "", "Who catches the most Pokémon from Monday to Friday? Their Beyblade wins!"));
+    } else {
+      body.appendChild(make("b", "", "Beyblade Battle!"));
+      body.appendChild(make("small", "", "Who caught the most Pokémon from " + range + "?"));
+      var b = make("button", "btn purple small", "▶ Watch the battle!");
+      b.type = "button"; b.id = "watchBattle";
+      b.onclick = function () {
+        BeyBattle.play({ fighters: battleFighters(wk), seed: wk.from, note: "Pokémon caught from study, " + range });
+      };
+      body.appendChild(b);
+    }
+    box.appendChild(body);
+  }
+
   // ---------- bonus Beyblades ----------
   // The next bonus Beyblade the child may choose: { n, why } (n = how many were chosen before), or null.
   function bonusLeft(kidId) {
@@ -2955,6 +3014,7 @@
     var s = summary();
     el("dates").textContent = "📚 Reading Challenge";
     renderTabs();
+    renderBattle();
     renderMissions();
     renderProgress(s);
     renderBox();
