@@ -76,11 +76,14 @@ var BADGE_STEPS = { maths: 5000, latin: 5000, french: 5000, mymaths: 1000, senec
 // Rank legends (type "legend"): a legendary Pokémon the child chooses at these ranks (0-based like "peak":
 // Rank 10, Rank 15 and CHAMPION). "title" = the rank. The same as RANK_LEGENDS in index.html.
 var RANK_LEGENDS = [9, 14, 20];
-// Great weeks (type "week"): a bonus Pokémon for a week (Monday to Sunday, UK days) with study on WEEK_DAYS days
-// or more, from WEEK_FROM, once the week is over. A day counts when a book, times tables or practice record was
-// logged on it (the time in its id, like the page). "title" = the Monday. The same as in index.html.
+// Great weeks (type "week"): a bonus Pokémon for a week (Monday to Sunday, UK days) with study on every day
+// (WEEK_DAYS = 7), from WEEK_FROM, once the week is over. The first week (16 Nov) needed 5 days (WEEK_DAYS_BEFORE).
+// A day counts when a book, times tables or practice record was logged on it (the time in its id, like the page).
+// "title" = the Monday. The same as in index.html.
 var WEEK_FROM = "2026-11-16";
-var WEEK_DAYS = 5;
+var WEEK_DAYS = 7;
+var WEEK_DAYS_BEFORE = { "2026-11-16": 5 };
+function weekDays_(week) { return WEEK_DAYS_BEFORE[week] || WEEK_DAYS; }
 var STUDY_TYPES = ["read", "maths", "latin", "mymaths", "french", "seneca"];
 var BADGE_NAMES = { maths: "Times tables", latin: "Latin", french: "French", mymaths: "MyMaths", seneca: "Seneca" };
 var PASS_RATE = 0.8;
@@ -761,7 +764,7 @@ function addWeek_(x) {
   if (!isInt_(mon) || mon <= 0 || mon > MAX_FORM || PRIZE_MONS[1].concat(PRIZE_MONS[2]).indexOf(mon) >= 0) throw new Error("Bad Pokémon");
   if (dayKey_(Date.now()) <= addDays_(week, 6)) throw new Error("Not possible: that week is not over yet.");
   var rows = entriesSheet_().getDataRange().getValues().slice(1);
-  if (studyDays_(kid, week, rows) < WEEK_DAYS) throw new Error("Not possible: fewer than " + WEEK_DAYS + " days that week.");
+  if (studyDays_(kid, week, rows) < weekDays_(week)) throw new Error("Not possible: fewer than " + weekDays_(week) + " days that week.");
   if (rows.some(function (r) { return r[2] === "week" && String(r[1]) === kid && cellDay_(r[4], "week") === week; })) throw new Error("Not possible: that week's bonus was already caught.");
   // Stored with a leading ' so Sheets keeps it as text (a Date would depend on the spreadsheet's time zone).
   entriesSheet_().appendRow([id, kid, "week", day, "'" + week, "Week", "", "", "", new Date(), mon, "", ""]);

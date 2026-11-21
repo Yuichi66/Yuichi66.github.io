@@ -689,13 +689,13 @@
 </div>
 
 <!-- ?v= must change with APP_VERSION so phones fetch the new files -->
-<script src="evo-data.js?v=2026-11-18-4"></script>
-<script src="dex-data.js?v=2026-11-18-4"></script>
-<script src="growth.js?v=2026-11-18-4"></script>
-<script src="regions.js?v=2026-11-18-4"></script>
-<script src="rules.js?v=2026-11-18-4"></script>
-<script src="parent.js?v=2026-11-18-4"></script>
-<script src="bey-data.js?v=2026-11-18-4"></script>
+<script src="evo-data.js?v=2026-11-21-1"></script>
+<script src="dex-data.js?v=2026-11-21-1"></script>
+<script src="growth.js?v=2026-11-21-1"></script>
+<script src="regions.js?v=2026-11-21-1"></script>
+<script src="rules.js?v=2026-11-21-1"></script>
+<script src="parent.js?v=2026-11-21-1"></script>
+<script src="bey-data.js?v=2026-11-21-1"></script>
 <script>
 (function () {
   "use strict";
@@ -705,7 +705,7 @@
   var REFRESH_MS = 60000;
   // Change on every release: a page left open with older code reloads itself,
   // so every phone works out the same Pokémon.
-  var APP_VERSION = "2026-11-18-4";
+  var APP_VERSION = "2026-11-21-1";
   // Sent with every change; the sheet refuses changes from older pages (MIN_CLIENT_GEN in Code.gs).
   var CLIENT_GEN = 19;
   var STORAGE_KEY = "htrc-2026-autumn-v3";
@@ -738,9 +738,10 @@
   // Rank legends: a legendary Pokémon to choose at these ranks (0-based; Rank 10, Rank 15, CHAMPION).
   // The same as RANK_LEGENDS in Code.gs.
   var RANK_LEGENDS = [9, 14, 20];
-  // Great weeks: study on WEEK_DAYS days of a week (Monday to Sunday, UK days) from WEEK_FROM gives a bonus
-  // Pokémon once the week is over. The same as in Code.gs.
-  var WEEK_FROM = "2026-11-16", WEEK_DAYS = 5;
+  // Great weeks: study on every day of a week (WEEK_DAYS = 7, Monday to Sunday, UK days) from WEEK_FROM gives a
+  // bonus Pokémon once the week is over. The first week (16 Nov) needed 5 days. The same as in Code.gs.
+  var WEEK_FROM = "2026-11-16", WEEK_DAYS = 7, WEEK_DAYS_BEFORE = { "2026-11-16": 5 };
+  function weekDays(week) { return WEEK_DAYS_BEFORE[week] || WEEK_DAYS; }
   // Bonus Beyblades: extra Beyblades a child may choose, one per reason. The same as BONUS_BEYS in Code.gs.
   var BONUS_BEYS = { taiga: ["Sorry: the times tables bar showed 12,500, but there was no badge there"], yudai: ["Well done: a positive incident in Geography"] };
   // Gym badges: one every `step` correct answers in a subject. The same as BADGE_STEPS in Code.gs.
@@ -1827,7 +1828,8 @@
   // ---------- great weeks ----------
   // Days with study (a book tried, times tables or practice logged; the time in the record's id) in the week
   // starting on Monday `start`, for a child. The same rule as studyDays_ in Code.gs.
-  function studyDays(kidId, start) {
+  function studyDays(kidId, start) { return Object.keys(studyDayKeys(kidId, start)).length; }
+  function studyDayKeys(kidId, start) {
     var d = state.kids[kidId], end = Rules.addDays(start, 6), days = {};
     d.entries.concat(d.maths, d.practice).forEach(function (x) {
       var ms = loggedAt(x);
@@ -1835,14 +1837,14 @@
       var k = Rules.dayKey(ms);
       if (k >= start && k <= end) days[k] = true;
     });
-    return Object.keys(days).length;
+    return days;
   }
   // Finished weeks from WEEK_FROM with enough days whose bonus is not caught yet, oldest first.
   function weeksToClaim(kidId) {
     var thisWeek = Rules.weekStart(Rules.dayKey(Date.now())), out = [];
     var got = (state.kids[kidId].weeks || []).map(function (w) { return w.week; });
     for (var w = WEEK_FROM; w < thisWeek; w = Rules.addDays(w, 7)) {
-      if (got.indexOf(w) < 0 && studyDays(kidId, w) >= WEEK_DAYS) out.push(w);
+      if (got.indexOf(w) < 0 && studyDays(kidId, w) >= weekDays(w)) out.push(w);
     }
     return out;
   }
@@ -1854,13 +1856,17 @@
     var body = make("div", "gym-body");
     if (thisWeek < WEEK_FROM) {
       body.appendChild(make("b", "", "Starts on " + fmt(new Date(WEEK_FROM + "T00:00")) + "!"));
-      body.appendChild(make("small", "", "Study on " + WEEK_DAYS + " days of a week (Mon to Sun) → a bonus Pokémon the next Monday!"));
+      body.appendChild(make("small", "", "Study every day of a week (Mon to Sun) → a bonus Pokémon the next Monday!"));
     } else {
-      var n = studyDays(current, thisWeek);
-      body.appendChild(make("b", "", "This week: " + Math.min(n, 7) + " / " + WEEK_DAYS + " days"));
-      body.appendChild(make("small", "", n >= WEEK_DAYS ? "✅ Great week! Your bonus Pokémon comes on Monday!" :
-        "🎯 " + (WEEK_DAYS - n) + " more day" + (WEEK_DAYS - n > 1 ? "s" : "") + " of study → a bonus Pokémon next Monday!"));
-      if (n >= WEEK_DAYS) row.className += " has";
+      var keys = studyDayKeys(current, thisWeek), n = Object.keys(keys).length, need = weekDays(thisWeek);
+      // Days still free this week: today (if no study yet) to Sunday. Too few means no bonus is possible now.
+      var free = 0;
+      for (var k = today; k <= Rules.addDays(thisWeek, 6); k = Rules.addDays(k, 1)) if (!keys[k]) free++;
+      body.appendChild(make("b", "", "This week: " + Math.min(n, 7) + " / " + need + " days"));
+      body.appendChild(make("small", "", n >= need ? "✅ Great week! Your bonus Pokémon comes on Monday!" :
+        n + free < need ? "A day was missed, so no bonus this week. Study every day from Monday → a bonus Pokémon!" :
+        "🎯 " + (need - n) + " more day" + (need - n > 1 ? "s" : "") + " of study → a bonus Pokémon next Monday!"));
+      if (n >= need) row.className += " has";
     }
     row.appendChild(body);
     box.appendChild(row);
