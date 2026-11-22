@@ -211,6 +211,10 @@
   .evo-btn[disabled] { opacity: .6; cursor: wait; animation: none; }
   @keyframes glow { 50% { box-shadow: 0 0 10px 2px var(--yellow); } }
   .overlay .pop.evolving { animation: evolve 2.4s ease-in forwards; }
+  .overlay .news-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px 10px; width: min(92vw, 440px); margin: 0 auto 6px; }
+  .overlay .news-grid figure { margin: 0; animation: pop .6s ease-out both; }
+  .overlay .news-grid img { display: block; width: 100%; aspect-ratio: 1; object-fit: contain; filter: drop-shadow(0 4px 8px rgba(0,0,0,.5)); }
+  .overlay .news-grid figcaption { font-size: 13px; font-weight: bold; line-height: 1.2; }
   @keyframes evolve { 0% { filter: brightness(1); transform: scale(1); } 30% { transform: scale(.9); } 50% { transform: scale(1.1); } 100% { filter: brightness(0) invert(1) drop-shadow(0 0 30px #fff); transform: scale(1.15); } }
   .entry .meta { font-size: 12px; color: #555; margin-top: 2px; }
   .entry .del { position: absolute; top: 4px; right: 4px; border: none; background: none; cursor: pointer; font-size: 14px; color: #999; }
@@ -700,16 +704,16 @@
 </div>
 
 <!-- ?v= must change with APP_VERSION so phones fetch the new files -->
-<script src="evo-data.js?v=2026-11-22-1"></script>
-<script src="dex-data.js?v=2026-11-22-1"></script>
-<script src="growth.js?v=2026-11-22-1"></script>
-<script src="regions.js?v=2026-11-22-1"></script>
-<script src="rules.js?v=2026-11-22-1"></script>
-<script src="parent.js?v=2026-11-22-1"></script>
-<script src="bey-data.js?v=2026-11-22-1"></script>
-<script src="battle.js?v=2026-11-22-1"></script>
-<script src="pokemoves.js?v=2026-11-22-1"></script>
-<script src="pokebattle.js?v=2026-11-22-1"></script>
+<script src="evo-data.js?v=2026-11-22-2"></script>
+<script src="dex-data.js?v=2026-11-22-2"></script>
+<script src="growth.js?v=2026-11-22-2"></script>
+<script src="regions.js?v=2026-11-22-2"></script>
+<script src="rules.js?v=2026-11-22-2"></script>
+<script src="parent.js?v=2026-11-22-2"></script>
+<script src="bey-data.js?v=2026-11-22-2"></script>
+<script src="battle.js?v=2026-11-22-2"></script>
+<script src="pokemoves.js?v=2026-11-22-2"></script>
+<script src="pokebattle.js?v=2026-11-22-2"></script>
 <script>
 (function () {
   "use strict";
@@ -719,7 +723,7 @@
   var REFRESH_MS = 60000;
   // Change on every release: a page left open with older code reloads itself,
   // so every phone works out the same Pokémon.
-  var APP_VERSION = "2026-11-22-1";
+  var APP_VERSION = "2026-11-22-2";
   // Sent with every change; the sheet refuses changes from older pages (MIN_CLIENT_GEN in Code.gs).
   var CLIENT_GEN = 19;
   var STORAGE_KEY = "htrc-2026-autumn-v3";
@@ -3049,6 +3053,7 @@
     renderSheets();
     renderSettings();
     celebrateGift();
+    celebrateNews();
   }
 
   // ---------- shared storage (Google Sheet via Apps Script) ----------
@@ -3262,6 +3267,7 @@
 
   function show(artNode, big, mid) {
     showingGift = null;
+    showingNews = "";
     var art = el("ovArt");
     art.innerHTML = "";
     if (artNode) art.appendChild(artNode);
@@ -3276,10 +3282,12 @@
   }
   el("ovClose").onclick = function () {
     giftClosed();
+    newsClosed();
     el("overlay").className = "overlay";
     var id = evolveAfterOk;
     evolveAfterOk = null;
     if (id) openEvolve(id, "level");
+    else celebrateNews();
   };
   function tierUpMessage(before, after) {
     var msg = after.tier > before.tier ? " · 🏆 " + TIERS[after.tier - 1].name + " unlocked!" +
@@ -3578,6 +3586,37 @@
     giftsSeen[showingGift] = true;
     showingGift = null;
     try { window.localStorage.setItem(GIFT_SEEN_KEY, JSON.stringify(giftsSeen)); }
+    catch (e) { /* storage unavailable: shown once while the page is open */ }
+  }
+
+  // News for the children: shown once to each child (on this phone) when their page opens, after any gift.
+  // A new id shows it again to everyone. mons: [form id, name] (all can be reached with a Mega Stone, see Growth.stoneOf).
+  var NEWS = { id: "za-megas", title: "🆕 NEW Mega Evolutions!",
+    text: "Mega Evolutions from Pokémon Legends: Z-A are here! Rank up to get a 💎 Mega Stone, then tap a Pokémon that can Mega Evolve.",
+    mons: [[10281, "Mega Dragonite"], [10294, "Mega Greninja"], [10309, "Mega Garchomp Z"], [10310, "Mega Lucario Z"], [10304, "Mega Raichu X"], [10280, "Mega Starmie"]] };
+  var NEWS_SEEN_KEY = "htrc-news-seen", showingNews = "";
+  var newsSeen = (function () {
+    try { return JSON.parse(window.localStorage.getItem(NEWS_SEEN_KEY) || "{}") || {}; }
+    catch (e) { return {}; }
+  })();
+  function celebrateNews() {
+    if (newsSeen[current + ":" + NEWS.id] || growthNote || document.querySelector(".sheet.show, .overlay.show, .bb")) return;
+    var grid = make("div", "news-grid");
+    NEWS.mons.forEach(function (m) {
+      var f = make("figure", "");
+      f.appendChild(artwork(m[0], m[1], "news-mon"));
+      f.appendChild(make("figcaption", "", m[1]));
+      grid.appendChild(f);
+    });
+    show(grid, NEWS.title, NEWS.text);
+    showingNews = current;
+  }
+  // Seen only once OK is pressed on it (another message can replace it before that).
+  function newsClosed() {
+    if (!showingNews) return;
+    newsSeen[showingNews + ":" + NEWS.id] = true;
+    showingNews = "";
+    try { window.localStorage.setItem(NEWS_SEEN_KEY, JSON.stringify(newsSeen)); }
     catch (e) { /* storage unavailable: shown once while the page is open */ }
   }
 
