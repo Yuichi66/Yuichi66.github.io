@@ -1,8 +1,9 @@
 // Pokémon Battle: the week after a Beyblade Battle, the children's partner Pokémon battle instead. A full-screen
-// canvas at the phone's full resolution (official artwork), moves drawn by type, HP bars, music and sound made in
+// canvas at the phone's full resolution (official artwork), moves drawn by their type, HP bars, music and sound made in
 // the browser. The battle is a script made from the seed and the scores: the lowest faints first, the winner
 // keeps some HP, so every phone shows the same battle and it always ends as the scores say. Needs battle.js.
-// PokeBattle.play({ fighters: [{ name, monName, level, type, img, score, color }], seed, note, onEnd })
+// Each Pokémon uses its real moves (pokemoves.js; dex = its form, species = its species).
+// PokeBattle.play({ fighters: [{ name, monName, level, type, dex, species, img, score, color }], seed, note, onEnd })
 var PokeBattle = (function () {
   "use strict";
   var K = BeyBattle.kit, clamp = K.clamp, ease = K.ease, pop = K.pop;
@@ -20,6 +21,44 @@ var PokeBattle = (function () {
     Bug: ["X-Scissor", "#9bc53d", "#e8ffb0", "dash"], Flying: ["Air Slash", "#9fd4ff", "#ffffff", "slash"]
   };
   function moveOf(type) { return MOVES[type] || MOVES.Normal; }
+  // Each Pokémon's real moves (pokemoves.js): own = [[name, type, 1 physical / 2 special, power], ...] strongest first;
+  // big = the move for a critical hit or a knock-out (a Gigantamax form's G-Max move, else its strongest move).
+  // A Pokémon with no attacking move uses Struggle, as in the games.
+  function movesOf(f) {
+    var P = typeof POKE_MOVES === "undefined" ? null : POKE_MOVES;
+    if (!P) { var m = moveOf(f.type); return { own: [[m[0], MOVES[f.type] ? f.type : "Normal", 2, 90]], big: [m[0], MOVES[f.type] ? f.type : "Normal", 2, 90] }; }
+    var own = (P.by[f.dex] || P.by[f.species] || []).map(function (i) { return P.list[i]; });
+    if (!own.length) own = [["Struggle", "Normal", 1, 50]];
+    return { own: own, big: P.gmax[f.dex] !== undefined ? P.list[P.gmax[f.dex]] : own[0] };
+  }
+  // Which move each turn (own random numbers from the seed, so the same on every phone): the big move for a critical
+  // hit or a knock-out, otherwise one of its moves, not the same one twice in a row.
+  function pickMoves(turns, sets, seed) {
+    var mr = K.rng("poke-moves-" + String(seed || "battle")), last = {};
+    return turns.map(function (tu) {
+      var set = sets[tu.att], pick;
+      if (tu.crit || tu.ko) pick = set.big;
+      else {
+        var c = set.own.filter(function (m) { return m !== last[tu.att]; });
+        if (!c.length) c = set.own;
+        pick = c[Math.floor(mr() * c.length)];
+      }
+      last[tu.att] = pick;
+      return pick;
+    });
+  }
+  // How a move looks: [name, colour, colour, look, type]; colours from its type, the look from its type and name.
+  function looksOf(m) {
+    var name = m[0], type = MOVES[m[1]] ? m[1] : "Normal", base = MOVES[type], look;
+    if (type === "Electric") look = "bolt";
+    else if (type === "Rock") look = "rocks";
+    else if (type === "Ground") look = "quake";
+    else if (type === "Grass" && !/Whip|Slam|Punch|Hammer|Horn|Drum|Knot/.test(name)) look = "leaves";
+    else if (/Slash|Claw|Scissor|Blade|Cutter|Cut$|Wing|Fang|Bite|Crunch|Razor|Talon/.test(name)) look = "slash";
+    else if (m[2] === 1 && !/^G-Max/.test(name)) look = "dash";
+    else look = base[3];
+    return [name, base[1], base[2], look, type];
+  }
 
   // ---------- the script: who attacks whom, when, for how much ----------
   var START = 5.2, TURN = 1.45, HIT = 0.7;
@@ -105,6 +144,10 @@ var PokeBattle = (function () {
     root.setAttribute("data-phase", "intro");
     root.setAttribute("data-fighters", fighters.map(function (f) { return f.name + ":" + (f.monName || "-"); }).join(" "));
     root.setAttribute("data-types", fighters.map(function (f) { return f.type; }).join(" "));
+    var sets = fighters.map(movesOf);
+    root.setAttribute("data-moves", fighters.map(function (f, i) {
+      return f.name + ":" + sets[i].own.map(function (m) { return m[0]; }).join("/") + (sets[i].big !== sets[i].own[0] ? "+" + sets[i].big[0] : "");
+    }).join(" | "));
     var canvas = document.createElement("canvas"), close = document.createElement("button"), end = document.createElement("div");
     close.className = "bb-x"; close.type = "button"; close.textContent = "✕"; close.setAttribute("aria-label", "Close");
     end.className = "bb-end";
@@ -133,6 +176,8 @@ var PokeBattle = (function () {
     function reset() {
       var r = K.rng("poke-" + String(opts.seed || "battle"));
       var sc = script(fighters, res, r);
+      var picks = pickMoves(sc.turns, sets, opts.seed);
+      sc.turns.forEach(function (tu, k) { tu.mv = looksOf(picks[k]); });
       st = { t: 0, r: r, turns: sc.turns, winAt: sc.winAt, done: {}, hp: fighters.map(function () { return 100; }), shown: fighters.map(function () { return 100; }),
         fx: [], parts: [], shake: 0, flash: 0, msg: "", msgAt: 0, fainted: {}, won: false, sent: 0, confetti: [] };
       root.setAttribute("data-phase", "intro"); root.removeAttribute("data-out");
@@ -163,7 +208,7 @@ var PokeBattle = (function () {
       s.turns.forEach(function (tu, k) {
         if (s.done[k] === undefined && t >= tu.at) {
           s.done[k] = 0;
-          var mv = moveOf(fighters[tu.att].type);
+          var mv = tu.mv;
           say(fighters[tu.att].name + "'s " + (fighters[tu.att].monName || "Pokémon") + " used " + mv[0] + "!");
           moveSound(sound, mv[3]);
           s.fx.push({ k: k, tu: tu, mv: mv, at: tu.at });
@@ -173,8 +218,8 @@ var PokeBattle = (function () {
           s.hp[tu.tgt] = tu.hpAfter;
           hitSound(sound, tu.crit || tu.ko);
           s.shake = Math.max(s.shake, tu.ko ? 0.05 : tu.crit ? 0.03 : 0.018);
-          if (fighters[tu.att].type === "Electric" || tu.ko) s.flash = 1;
-          burst(tu.tgt, moveOf(fighters[tu.att].type), tu.crit || tu.ko ? 46 : 26);
+          if (tu.mv[4] === "Electric" || tu.ko) s.flash = 1;
+          burst(tu.tgt, tu.mv, tu.crit || tu.ko ? 46 : 26);
           if (tu.crit && !tu.ko) s.texts = (s.texts || []).concat([{ text: "Critical hit!", at: t, i: tu.tgt }]);
           if (tu.dmg === 0) say("It missed!");
         }
@@ -396,11 +441,18 @@ var PokeBattle = (function () {
       round(x, y, bw, bh, 14); g.fill(); g.stroke();
       g.strokeStyle = "#e3350d"; g.lineWidth = 2; round(x + 5, y + 5, bw - 10, bh - 10, 10); g.stroke();
       var shown = st.msg.slice(0, Math.floor((st.t - st.msgAt) * 45));
+      function wrap(text, size) {
+        g.font = "bold " + size + "px " + font;
+        var line = "", out = [];
+        text.split(" ").forEach(function (w) { var test = line ? line + " " + w : w; if (g.measureText(test).width > bw - 36 && line) { out.push(line); line = w; } else line = test; });
+        out.push(line);
+        return out;
+      }
+      // smaller letters when the whole message (long names and moves) would need more than two lines
       var fs = Math.min(bh * 0.34, 22);
-      g.fillStyle = "#1d1d1f"; g.font = "bold " + fs + "px " + font; g.textAlign = "left"; g.textBaseline = "middle";
-      var words = shown.split(" "), line = "", lines = [];
-      words.forEach(function (w) { var test = line ? line + " " + w : w; if (g.measureText(test).width > bw - 36 && line) { lines.push(line); line = w; } else line = test; });
-      lines.push(line);
+      while (fs > 12 && wrap(st.msg, fs).length > 2) fs *= 0.9;
+      var lines = wrap(shown, fs);
+      g.fillStyle = "#1d1d1f"; g.textAlign = "left"; g.textBaseline = "middle";
       lines.slice(0, 2).forEach(function (L, j) { g.fillText(L, x + 18, y + bh / 2 + (j - (Math.min(lines.length, 2) - 1) / 2) * fs * 1.2); });
       g.restore();
     }
@@ -503,5 +555,5 @@ var PokeBattle = (function () {
     return { close: finish };
   }
 
-  return { play: play, script: script };
+  return { play: play, script: script, movesOf: movesOf, pickMoves: pickMoves, looksOf: looksOf };
 })();

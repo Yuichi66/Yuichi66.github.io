@@ -700,15 +700,16 @@
 </div>
 
 <!-- ?v= must change with APP_VERSION so phones fetch the new files -->
-<script src="evo-data.js?v=2026-11-21-5"></script>
-<script src="dex-data.js?v=2026-11-21-5"></script>
-<script src="growth.js?v=2026-11-21-5"></script>
-<script src="regions.js?v=2026-11-21-5"></script>
-<script src="rules.js?v=2026-11-21-5"></script>
-<script src="parent.js?v=2026-11-21-5"></script>
-<script src="bey-data.js?v=2026-11-21-5"></script>
-<script src="battle.js?v=2026-11-21-5"></script>
-<script src="pokebattle.js?v=2026-11-21-5"></script>
+<script src="evo-data.js?v=2026-11-22-1"></script>
+<script src="dex-data.js?v=2026-11-22-1"></script>
+<script src="growth.js?v=2026-11-22-1"></script>
+<script src="regions.js?v=2026-11-22-1"></script>
+<script src="rules.js?v=2026-11-22-1"></script>
+<script src="parent.js?v=2026-11-22-1"></script>
+<script src="bey-data.js?v=2026-11-22-1"></script>
+<script src="battle.js?v=2026-11-22-1"></script>
+<script src="pokemoves.js?v=2026-11-22-1"></script>
+<script src="pokebattle.js?v=2026-11-22-1"></script>
 <script>
 (function () {
   "use strict";
@@ -718,7 +719,7 @@
   var REFRESH_MS = 60000;
   // Change on every release: a page left open with older code reloads itself,
   // so every phone works out the same Pokémon.
-  var APP_VERSION = "2026-11-21-5";
+  var APP_VERSION = "2026-11-22-1";
   // Sent with every change; the sheet refuses changes from older pages (MIN_CLIENT_GEN in Code.gs).
   var CLIENT_GEN = 19;
   var STORAGE_KEY = "htrc-2026-autumn-v3";
@@ -2134,8 +2135,9 @@
     var w = world();
     return KIDS.map(function (k) {
       var m = partnerOf(k.id, w), score = studyCatches(k.id, wk.from, wk.to), color = BATTLE_COLORS[k.id] || "#7b3fe4";
-      if (!m) return { name: k.name, monName: "", level: 0, type: "Normal", img: "", score: score, color: color };
+      if (!m) return { name: k.name, monName: "", level: 0, type: "Normal", dex: 0, species: 0, img: "", score: score, color: color };
       return { name: k.name, monName: (m.c.shiny ? "✨" : "") + m.c.name, level: m.level, type: monEntry(Regions.speciesOf(m.c.dex) || m.c.dex)[1],
+        dex: m.c.dex, species: Regions.speciesOf(m.c.dex) || m.c.dex,
         img: artUrl(m.c.dex, m.c.shiny), img2: spriteUrl(m.c.dex, m.c.shiny), score: score, color: color };
     });
   }
