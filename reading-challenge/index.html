@@ -723,7 +723,7 @@
   var REFRESH_MS = 60000;
   // Change on every release: a page left open with older code reloads itself,
   // so every phone works out the same Pokémon.
-  var APP_VERSION = "2026-11-22-2";
+  var APP_VERSION = "2026-11-27-1";
   // Sent with every change; the sheet refuses changes from older pages (MIN_CLIENT_GEN in Code.gs).
   var CLIENT_GEN = 19;
   var STORAGE_KEY = "htrc-2026-autumn-v3";
@@ -2435,7 +2435,7 @@
       var card = make("div", "entry badge-card");
       card.appendChild(make("div", "badge-medal", "🏅"));
       card.appendChild(make("div", "title", g.title));
-      card.appendChild(make("div", "mon", "🎁 Prize: " + (c ? c.name : "a Pokémon")));
+      card.appendChild(make("div", "mon", "🎁 Prize: " + (g.item || (c ? c.name : "a Pokémon"))));
       card.appendChild(make("div", "meta", fmt(dayDate(g.day))));
       log.appendChild(card);
     });
@@ -3095,7 +3095,7 @@
       else if (e.type === "sleep") next.kids[e.kid].sleeps.push({ id: e.id, kid: e.kid, type: "sleep", day: e.day, target: e.site, reason: e.title || "", seq: seq });
       else if (e.type === "bonus") next.kids[e.kid].bonuses.push({ id: e.id, kid: e.kid, type: "bonus", day: e.day, title: e.title || "", bey: e.bey || 0, seq: seq });
       else if (e.type === "wake") next.kids[e.kid].wakes.push({ id: e.id, kid: e.kid, type: "wake", day: e.day, target: e.site, reason: e.title || "", seq: seq });
-      else if (e.type === "gift") next.kids[e.kid].gifts.push({ id: e.id, kid: e.kid, type: e.type, day: e.day, title: e.title || "", mon: e.mon || 0, seq: seq });
+      else if (e.type === "gift") next.kids[e.kid].gifts.push({ id: e.id, kid: e.kid, type: e.type, day: e.day, title: e.title || "", mon: e.mon || 0, item: !e.mon && e.site && e.site !== "Gift" ? e.site : "", seq: seq });
       else next.kids[e.kid].entries.push(e);
     });
     if (ticketTry && next.kids[ticketTry.tx.kid].trades.some(function (t) { return t.id === ticketTry.tx.id; })) ticketTry = null;
@@ -3562,13 +3562,22 @@
     try { return JSON.parse(window.localStorage.getItem(GIFT_SEEN_KEY) || "{}") || {}; }
     catch (e) { return {}; }
   })();
+  // A prize that is a thing, not a Pokémon (a "gift" row with no "mon" and the thing's name in "site").
+  var ITEM_PICS = { "Zygarde Cube": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/zygarde-cube.png" };
+  function itemArt(name) {
+    if (!ITEM_PICS[name]) return make("div", "ball huge", "🎁");
+    var img = document.createElement("img");
+    img.className = "pop sprite"; img.alt = name; img.src = ITEM_PICS[name];
+    return img;
+  }
   function celebrateGift() {
     if (growthNote || document.querySelector(".sheet.show, .overlay.show, .bb")) return;
     var g = (data().gifts || []).filter(function (x) { return !giftsSeen[x.id]; })[0];
     if (!g) return;
     var c = catches().byId[g.id];
     var name = c ? c.name : "a Pokémon";
-    show(artwork(c ? c.dex : g.mon, name), "🎉 CONGRATULATIONS, " + kidName(current) + "! 🎉",
+    if (g.item) show(itemArt(g.item), "🎉 CONGRATULATIONS, " + kidName(current) + "! 🎉", "🏅 " + g.title + "! You got the " + g.item + "!");
+    else show(artwork(c ? c.dex : g.mon, name), "🎉 CONGRATULATIONS, " + kidName(current) + "! 🎉",
       "🏅 " + g.title + "! You got " + name + "! Look in your 🎒 Pokémon box.");
     var party = make("div", "confetti");
     for (var i = 0; i < 24; i++) {
