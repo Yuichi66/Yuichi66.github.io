@@ -227,10 +227,11 @@
   .box-mon { position: relative; font-family: inherit; color: #000; cursor: pointer; border: 3px solid #000; border-radius: 16px; padding: 18px 4px 8px; text-align: center; background: radial-gradient(circle at 50% 40%, #fff 0 42%, var(--tint, #ddd) 100%); box-shadow: 0 4px 0 #000; transition: transform .1s; }
   .box-mon:active { transform: translateY(3px); box-shadow: 0 1px 0 #000; }
   .box-item { position: relative; font-family: inherit; color: #000; cursor: pointer; border: 3px solid #000; border-radius: 16px; padding: 18px 4px 8px; text-align: center; background: radial-gradient(circle at 50% 40%, #fff 0 42%, #ffd84d 100%); box-shadow: 0 4px 0 #000; }
-  .box-item img { display: block; width: 100%; aspect-ratio: 1; object-fit: contain; image-rendering: pixelated; filter: drop-shadow(0 3px 3px rgba(0,0,0,.35)); }
+  .box-item img { display: block; width: 100%; aspect-ratio: 1; object-fit: contain; filter: drop-shadow(0 3px 3px rgba(0,0,0,.35)); }
   .box-item .name { display: block; font-weight: bold; font-size: 13px; line-height: 1.2; }
   .box-item .no { position: absolute; top: 3px; left: 0; right: 0; font-size: 11px; color: #333; }
-  .gift-item-art { display: block; width: 120px; height: 120px; margin: 4px auto; image-rendering: pixelated; object-fit: contain; }
+  .gift-item-art { display: block; width: 128px; height: 128px; margin: 4px auto; object-fit: contain; }
+  .item-art { image-rendering: auto; }
   .box-mon:focus-visible { outline: 3px solid var(--yellow); outline-offset: 2px; }
   .box-mon.partner { box-shadow: 0 0 0 3px var(--yellow), 0 4px 0 #000; }
   .box-mon .box-art { display: block; width: 100%; aspect-ratio: 1; object-fit: contain; filter: drop-shadow(0 3px 3px rgba(0,0,0,.35)); }
@@ -728,7 +729,7 @@
   var REFRESH_MS = 60000;
   // Change on every release: a page left open with older code reloads itself,
   // so every phone works out the same Pokémon.
-  var APP_VERSION = "2026-11-27-2";
+  var APP_VERSION = "2026-11-27-3";
   // Sent with every change; the sheet refuses changes from older pages (MIN_CLIENT_GEN in Code.gs).
   var CLIENT_GEN = 19;
   var STORAGE_KEY = "htrc-2026-autumn-v3";
@@ -3580,11 +3581,11 @@
     catch (e) { return {}; }
   })();
   // A prize that is a thing, not a Pokémon (a "gift" row with no "mon" and the thing's name in "site").
-  var ITEM_PICS = { "Zygarde Cube": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/zygarde-cube.png" };
+  var ITEM_PICS = { "Zygarde Cube": "items/zygarde-cube.png" };
   function itemArt(name) {
     if (!ITEM_PICS[name]) return make("div", "ball huge", "🎁");
     var img = document.createElement("img");
-    img.className = "pop sprite"; img.alt = name; img.src = ITEM_PICS[name];
+    img.className = "pop item-art"; img.alt = name; img.src = ITEM_PICS[name];
     return img;
   }
   function celebrateGift() {
